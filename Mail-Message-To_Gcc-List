@@ -1,0 +1,56 @@
+Hi
+
+I have developed a new version of the gnu assembler for riscv machines.
+
+Abstract:
+———
+
+The GNU assembler (gas) is centered on flexibility and portability. These two objectives have quite a cost in program readability, code size  and execution time. 
+
+I have developed a « tiny » version of the GNU assembler focusing on simplicity and speed.
+
+I have picked up from the several hundreds of megabytes of binutils just the routines that are needed to a functional assembler, for the use case of compiler generated assembler text for a single machine. That meant:
+
+1) There is no linker code in this assembler. An assembler doesn’t need any linker code. It is an assembler, period.
+2) There are no macros, no preprocessing, nothing that makes an assembler easier to use for a human developer. This is NOT a replacement of gas, that is obviously still available everywhere. If you want to develop in assembler use gas, not this tiny assembler.
+3) Since there isn’t a human user, all the sophisticated error handling is not necessary. Messages are in English ONLY and if you do not know that language just do not make any mistakes!
+4) All the vectorization for separating the front end and the backend are eliminated. There is no indirection through function tables the functions in the backend are called directly. This has the advantage that when you see a function call like statement like foo(42); it means that you are calling the « foo » function, not a macro that is expanded into something else then renamed to yet another name.
+5) The BFD library has been disabled. Only some procedures of that library are in the code. The same for libierty, that has almost vanished.
+6) The code has been cleaned up from all cruft like this:
+          /* The magic number BSD_FILL_SIZE_CROCK_4 is from BSD 4.2 VAX
+         * flavoured AS.  The following bizarre behaviour is to be
+         * compatible with above.  I guess they tried to take up to 8
+         * bytes from a 4-byte expression and they forgot to sign
+         * extend.  */
+#define BSD_FILL_SIZE_CROCK_4 (4)
+
+So, we are still in 2023 keeping bug compatibility with an  assembler for a machine that ceased production in 2000?
+
+In a similar vein, all code that referenced the Motorola 68000 (an even older machine) the Z80, the SUN SPARC, etc is gone. This assembler will only produce 64 bits ELF code and compile for a 64 bit risk CPU.
+
+Availability:
+$ git clone https://github.com/jacob-navia/tiny-asm
+
+Building the tiny assembler:
+$ gcc -o asm asm.c
+
+There is no Makefile
+
+In some machines, the obstack  library is not a part of the libc. (Not linux, Apple, for instance). For those machines obtsack.c is provided in the distribution and the compilation command should be:
+$ gcc -o asm asm.c obstack.c
+
+star64:~/riscv-asm$ objdump -h asm | grep text
+ 11 .text         0002e53e  0000000000028060  0000000000028060  00028060  2**2
+
+Just 189 758 bytes. The gnu assembler is:
+star64:~/riscv-asm$ objdump -h ../binutils-gdb/gas/as-new | grep text
+ 11 .text         000d8d10  00000000000465a0  00000000000465a0  000465a0  2**2
+888 080 bytes.
+
+Further work:
+The idea is to replace the system assembler in gcc and replaced with a linked assembler that speeds gcc: instead of writing an assembler file you just pass a pointer to the text buffer in memory.
+But that is still much further down the road.
+
+Enjoy!
+
+jacob

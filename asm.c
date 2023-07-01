@@ -201,8 +201,7 @@ static void	print_version_id(void)
 {
 	static int	printed;
 
-	if (printed)
-		return;
+	if (printed) return;
 	printed = 1;
 
 	fprintf(stderr,"tiny GNU assembler version %s (%s) not using BFD\n",
@@ -473,8 +472,7 @@ static void	parse_args(int *pargc,char ***pargv)
 			break;
 
 		case OPTION_VERSION:
-			/* This output is intended to follow the GNU standards
-			 * document.  */
+			/* This output is intended to follow the GNU standards document.  */
 			printf("tiny GNU assembler without BFD\n");
 			printf("Copyright (C) 2023 Free Software Foundation,Inc.\n");
 			printf("Hacked by jacob in the summer of 2023\n");
@@ -21105,18 +21103,7 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 		reloc_entry->addend = relocation;
 		return flag;
 	}
-	if (!howto->install_addend
-	    && abfd->xvec->flavour == bfd_target_coff_flavour) {
-		/*
-		 * This is just weird.  We're subtracting out the original
-		 * addend,so that for COFF the addend is ignored???
-		 */
-		relocation -= reloc_entry->addend;
-		/* FIXME: There should be no target specific code here...  */
-		if (strcmp(abfd->xvec->name,"coff-z8k") != 0)
-			reloc_entry->addend = 0;
-	} else
-		reloc_entry->addend = relocation;
+	reloc_entry->addend = relocation;
 
 	/* Is the address of the relocation really within the section?  */
 	octets = reloc_entry->address;
@@ -22048,10 +22035,10 @@ static void	create_note_reloc(segT sec,
 			      		symbolS *	sym,
 			      		size_t	note_offset,
 			      		size_t	desc2_offset,
-			      		offsetT	desc2_size,
+			      		offsetT	desc2_size ATTRIBUTE_UNUSED,
 			      		int		reloc_type,
 			      		bfd_vma	addend,
-			      		char         *note)
+			      		char         *note ATTRIBUTE_UNUSED)
 {
 	struct reloc_list *reloc;
 
@@ -22077,27 +22064,6 @@ static void	create_note_reloc(segT sec,
 
 	reloc->next = reloc_list;
 	reloc_list = reloc;
-
-	/* For REL relocs,store the addend in the section.  */
-	if (!sec->use_rela_p
-	/*
-	 * The SH target is a special case that uses RELA relocs but still
-	 * stores the addend in the word being relocated.
-	 */
-	    || strstr(bfd_get_target(stdoutput),"-sh") != NULL) {
-		offsetT		i;
-
-		/* Zero out the addend,since it is now stored in the note.  */
-		reloc->u.b.r.addend = 0;
-
-		if (target_big_endian) {
-			for (i = desc2_size; addend != 0 && i > 0; addend >>= 8,i--)
-				note[desc2_offset + i - 1] = (addend & 0xff);
-		} else {
-			for (i = 0; addend != 0 && i < desc2_size; addend >>= 8,i++)
-				note[desc2_offset + i] = (addend & 0xff);
-		}
-	}
 }
 
 static void	maybe_generate_build_notes(void)

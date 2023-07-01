@@ -621,8 +621,7 @@ static struct bfd_hash_entry *bfd_hash_lookup
     bool /*create*/, bool /*copy*/);
 
 static struct bfd_hash_entry *bfd_hash_insert (struct bfd_hash_table *,
-    const char *,
-    unsigned long /*hash*/);
+    const char *, unsigned long /*hash*/);
 
 static void bfd_hash_rename (struct bfd_hash_table *,
     const char *, struct bfd_hash_entry *);
@@ -630,14 +629,12 @@ static void *bfd_hash_allocate (struct bfd_hash_table *, unsigned int /*size*/);
 static struct bfd_hash_entry *bfd_hash_newfunc (struct bfd_hash_entry *,
     struct bfd_hash_table *, const char *);
 static struct bfd_hash_entry * bfd_section_hash_newfunc (struct bfd_hash_entry *entry,
-			  struct bfd_hash_table *table,
-			  const char *string);
+			  struct bfd_hash_table *table, const char *string);
 /* Extracted from section.c.  */
 /* Linenumber stuff.  */
 typedef struct lineno_cache_entry {
   unsigned int line_number;    /* Linenumber from start of function.  */
-  union
-  {
+  union {
     struct bfd_symbol *sym;    /* Function name.  */
     bfd_vma offset;            /* Offset into section.  */
   } u;
@@ -864,7 +861,6 @@ typedef struct bfd_section {
   /*  End of section flags.  */
 
   /* Some internal packed boolean fields.  */
-
   /* See the vma field.  */
   unsigned int user_set_vma : 1;
 
@@ -886,7 +882,6 @@ typedef struct bfd_section {
 #define DECOMPRESS_SECTION_ZSTD  3
 
   /* The following flags are used by the ELF linker. */
-
   /* Mark sections which have been allocated to segments.  */
   unsigned int segment_mark : 1;
 
@@ -1137,7 +1132,6 @@ struct bfd_symbol;
      { NULL }, { NULL }, NULL,             0                           \
 								       \
     }
-
 /* ------------------------------------------------------ symbol definition */
 /* These symbols are global, not specific to any BFD.  Therefore, anything
    that tries to change them is broken, and should be repaired.  */
@@ -1277,8 +1271,7 @@ typedef struct bfd_symbol {
   struct bfd_section *section;
 
   /* Back end special data.  */
-  union
-    {
+  union {
       void *p;
       bfd_vma i;
     }
@@ -1359,12 +1352,6 @@ static bool set_section_contents (bfd *abfd, asection *section, const void *data
 const char *bfd_generic_group_name (bfd *, const asection *sec);
 
 /* Extracted from syms.c.  */
-typedef enum bfd_print_symbol {
-  bfd_print_symbol_name,
-  bfd_print_symbol_more,
-  bfd_print_symbol_all
-} bfd_print_symbol_type;
-
 /* Information about a symbol that nm needs.  */
 typedef struct _symbol_info {
   symvalue value;
@@ -1386,15 +1373,11 @@ static bool bfd_set_symtab (bfd *abfd, asymbol **location, unsigned int count);
 typedef struct carsym {
   const char *name;
   file_ptr file_offset;        /* Look here to find the file.  */
-}
-carsym;
+} carsym;
 
 /* A count of carsyms (canonical archive symbols).  */
  typedef unsigned long symindex;
 #define BFD_NO_MORE_SYMBOLS ((symindex) ~0)
-
-symindex bfd_get_next_mapent
-   (bfd *abfd, symindex previous, carsym **sym);
 
 /* Extracted from archures.c.  */
 enum bfd_architecture {
@@ -1904,14 +1887,10 @@ static inline void bfd_section_list_remove (bfd *abfd, asection *s)
 {
   asection *next = s->next;
   asection *prev = s->prev;
-  if (prev)
-    prev->next = next;
-  else
-    abfd->sections = next;
-  if (next)
-    next->prev = prev;
-  else
-    abfd->section_last = prev;
+  if (prev) prev->next = next;
+  else abfd->sections = next;
+  if (next) next->prev = prev;
+  else abfd->section_last = prev;
 }
 
 static inline void bfd_section_list_append (bfd *abfd, asection *s)
@@ -2069,8 +2048,8 @@ static inline char * bfd_zdebug_name_to_debug (bfd *abfd, const char *name)
   memcpy (new_name + 1, name + 2, len - 1);
   return new_name;
 }
-static void bfd_update_compression_header
-   (bfd *abfd, bfd_byte *contents, asection *sec);
+static void bfd_update_compression_header (bfd *abfd, 
+						bfd_byte *contents, asection *sec);
 
 static int bfd_get_compression_header_size (bfd *abfd, asection *sec);
 static bool elf_write_object_contents (bfd *abfd);
@@ -2085,15 +2064,9 @@ static bool bfd_set_format (bfd *abfd, bfd_format format);
    converted from absolute to section-relative ones late in the
    link.  Use this macro to correctly determine whether the symbol
    will actually end up absolute in output.  */
-#define bfd_link_split_section(abfd, sec) \
-       BFD_SEND (abfd, _bfd_link_split_section, (abfd, sec))
-
-#define bfd_define_common_symbol(output_bfd, info, h) \
-       BFD_SEND (output_bfd, _bfd_define_common_symbol, (output_bfd, info, h))
 
 struct bfd_link_hash_entry *bfd_generic_define_start_stop
-   (struct bfd_link_info *info,
-    const char *symbol, asection *sec);
+   (struct bfd_link_info *info, const char *symbol, asection *sec);
 
 struct bfd_elf_version_tree * bfd_find_version_for_sym
    (struct bfd_elf_version_tree *verdefs,
@@ -2264,8 +2237,7 @@ struct reloc_howto_struct {
   HOWTO ((C), 0, 1, 0, false, 0, complain_overflow_dont, NULL, \
 	 NULL, false, 0, 0, false)
 
-static inline unsigned int
-bfd_get_reloc_size (reloc_howto_type *howto)
+static inline unsigned int bfd_get_reloc_size (reloc_howto_type *howto)
 {
   return howto->size;
 }
@@ -2274,82 +2246,48 @@ typedef struct relent_chain
 {
   arelent relent;
   struct relent_chain *next;
-}
-arelent_chain;
+} arelent_chain;
 
-static bfd_reloc_status_type bfd_check_overflow
-   (enum complain_overflow how,
-    unsigned int bitsize,
-    unsigned int rightshift,
-    unsigned int addrsize,
+static bfd_reloc_status_type bfd_check_overflow (enum complain_overflow how,
+    unsigned int bitsize, unsigned int rightshift, unsigned int addrsize,
     bfd_vma relocation);
 
-static bool bfd_reloc_offset_in_range
-   (reloc_howto_type *howto,
-    bfd *abfd,
-    asection *section,
-    size_t offset);
+static bool bfd_reloc_offset_in_range (reloc_howto_type *howto,
+    bfd *abfd, asection *section, size_t offset);
 
-static bfd_reloc_status_type bfd_install_relocation
-   (bfd *abfd,
-    arelent *reloc_entry,
-    void *data, bfd_vma data_start,
-    asection *input_section,
-    char **error_message);
+static bfd_reloc_status_type bfd_install_relocation (bfd *abfd,
+    arelent *reloc_entry, void *data, bfd_vma data_start,
+    asection *input_section, char **error_message);
 
 enum bfd_reloc_code_real {
   _dummy_first_bfd_reloc_code_real,
 
   BFD_RELOC_CTOR,
 /* Basic absolute relocations of N bits.  */
-  BFD_RELOC_64,
-  BFD_RELOC_32,
-  BFD_RELOC_26,
-  BFD_RELOC_24,
-  BFD_RELOC_16,
-  BFD_RELOC_14,
-  BFD_RELOC_8,
+  BFD_RELOC_64, BFD_RELOC_32, BFD_RELOC_26, BFD_RELOC_24, BFD_RELOC_16,
+  BFD_RELOC_14, BFD_RELOC_8,
 
 /* PC-relative relocations.  Sometimes these are relative to the address
 of the relocation itself; sometimes they are relative to the start of
 the section containing the relocation.  It depends on the specific target.  */
-  BFD_RELOC_64_PCREL,
-  BFD_RELOC_32_PCREL,
-  BFD_RELOC_24_PCREL,
-  BFD_RELOC_16_PCREL,
-  BFD_RELOC_12_PCREL,
-  BFD_RELOC_8_PCREL,
+  BFD_RELOC_64_PCREL, BFD_RELOC_32_PCREL, BFD_RELOC_24_PCREL, BFD_RELOC_16_PCREL,
+  BFD_RELOC_12_PCREL, BFD_RELOC_8_PCREL,
 
 /* Section relative relocations.  Some targets need this for DWARF2.  */
   BFD_RELOC_32_SECREL,
   BFD_RELOC_16_SECIDX,
 
 /* For ELF.  */
-  BFD_RELOC_32_GOT_PCREL,
-  BFD_RELOC_16_GOT_PCREL,
-  BFD_RELOC_8_GOT_PCREL,
-  BFD_RELOC_32_GOTOFF,
-  BFD_RELOC_16_GOTOFF,
-  BFD_RELOC_LO16_GOTOFF,
-  BFD_RELOC_HI16_GOTOFF,
-  BFD_RELOC_HI16_S_GOTOFF,
-  BFD_RELOC_8_GOTOFF,
-  BFD_RELOC_64_PLT_PCREL,
-  BFD_RELOC_32_PLT_PCREL,
-  BFD_RELOC_24_PLT_PCREL,
-  BFD_RELOC_16_PLT_PCREL,
-  BFD_RELOC_8_PLT_PCREL,
-  BFD_RELOC_64_PLTOFF,
-  BFD_RELOC_32_PLTOFF,
-  BFD_RELOC_16_PLTOFF,
-  BFD_RELOC_LO16_PLTOFF,
-  BFD_RELOC_HI16_PLTOFF,
-  BFD_RELOC_HI16_S_PLTOFF,
-  BFD_RELOC_8_PLTOFF,
+  BFD_RELOC_32_GOT_PCREL, BFD_RELOC_16_GOT_PCREL, BFD_RELOC_8_GOT_PCREL,
+  BFD_RELOC_32_GOTOFF, BFD_RELOC_16_GOTOFF, BFD_RELOC_LO16_GOTOFF,
+  BFD_RELOC_HI16_GOTOFF, BFD_RELOC_HI16_S_GOTOFF, BFD_RELOC_8_GOTOFF,
+  BFD_RELOC_64_PLT_PCREL, BFD_RELOC_32_PLT_PCREL, BFD_RELOC_24_PLT_PCREL,
+  BFD_RELOC_16_PLT_PCREL, BFD_RELOC_8_PLT_PCREL, BFD_RELOC_64_PLTOFF,
+  BFD_RELOC_32_PLTOFF, BFD_RELOC_16_PLTOFF, BFD_RELOC_LO16_PLTOFF,
+  BFD_RELOC_HI16_PLTOFF, BFD_RELOC_HI16_S_PLTOFF, BFD_RELOC_8_PLTOFF,
 
 /* Size relocations.  */
-  BFD_RELOC_SIZE32,
-  BFD_RELOC_SIZE64,
+  BFD_RELOC_SIZE32, BFD_RELOC_SIZE64,
 
 /* Relocations used by 68K ELF.  */
   BFD_RELOC_68K_GLOB_DAT,
@@ -2407,55 +2345,21 @@ decided relatively late.  */
   BFD_RELOC_VTABLE_ENTRY,
 
 /* RISC-V relocations.  */
-  BFD_RELOC_RISCV_HI20=1321,
-  BFD_RELOC_RISCV_PCREL_HI20,
-  BFD_RELOC_RISCV_PCREL_LO12_I,
-  BFD_RELOC_RISCV_PCREL_LO12_S,
-  BFD_RELOC_RISCV_LO12_I,
-  BFD_RELOC_RISCV_LO12_S,
-  BFD_RELOC_RISCV_GPREL12_I,
-  BFD_RELOC_RISCV_GPREL12_S,
-  BFD_RELOC_RISCV_TPREL_HI20,
-  BFD_RELOC_RISCV_TPREL_LO12_I,
-  BFD_RELOC_RISCV_TPREL_LO12_S,
-  BFD_RELOC_RISCV_TPREL_ADD,
-  BFD_RELOC_RISCV_CALL,
-  BFD_RELOC_RISCV_CALL_PLT,
-  BFD_RELOC_RISCV_ADD8,
-  BFD_RELOC_RISCV_ADD16,
-  BFD_RELOC_RISCV_ADD32,
-  BFD_RELOC_RISCV_ADD64,
-  BFD_RELOC_RISCV_SUB8,
-  BFD_RELOC_RISCV_SUB16,
-  BFD_RELOC_RISCV_SUB32,
-  BFD_RELOC_RISCV_SUB64,
-  BFD_RELOC_RISCV_GOT_HI20,
-  BFD_RELOC_RISCV_TLS_GOT_HI20,
-  BFD_RELOC_RISCV_TLS_GD_HI20,
-  BFD_RELOC_RISCV_JMP,
-  BFD_RELOC_RISCV_TLS_DTPMOD32,
-  BFD_RELOC_RISCV_TLS_DTPREL32,
-  BFD_RELOC_RISCV_TLS_DTPMOD64,
-  BFD_RELOC_RISCV_TLS_DTPREL64,
-  BFD_RELOC_RISCV_TLS_TPREL32,
-  BFD_RELOC_RISCV_TLS_TPREL64,
-  BFD_RELOC_RISCV_ALIGN,
-  BFD_RELOC_RISCV_RVC_BRANCH,
-  BFD_RELOC_RISCV_RVC_JUMP,
-  BFD_RELOC_RISCV_RVC_LUI,
-  BFD_RELOC_RISCV_GPREL_I,
-  BFD_RELOC_RISCV_GPREL_S,
-  BFD_RELOC_RISCV_TPREL_I,
-  BFD_RELOC_RISCV_TPREL_S,
-  BFD_RELOC_RISCV_RELAX,
-  BFD_RELOC_RISCV_CFA,
-  BFD_RELOC_RISCV_SUB6,
-  BFD_RELOC_RISCV_SET6,
-  BFD_RELOC_RISCV_SET8,
-  BFD_RELOC_RISCV_SET16,
-  BFD_RELOC_RISCV_SET32,
-  BFD_RELOC_RISCV_32_PCREL,
-  BFD_RELOC_RISCV_SET_ULEB128,
+  BFD_RELOC_RISCV_HI20=1321, BFD_RELOC_RISCV_PCREL_HI20, BFD_RELOC_RISCV_PCREL_LO12_I,
+  BFD_RELOC_RISCV_PCREL_LO12_S, BFD_RELOC_RISCV_LO12_I, BFD_RELOC_RISCV_LO12_S,
+  BFD_RELOC_RISCV_GPREL12_I, BFD_RELOC_RISCV_GPREL12_S, BFD_RELOC_RISCV_TPREL_HI20,
+  BFD_RELOC_RISCV_TPREL_LO12_I, BFD_RELOC_RISCV_TPREL_LO12_S, BFD_RELOC_RISCV_TPREL_ADD,
+  BFD_RELOC_RISCV_CALL, BFD_RELOC_RISCV_CALL_PLT, BFD_RELOC_RISCV_ADD8, BFD_RELOC_RISCV_ADD16,
+  BFD_RELOC_RISCV_ADD32, BFD_RELOC_RISCV_ADD64, BFD_RELOC_RISCV_SUB8, BFD_RELOC_RISCV_SUB16,
+  BFD_RELOC_RISCV_SUB32, BFD_RELOC_RISCV_SUB64, BFD_RELOC_RISCV_GOT_HI20, BFD_RELOC_RISCV_TLS_GOT_HI20,
+  BFD_RELOC_RISCV_TLS_GD_HI20, BFD_RELOC_RISCV_JMP, BFD_RELOC_RISCV_TLS_DTPMOD32,
+  BFD_RELOC_RISCV_TLS_DTPREL32, BFD_RELOC_RISCV_TLS_DTPMOD64, BFD_RELOC_RISCV_TLS_DTPREL64,
+  BFD_RELOC_RISCV_TLS_TPREL32, BFD_RELOC_RISCV_TLS_TPREL64, BFD_RELOC_RISCV_ALIGN,
+  BFD_RELOC_RISCV_RVC_BRANCH, BFD_RELOC_RISCV_RVC_JUMP, BFD_RELOC_RISCV_RVC_LUI,
+  BFD_RELOC_RISCV_GPREL_I, BFD_RELOC_RISCV_GPREL_S, BFD_RELOC_RISCV_TPREL_I,
+  BFD_RELOC_RISCV_TPREL_S, BFD_RELOC_RISCV_RELAX, BFD_RELOC_RISCV_CFA,
+  BFD_RELOC_RISCV_SUB6, BFD_RELOC_RISCV_SET6, BFD_RELOC_RISCV_SET8, BFD_RELOC_RISCV_SET16,
+  BFD_RELOC_RISCV_SET32, BFD_RELOC_RISCV_32_PCREL, BFD_RELOC_RISCV_SET_ULEB128,
   BFD_RELOC_RISCV_SUB_ULEB128,
 
   BFD_RELOC_UNUSED };
@@ -2478,445 +2382,41 @@ struct stab_info {
   struct bfd_section *stabstr;
 };
 
-/* Extracted from targets.c.  */
-#define BFD_SEND(bfd, message, arglist) \
-  ((*((bfd)->xvec->message)) arglist)
-
-#ifdef DEBUG_BFD_SEND
-#undef BFD_SEND
-#define BFD_SEND(bfd, message, arglist) \
-  (((bfd) && (bfd)->xvec && (bfd)->xvec->message) ? \
-    ((*((bfd)->xvec->message)) arglist) : \
-    (gas_assert ( NULL))
-#endif
-#define BFD_SEND_FMT(bfd, message, arglist) \
-  (((bfd)->xvec->message[(int) ((bfd)->format)]) arglist)
-
-#ifdef DEBUG_BFD_SEND
-#undef BFD_SEND_FMT
-#define BFD_SEND_FMT(bfd, message, arglist) \
-  (((bfd) && (bfd)->xvec && (bfd)->xvec->message) ? \
-   (((bfd)->xvec->message[(int) ((bfd)->format)]) arglist) : \
-   (gas_assert (NULL))
-#endif
-
 /* Defined to TRUE if unused section symbol should be kept.  */
-#ifndef TARGET_KEEP_UNUSED_SECTION_SYMBOLS
 #define TARGET_KEEP_UNUSED_SECTION_SYMBOLS true
-#endif
 
 enum bfd_flavour {
   /* N.B. Update bfd_flavour_name if you change this.  */
-  bfd_target_unknown_flavour,
-  bfd_target_aout_flavour,
-  bfd_target_coff_flavour,
-  bfd_target_ecoff_flavour,
-  bfd_target_xcoff_flavour,
+  bfd_target_unknown_flavour, bfd_target_aout_flavour, bfd_target_coff_flavour,
+  bfd_target_ecoff_flavour, bfd_target_xcoff_flavour,
   bfd_target_elf_flavour,
-  bfd_target_tekhex_flavour,
-  bfd_target_srec_flavour,
-  bfd_target_verilog_flavour,
-  bfd_target_ihex_flavour,
-  bfd_target_som_flavour,
-  bfd_target_msdos_flavour,
-  bfd_target_evax_flavour,
-  bfd_target_mmo_flavour,
-  bfd_target_mach_o_flavour,
-  bfd_target_pef_flavour,
-  bfd_target_pef_xlib_flavour,
-  bfd_target_sym_flavour
+  bfd_target_tekhex_flavour, bfd_target_srec_flavour, bfd_target_verilog_flavour,
+  bfd_target_ihex_flavour, bfd_target_som_flavour, bfd_target_msdos_flavour,
+  bfd_target_evax_flavour, bfd_target_mmo_flavour, bfd_target_mach_o_flavour,
+  bfd_target_pef_flavour, bfd_target_pef_xlib_flavour, bfd_target_sym_flavour
 };
 
 enum bfd_endian { BFD_ENDIAN_BIG, BFD_ENDIAN_LITTLE, BFD_ENDIAN_UNKNOWN };
 
 /* Forward declarations.  */
-struct flag_info;
-typedef void (*bfd_cleanup) (bfd *);
+struct flag_info; typedef void (*bfd_cleanup) (bfd *);
 
-typedef struct bfd_target
+static inline enum bfd_flavour bfd_get_flavour (const bfd *abfd ATTRIBUTE_UNUSED)
 {
-  /* Identifies the kind of target, e.g., SunOS4, Ultrix, etc.  */
-  const char *name;
-
- /* The "flavour" of a back end is a general indication about
-    the contents of a file.  */
-  enum bfd_flavour flavour;
-
-  /* The order of bytes within the data area of a file.  */
-  enum bfd_endian byteorder;
-
- /* The order of bytes within the header parts of a file.  */
-  enum bfd_endian header_byteorder;
-
-  /* A mask of all the flags which an executable may have set -
-     from the set <<BFD_NO_FLAGS>>, <<HAS_RELOC>>, ...<<D_PAGED>>.  */
-  flagword object_flags;
-
- /* A mask of all the flags which a section may have set - from
-    the set <<SEC_NO_FLAGS>>, <<SEC_ALLOC>>, ...<<SET_NEVER_LOAD>>.  */
-  flagword section_flags;
-
- /* The character normally found at the front of a symbol.
-    (if any), perhaps `_'.  */
-  char symbol_leading_char;
-
- /* The pad character for file names within an archive header.  */
-  char ar_pad_char;
-
-  /* The maximum number of characters in an archive header.  */
-  unsigned char ar_max_namelen;
-
-  /* How well this target matches, used to select between various
-     possible targets when more than one target matches.  */
-  unsigned char match_priority;
-
- /* TRUE if unused section symbols should be kept.  */
-  bool keep_unused_section_symbols;
-
-  /* Entries for byte swapping for data. These are different from the
-     other entry points, since they don't take a BFD as the first argument.
-     Certain other handlers could do the same.  */
-  uint64_t       (*bfd_getx64) (const void *);
-  int64_t        (*bfd_getx_signed_64) (const void *);
-  void           (*bfd_putx64) (uint64_t, void *);
-  bfd_vma        (*bfd_getx32) (const void *);
-  bfd_signed_vma (*bfd_getx_signed_32) (const void *);
-  void           (*bfd_putx32) (bfd_vma, void *);
-  bfd_vma        (*bfd_getx16) (const void *);
-  bfd_signed_vma (*bfd_getx_signed_16) (const void *);
-  void           (*bfd_putx16) (bfd_vma, void *);
-
-  /* Byte swapping for the headers.  */
-  uint64_t       (*bfd_h_getx64) (const void *);
-  int64_t        (*bfd_h_getx_signed_64) (const void *);
-  void           (*bfd_h_putx64) (uint64_t, void *);
-  bfd_vma        (*bfd_h_getx32) (const void *);
-  bfd_signed_vma (*bfd_h_getx_signed_32) (const void *);
-  void           (*bfd_h_putx32) (bfd_vma, void *);
-  bfd_vma        (*bfd_h_getx16) (const void *);
-  bfd_signed_vma (*bfd_h_getx_signed_16) (const void *);
-  void           (*bfd_h_putx16) (bfd_vma, void *);
-
-  /* Format dependent routines: these are vectors of entry points
-     within the target vector structure, one for each format to check.  */
-
-  /* Check the format of a file being read.  Return a <<bfd_cleanup>> on
-     success or zero on failure.  */
-  bfd_cleanup (*_bfd_check_format[bfd_type_end]) (bfd *);
-
-  /* Set the format of a file being written.  */
-  bool (*_bfd_set_format[bfd_type_end]) (bfd *);
-
-  /* Write cached information into a file being written, at <<bfd_close>>.  */
-  bool (*_bfd_write_contents[bfd_type_end]) (bfd *);
-
-  /* Called when the BFD is being closed to do any necessary cleanup.  */
-  bool (*_close_and_cleanup) (bfd *);
-  /* Ask the BFD to free all cached information.  */
-  bool (*_bfd_free_cached_info) (bfd *);
-  /* Called when a new section is created.  */
-  bool (*_new_section_hook) (bfd *, sec_ptr);
-  /* Read the contents of a section.  */
-  bool (*_bfd_get_section_contents) (bfd *, sec_ptr, void *, file_ptr,
-				     size_t);
-  bool (*_bfd_get_section_contents_in_window) (bfd *, sec_ptr, bfd_window *,
-					       file_ptr, size_t);
-
-  /* Called to copy BFD general private data from one object file
-     to another.  */
-  bool (*_bfd_copy_private_bfd_data) (bfd *, bfd *);
-  /* Called to merge BFD general private data from one object file
-     to a common output file when linking.  */
-  bool (*_bfd_merge_private_bfd_data) (bfd *, struct bfd_link_info *);
-  /* Called to initialize BFD private section data from one object file
-     to another.  */
-  bool (*_bfd_init_private_section_data) (bfd *, sec_ptr, bfd *, sec_ptr,
-					  struct bfd_link_info *);
-  /* Called to copy BFD private section data from one object file
-     to another.  */
-  bool (*_bfd_copy_private_section_data) (bfd *, sec_ptr, bfd *, sec_ptr);
-  /* Called to copy BFD private symbol data from one symbol
-     to another.  */
-  bool (*_bfd_copy_private_symbol_data) (bfd *, asymbol *,
-					 bfd *, asymbol *);
-  /* Called to copy BFD private header data from one object file
-     to another.  */
-  bool (*_bfd_copy_private_header_data) (bfd *, bfd *);
-  /* Called to set private backend flags.  */
-  bool (*_bfd_set_private_flags) (bfd *, flagword);
-
-  /* Called to print private BFD data.  */
-  bool (*_bfd_print_private_bfd_data) (bfd *, void *);
-
-  char *(*_core_file_failing_command) (bfd *);
-  int   (*_core_file_failing_signal) (bfd *);
-  bool  (*_core_file_matches_executable_p) (bfd *, bfd *);
-  int   (*_core_file_pid) (bfd *);
-
-  bool (*_bfd_slurp_armap) (bfd *);
-  bool (*_bfd_slurp_extended_name_table) (bfd *);
-  bool (*_bfd_construct_extended_name_table) (bfd *, char **,
-					      size_t *,
-					      const char **);
-  void (*_bfd_truncate_arname) (bfd *, const char *, char *);
-  bool (*write_armap) (bfd *, unsigned, struct orl *, unsigned, int);
-  void *(*_bfd_read_ar_hdr_fn) (bfd *);
-  bool (*_bfd_write_ar_hdr_fn) (bfd *, bfd *);
-  bfd *(*openr_next_archived_file) (bfd *, bfd *);
-  bfd *(*_bfd_get_elt_at_index) (bfd *, symindex);
-  int  (*_bfd_stat_arch_elt) (bfd *, struct stat *);
-  bool (*_bfd_update_armap_timestamp) (bfd *);
-
-#define BFD_JUMP_TABLE_SYMBOLS1(NAME) \
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0,\
-  0
-  long (*_bfd_get_symtab_upper_bound) (bfd *);
-  long (*_bfd_canonicalize_symtab) (bfd *, struct bfd_symbol **);
-  struct bfd_symbol *
-       (*_bfd_make_empty_symbol) (bfd *);
-  void (*_bfd_print_symbol) (bfd *, void *, struct bfd_symbol *,
-			     bfd_print_symbol_type);
-#define bfd_print_symbol(b,p,s,e) \
-       BFD_SEND (b, _bfd_print_symbol, (b,p,s,e))
-  void  (*_bfd_get_symbol_info) (bfd *, struct bfd_symbol *, symbol_info *);
-#define bfd_get_symbol_info(b,p,e) \
-       BFD_SEND (b, _bfd_get_symbol_info, (b,p,e))
-  const char *
-       (*_bfd_get_symbol_version_string) (bfd *, struct bfd_symbol *,
-					  bool, bool *);
-#define bfd_get_symbol_version_string(b,s,p,h) \
-       BFD_SEND (b, _bfd_get_symbol_version_string, (b,s,p,h))
-  bool (*_bfd_is_local_label_name) (bfd *, const char *);
-  bool (*_bfd_is_target_special_symbol) (bfd *, asymbol *);
-  alent *
-       (*_get_lineno) (bfd *, struct bfd_symbol *);
-  bool (*_bfd_find_nearest_line) (bfd *, struct bfd_symbol **,
-				  struct bfd_section *, bfd_vma,
-				  const char **, const char **,
-				  unsigned int *, unsigned int *);
-  bool (*_bfd_find_nearest_line_with_alt) (bfd *, const char *,
-					   struct bfd_symbol **,
-					   struct bfd_section *, bfd_vma,
-					   const char **, const char **,
-					   unsigned int *, unsigned int *);
-  bool (*_bfd_find_line) (bfd *, struct bfd_symbol **,
-			  struct bfd_symbol *, const char **,
-			  unsigned int *);
-  bool (*_bfd_find_inliner_info)
-    (bfd *, const char **, const char **, unsigned int *);
- /* Back-door to allow format-aware applications to create debug symbols
-    while using BFD for everything else.  Currently used by the assembler
-    when creating COFF files.  */
-  asymbol *
-       (*_bfd_make_debug_symbol) (bfd *);
-#define bfd_read_minisymbols(b, d, m, s) \
-       BFD_SEND (b, _read_minisymbols, (b, d, m, s))
-  long (*_read_minisymbols) (bfd *, bool, void **, unsigned int *);
-#define bfd_minisymbol_to_symbol(b, d, m, f) \
-       BFD_SEND (b, _minisymbol_to_symbol, (b, d, m, f))
-  asymbol *
-       (*_minisymbol_to_symbol) (bfd *, bool, const void *, asymbol *);
-
-  /* Routines for relocs.  */
-#define BFD_JUMP_TABLE_RELOCS(NAME) \
-  NAME##_get_reloc_upper_bound, \
-  NAME##_canonicalize_reloc, \
-  NAME##_set_reloc, \
-  NAME##_bfd_reloc_type_lookup, \
-  NAME##_bfd_reloc_name_lookup
-
-  long (*_get_reloc_upper_bound) (bfd *, sec_ptr);
-  long (*_bfd_canonicalize_reloc) (bfd *, sec_ptr, arelent **,
-				   struct bfd_symbol **);
-  void (*_bfd_set_reloc) (bfd *, sec_ptr, arelent **, unsigned int);
-  /* See documentation on reloc types.  */
-  reloc_howto_type *
-       (*reloc_type_lookup) (bfd *, bfd_reloc_code_real_type);
-  reloc_howto_type *
-       (*reloc_name_lookup) (bfd *, const char *);
-
-  /* Routines used when writing an object file.  */
-#define BFD_JUMP_TABLE_WRITE(NAME) \
-  NAME##_set_arch_mach, \
-  NAME##_set_section_contents
-
-  bool (*_bfd_set_arch_mach) (bfd *, enum bfd_architecture,
-				     unsigned long);
-  bool (*_bfd_set_section_contents) (bfd *, sec_ptr, const void *,
-				     file_ptr, size_t);
-
-  /* Routines used by the linker.  */
-#define BFD_JUMP_TABLE_LINK(NAME) \
-  NAME##_sizeof_headers, \
-  NAME##_bfd_get_relocated_section_contents, \
-  NAME##_bfd_relax_section, \
-  NAME##_bfd_link_hash_table_create, \
-  NAME##_bfd_link_add_symbols, \
-  NAME##_bfd_link_just_syms, \
-  NAME##_bfd_copy_link_hash_symbol_type, \
-  NAME##_bfd_final_link, \
-  NAME##_bfd_link_split_section, \
-  NAME##_bfd_link_check_relocs, \
-  NAME##_bfd_gc_sections, \
-  NAME##_bfd_lookup_section_flags, \
-  NAME##_bfd_merge_sections, \
-  NAME##_bfd_is_group_section, \
-  NAME##_bfd_group_name, \
-  NAME##_bfd_discard_group, \
-  NAME##_section_already_linked, \
-  NAME##_bfd_define_common_symbol, \
-  NAME##_bfd_link_hide_symbol, \
-  NAME##_bfd_define_start_stop
-
-  int  (*_bfd_sizeof_headers) (bfd *, struct bfd_link_info *);
-  bfd_byte *
-       (*_bfd_get_relocated_section_contents) (bfd *,
-					       struct bfd_link_info *,
-					       struct bfd_link_order *,
-					       bfd_byte *, bool,
-					       struct bfd_symbol **);
-
-  bool (*_bfd_relax_section) (bfd *, struct bfd_section *,
-			      struct bfd_link_info *, bool *);
-
-  /* Create a hash table for the linker.  Different backends store
-     different information in this table.  */
-  struct bfd_link_hash_table *
-       (*_bfd_link_hash_table_create) (bfd *);
-
-  /* Add symbols from this object file into the hash table.  */
-  bool (*_bfd_link_add_symbols) (bfd *, struct bfd_link_info *);
-
-  /* Indicate that we are only retrieving symbol values from this section.  */
-  void (*_bfd_link_just_syms) (asection *, struct bfd_link_info *);
-
-  /* Copy the symbol type and other attributes for a linker script
-     assignment of one symbol to another.  */
-#define bfd_copy_link_hash_symbol_type(b, t, f) \
-       BFD_SEND (b, _bfd_copy_link_hash_symbol_type, (b, t, f))
-  void (*_bfd_copy_link_hash_symbol_type) (bfd *,
-					   struct bfd_link_hash_entry *,
-					   struct bfd_link_hash_entry *);
-
-  /* Do a link based on the link_order structures attached to each
-     section of the BFD.  */
-  bool (*_bfd_final_link) (bfd *, struct bfd_link_info *);
-
-  /* Should this section be split up into smaller pieces during linking.  */
-  bool (*_bfd_link_split_section) (bfd *, struct bfd_section *);
-
-  /* Check the relocations in the bfd for validity.  */
-  bool (* _bfd_link_check_relocs)(bfd *, struct bfd_link_info *);
-
-  /* Remove sections that are not referenced from the output.  */
-  bool (*_bfd_gc_sections) (bfd *, struct bfd_link_info *);
-
-  /* Sets the bitmask of allowed and disallowed section flags.  */
-  bool (*_bfd_lookup_section_flags) (struct bfd_link_info *,
-				     struct flag_info *, asection *);
-
-  /* Attempt to merge SEC_MERGE sections.  */
-  bool (*_bfd_merge_sections) (bfd *, struct bfd_link_info *);
-
-  /* Is this section a member of a group?  */
-  bool (*_bfd_is_group_section) (bfd *, const struct bfd_section *);
-
-  /* The group name, if section is a member of a group.  */
-  const char *(*_bfd_group_name) (bfd *, const struct bfd_section *);
-
-  /* Discard members of a group.  */
-  bool (*_bfd_discard_group) (bfd *, struct bfd_section *);
-
-  /* Check if SEC has been already linked during a reloceatable or
-     final link.  */
-  bool (*_section_already_linked) (bfd *, asection *,
-				   struct bfd_link_info *);
-
-  /* Define a common symbol.  */
-  bool (*_bfd_define_common_symbol) (bfd *, struct bfd_link_info *,
-				     struct bfd_link_hash_entry *);
-
-  /* Hide a symbol.  */
-  void (*_bfd_link_hide_symbol) (bfd *, struct bfd_link_info *,
-				 struct bfd_link_hash_entry *);
-
-  /* Define a __start, __stop, .startof. or .sizeof. symbol.  */
-  struct bfd_link_hash_entry *
-       (*_bfd_define_start_stop) (struct bfd_link_info *, const char *,
-				  asection *);
-
-  /* Routines to handle dynamic symbols and relocs.  */
-#define BFD_JUMP_TABLE_DYNAMIC(NAME) \
-  NAME##_get_dynamic_symtab_upper_bound, \
-  NAME##_canonicalize_dynamic_symtab, \
-  NAME##_get_synthetic_symtab, \
-  NAME##_get_dynamic_reloc_upper_bound, \
-  NAME##_canonicalize_dynamic_reloc
-
-  /* Get the amount of memory required to hold the dynamic symbols.  */
-  long (*_bfd_get_dynamic_symtab_upper_bound) (bfd *);
-  /* Read in the dynamic symbols.  */
-  long (*_bfd_canonicalize_dynamic_symtab) (bfd *, struct bfd_symbol **);
-  /* Create synthetized symbols.  */
-  long (*_bfd_get_synthetic_symtab) (bfd *, long, struct bfd_symbol **,
-				     long, struct bfd_symbol **,
-				     struct bfd_symbol **);
-  /* Get the amount of memory required to hold the dynamic relocs.  */
-  long (*_bfd_get_dynamic_reloc_upper_bound) (bfd *);
-  /* Read in the dynamic relocs.  */
-  long (*_bfd_canonicalize_dynamic_reloc) (bfd *, arelent **,
-					   struct bfd_symbol **);
-
-  /* Opposite endian version of this target.  */
-  const struct bfd_target *alternative_target;
-
-  /* Data for use by back-end routines, which isn't
-     generic enough to belong in this structure.  */
-  const void *backend_data;
-
-} bfd_target;
-
-static inline const char *
-bfd_get_target (const bfd *abfd)
-{
-  return abfd->xvec->name;
+  return bfd_target_elf_flavour;
 }
 
-static inline enum bfd_flavour
-bfd_get_flavour (const bfd *abfd)
+static inline flagword bfd_applicable_file_flags (const bfd *abfd ATTRIBUTE_UNUSED)
 {
-  return abfd->xvec->flavour;
+  return 0x4ec1ff;
 }
 
-static inline flagword
-bfd_applicable_file_flags (const bfd *abfd)
+static inline bool bfd_family_coff (const bfd *abfd ATTRIBUTE_UNUSED)
 {
-  return abfd->xvec->object_flags;
+	return false;
 }
 
-static inline bool
-bfd_family_coff (const bfd *abfd)
-{
-  return (bfd_get_flavour (abfd) == bfd_target_coff_flavour
-	  || bfd_get_flavour (abfd) == bfd_target_xcoff_flavour);
-}
-
-static inline bool
-bfd_big_endian (const bfd *abfd ATTRIBUTE_UNUSED)
+static inline bool bfd_big_endian (const bfd *abfd ATTRIBUTE_UNUSED)
 {
   return 0; //abfd->xvec->byteorder == BFD_ENDIAN_BIG;
 }
@@ -2937,10 +2437,9 @@ bfd_header_little_endian (const bfd *abfd ATTRIBUTE_UNUSED)
   return 1; //abfd->xvec->header_byteorder == BFD_ENDIAN_LITTLE;
 }
 
-static inline flagword
-bfd_applicable_section_flags (const bfd *abfd)
+static inline flagword bfd_applicable_section_flags (const bfd *abfd ATTRIBUTE_UNUSED)
 {
-  return abfd->xvec->section_flags;
+  return 0x3c1a13f; // abfd->xvec->section_flags;
 }
 
 static inline char
@@ -2963,15 +2462,6 @@ bfd_keep_unused_section_symbols (const bfd *abfd ATTRIBUTE_UNUSED)
   return 1; //abfd->xvec->keep_unused_section_symbols;
 }
 
-const bfd_target *bfd_find_target (const char *target_name, bfd *abfd);
-const bfd_target *bfd_get_target_info (const char *target_name,
-    bfd *abfd, bool *is_bigendian, int *underscoring,
-    const char **def_target_arch);
-const char ** bfd_target_list (void);
-const bfd_target *bfd_iterate_over_targets
-   (int (*func) (const bfd_target *, void *),
-    void *data);
-const char *bfd_flavour_name (enum bfd_flavour flavour);
 #define elf_shstrtab(bfd)	(elf_tdata(bfd) -> o->strtab_ptr)
 ///////////////////////////////////////////end of bfd.h
 #endif
@@ -5164,7 +4654,6 @@ struct elf_sym_strtab { Elf_Internal_Sym sym; unsigned long dest_index; };
 #define elf_symbol_from(S) \
   ((((S)->flags & BSF_SYNTHETIC) == 0				\
     && (S)->the_bfd != NULL					\
-    && (S)->the_bfd->xvec->flavour == bfd_target_elf_flavour	\
     && (S)->the_bfd->tdata.elf_obj_data != 0)			\
    ? (elf_symbol_type *) (S)					\
    : 0)
@@ -5670,8 +5159,7 @@ static bool bfd_elf_allocate_object (bfd *, size_t, enum elf_target_id);
 #define _bfd_elf_read_minisymbols _bfd_generic_read_minisymbols
 #define _bfd_elf_minisymbol_to_symbol _bfd_generic_minisymbol_to_symbol
 /* If the target doesn't have reloc handling written yet:  */
-static int _bfd_elf_symbol_from_bfd_symbol
-  (bfd *, asymbol **);
+static int _bfd_elf_symbol_from_bfd_symbol (bfd *, asymbol **);
 static struct elf_strtab_hash * _bfd_elf_strtab_init (void);
 static void _bfd_elf_strtab_free (struct elf_strtab_hash *);
 static void _bfd_elf_strtab_clear_all_refs (struct elf_strtab_hash *);

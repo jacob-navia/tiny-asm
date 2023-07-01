@@ -1949,8 +1949,7 @@ static inline void bfd_section_list_insert_before (bfd *abfd, asection *b, asect
     abfd->sections = s;
 }
 
-static inline bool
-bfd_section_removed_from_list (const bfd *abfd, const asection *s)
+static inline bool bfd_section_removed_from_list (const bfd *abfd, const asection *s)
 {
   return s->next ? s->next->prev != s : abfd->section_last != s;
 }
@@ -2448,16 +2447,14 @@ bfd_get_symbol_leading_char (const bfd *abfd ATTRIBUTE_UNUSED)
   return 0; //abfd->xvec->symbol_leading_char;
 }
 
-static inline enum bfd_flavour
-bfd_asymbol_flavour (const asymbol *sy)
+static inline enum bfd_flavour bfd_asymbol_flavour (const asymbol *sy)
 {
   if ((sy->flags & BSF_SYNTHETIC) != 0)
     return bfd_target_unknown_flavour;
   return bfd_target_elf_flavour; //sy->the_bfd->xvec->flavour;
 }
 
-static inline bool
-bfd_keep_unused_section_symbols (const bfd *abfd ATTRIBUTE_UNUSED)
+static inline bool bfd_keep_unused_section_symbols (const bfd *abfd ATTRIBUTE_UNUSED)
 {
   return 1; //abfd->xvec->keep_unused_section_symbols;
 }
@@ -2625,8 +2622,8 @@ static void flonum_multip (const FLONUM_TYPE * a, const FLONUM_TYPE * b,
 #define ERROR_EXPONENT_OVERFLOW (2)
 
 /* These are assembler-wide concepts */
-
-static bfd *stdoutput;
+static bfd GlobalData;
+static bfd *stdoutput = &GlobalData;
 typedef bfd_vma addressT;
 typedef bfd_signed_vma offsetT;
 
@@ -10321,7 +10318,6 @@ static void output_file_create (const char *name);
 #define BFD_VERSION 240500000
 #define BFD_VERSION_STRING  "(GNU Binutils) " "2.40.50.20230531"
 #define REPORT_BUGS_TO "<https://sourceware.org/bugzilla/>"
-static void delete_bfd(bfd *);
 struct section_hash_entry {
   struct bfd_hash_entry root;
   asection section;

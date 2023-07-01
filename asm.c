@@ -8832,14 +8832,9 @@ static void	expr_set_precedence(void)
 }
 
 /* Initialize the expression parser.  */
-
 static void	expr_begin(void)
 {
-	expressionS	e;
 	expr_set_precedence();
-
-	/* Verify that X_op field is wide enough.  */
-	e.X_op = O_max;
 
 	memset(seen,0,sizeof seen);
 	memset(nr_seen,0,sizeof nr_seen);
@@ -9177,39 +9172,10 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 								default:
 									goto general;
 								case O_multiply:
-									/*
-									 * Do
-									 * the
-									 * multi
-									 * ply
-									 * as
-									 * unsig
-									 * ned
-									 * to
-									 * silen
-									 * ce
-									 * ubsan
-									 * .
-									 * The
-									 * resul
-									 * t is
-									 * of
-									 * cours
-									 * e
-									 * the
-									 * same
-									 * when
-									 * we
-									 * throw
-									 * 
-									 * away
-									 * high
-									 * bits
-									 * of
-									 * the
-									 * resul
-									 * t.
-									 */
+								/*
+								Do the multiply as unsig ned to silence ubsan.
+								The result is of* course the same when we throw
+								away high bits of the result.  */
 									resultP->X_add_number *= (valueT) v;
 									break;
 								case O_divide:
@@ -9220,98 +9186,14 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 									break;
 								case O_left_shift:
 								case O_right_shift:
-									/*
-									 * We
-									 * alway
-									 * s
-									 * use
-									 * unsig
-									 * ned
-									 * shift
-									 * s.
-									 * Accor
-									 * ding
-									 * to
-									 * the
-									 * ISO
-									 * C
-									 * stand
-									 * ard,
-									 * left
-									 * shift
-									 *  of
-									 * a
-									 * signe
-									 * d
-									 * type
-									 * havin
-									 * g a
-									 * negat
-									 * ive
-									 * value
-									 *  is
-									 * undef
-									 * ined
-									 * behav
-									 * iour,
-									 *  and
-									 * right
-									 * 
-									 * shift
-									 * of a
-									 * signe
-									 * d
-									 * type
-									 * havin
-									 * g
-									 * negat
-									 * ive
-									 * value
-									 *  is
-									 * imple
-									 * menta
-									 * tion
-									 * defin
-									 * ed.
-									 * Left
-									 * shift
-									 *  of
-									 * a
-									 * signe
-									 * d
-									 * type
-									 * when
-									 * the
-									 * resul
-									 * t
-									 * overf
-									 * lows
-									 * is
-									 * also
-									 * undef
-									 * ined
-									 * behav
-									 * iour.
-									 *   So
-									 * don't
-									 * 
-									 * trigg
-									 * er
-									 * ubsan
-									 * 
-									 * warni
-									 * ngs
-									 * or
-									 * rely
-									 * on
-									 * chara
-									 * cteri
-									 * stics
-									 *  of
-									 * the
-									 * compi
-									 * ler.
-									 */
+					          /* We always use unsigned shifts.  According to the ISO
+         						C standard, left shift of a signed type having a
+         						negative value is undefined behaviour, and right
+         						shift of a signed type having negative value is
+         						implementation defined.  Left shift of a signed type
+         						when the result overflows is also undefined
+         						behaviour.  So don't trigger ubsan warnings or rely
+         						on characteristics of the compiler.  */
 									if ((valueT) v >= sizeof(valueT) * CHAR_BIT) {
 										as_warn_value_out_of_range(("shift count"),v,0,
 													   sizeof(valueT) * CHAR_BIT - 1,
@@ -9338,35 +9220,9 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 								case O_bit_and:
 									resultP->X_add_number &= v;
 									break;
-									/*
-									 * Const
-									 * ant
-									 * +
-									 * const
-									 * ant
-									 * (O_ad
-									 * d)
-									 * is
-									 * handl
-									 * ed
-									 * by
-									 * the
-									 * previ
-									 * ous
-									 * if
-									 * state
-									 * ment
-									 * for
-									 * const
-									 * ant
-									 * + X,
-									 * so
-									 * is
-									 * omitt
-									 * ed
-									 * here.
-									 * 
-									 */
+					          /* Constant + constant (O_add) is handled by the
+   							      previous if statement for constant + X, so is omitted 
+								  here.  */
 								case O_subtract:
 									subtract_from_result(resultP,v,0);
 									is_unsigned = false;
@@ -9417,12 +9273,7 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 									|| op_left == O_subtract
 									|| (resultP->X_add_number == 0
 									    && right.X_add_number == 0))) {
-									/*
-									 * Symbo
-									 * l OP
-									 * symbo
-									 * l.
-									 */
+									/* Symbol OP symbol.  */
 									resultP->X_op = op_left;
 									resultP->X_op_symbol = right.X_add_symbol;
 									if (op_left == O_add)
@@ -9441,13 +9292,7 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 										}
 								} else {
 							general:
-									/*
-									 * The
-									 * gener
-									 * al
-									 * case.
-									 * 
-									 */
+									/* The general case. */
 									resultP->X_add_symbol = make_expr_symbol(resultP);
 									resultP->X_op_symbol = make_expr_symbol(&right);
 									resultP->X_op = op_left;
@@ -11869,14 +11714,10 @@ static bfd     *new_bfd(void)
 {
 	bfd            *nbfd;
 
-	nbfd = (bfd *) zmalloc(sizeof(bfd));
-	if (nbfd == NULL)
-		return NULL;
-
+	nbfd = stdoutput;
 	nbfd->memory = objalloc_create();
 	if (nbfd->memory == NULL) {
 		bfd_set_error(bfd_error_no_memory);
-		free(nbfd);
 		return NULL;
 	}
 	//nbfd->arch_info = &bfd_default_arch_struct;
@@ -11884,7 +11725,6 @@ static bfd     *new_bfd(void)
 	if (!bfd_hash_table_init_n(&nbfd->section_htab,bfd_section_hash_newfunc,
 				   sizeof(struct section_hash_entry),13)) {
 		objalloc_free((struct objalloc *)nbfd->memory);
-		free(nbfd);
 		return NULL;
 	}
 	nbfd->archive_plugin_fd = -1;
@@ -11910,7 +11750,6 @@ static bfd     *openw(const char *filename,const char *target ATTRIBUTE_UNUSED)
 	 */
 	ptr = bfd_alloc(nbfd,1 + strlen(filename));
 	if (!ptr) {
-		free(nbfd);
 		return NULL;
 	}
 	strcpy(ptr,filename);
@@ -11921,7 +11760,6 @@ static bfd     *openw(const char *filename,const char *target ATTRIBUTE_UNUSED)
 	if (nbfd->iostream == NULL) {
 		/* File not writeable,etc.  */
 		bfd_set_error(bfd_error_system_call);
-		free(nbfd);
 		return NULL;
 	}
 	return nbfd;
@@ -11979,7 +11817,7 @@ static void	output_file_create(const char *name)
 		as_fatal("can't open a bfd on stdout %s",name);
 
 	else
-		if (!(stdoutput = openw(name,TARGET_FORMAT))) {
+		if (!(openw(name,TARGET_FORMAT))) {
 			fprintf(stderr,"Can't create %s\n",name);
 			exit(1);
 		}
@@ -36407,18 +36245,11 @@ static void    *xrealloc(void *oldmem,size_t size)
 }
 /* Concatenate variable number of strings. */
 /*
- * @deftypefn Extension char* concat (const char *@var{s1},const char *@var{s2},
- * @ @dots{},@code{NULL})
- * 
  * Concatenate zero or more of strings and return the result in freshly
  * @code{xmalloc}ed memory.  The argument list is terminated by the first
  * @code{NULL} pointer encountered.  Pointers to empty strings are ignored.
  * 
- * @end deftypefn
- * 
  */
-
-
 static inline unsigned long vconcat_length(const char *,va_list);
 static inline unsigned long vconcat_length(const char *first,va_list args)
 {
@@ -36669,22 +36500,7 @@ static char	xstrerror_buf[sizeof ERRSTR_FMT + 20];
 static char    *xstrerror(int errnum)
 {
 	char           *errstr;
-#ifdef VMS
-	char           *(*vmslib_strerror) (int,...);
-
-	/* Override any possibly-conflicting declaration from system header.  */
-	vmslib_strerror = (char *(*) (int,...))strerror;
-	/*
-	 * Second argument matters iff first is EVMSERR,but it's simpler to
-	 * pass it unconditionally.  `vaxc$errno' is declared in <errno.h> and
-	 * maintained by the run-time library in parallel to `errno'. We assume
-	 * that `errnum' corresponds to the last value assigned to errno by the
-	 * run-time library,hence vaxc$errno will be relevant.
-	 */
-	errstr = (*vmslib_strerror) (errnum,vaxc$errno);
-#else
 	errstr = strerror(errnum);
-#endif
 
 	/* If `errnum' is out of range,result might be NULL.  We'll fix that.  */
 	if (!errstr) {
@@ -37169,24 +36985,6 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 		this_hdr->sh_flags |= SHF_STRINGS;
 	if ((asect->flags & SEC_GROUP) == 0 && elf_group_name(asect) != NULL)
 		this_hdr->sh_flags |= SHF_GROUP;
-#if 0
-	if ((asect->flags & SEC_THREAD_LOCAL) != 0) {
-		this_hdr->sh_flags |= SHF_TLS;
-		if (asect->size == 0
-		    && (asect->flags & SEC_HAS_CONTENTS) == 0) {
-			struct bfd_link_order *o = asect->map_tail.link_order;
-
-			this_hdr->sh_size = 0;
-			if (o != NULL) {
-				this_hdr->sh_size = o->offset + o->size;
-				if (this_hdr->sh_size != 0)
-					this_hdr->sh_type = SHT_NOBITS;
-			}
-		}
-	}
-	if ((asect->flags & (SEC_GROUP|SEC_EXCLUDE)) == SEC_EXCLUDE)
-		this_hdr->sh_flags |= SHF_EXCLUDE;
-#endif
 	/*
 	 * If the section has relocs,set up a section header for the
 	 * SHT_REL[A] section.  If two relocation sections are required for
@@ -37256,10 +37054,8 @@ static bool	sym_is_global(asymbol * sym)
 #define MAP_STRTAB    (SHN_HIOS + 3)
 #define MAP_SHSTRTAB  (SHN_HIOS + 4)
 #define MAP_SYM_SHNDX (SHN_HIOS + 5)
-/*
- * Map symbol from it's internal number to the external number,moving all
- * local symbols to be at the head of the list.
- */
+/* Map symbol from it's internal number to the external number,moving all
+ * local symbols to be at the head of the list.  */
 static bool	elf_map_symbols(bfd * abfd,unsigned int *pnum_locals)
 {
 	unsigned int	symcount = bfd_get_symcount(abfd);
@@ -37293,10 +37089,8 @@ static bool	elf_map_symbols(bfd * abfd,unsigned int *pnum_locals)
 	elf_section_syms(abfd) = sect_syms;
 	elf_num_section_syms(abfd) = max_index;
 
-	/*
-	 * Init sect_syms entries for any section symbols we have already
-	 * decided to output.
-	 */
+	/* Init sect_syms entries for any section symbols we have already
+	 * decided to output. */
 	for (idx = 0; idx < symcount; idx++) {
 		asymbol        *sym = syms[idx];
 
@@ -37317,12 +37111,10 @@ static bool	elf_map_symbols(bfd * abfd,unsigned int *pnum_locals)
 				num_locals++;
 	}
 
-	/*
-	 * We will be adding a section symbol for each normal BFD section.
+	/* We will be adding a section symbol for each normal BFD section.
 	 * Most sections will already have a section symbol in outsymbols,but
 	 * eg. SHT_GROUP sections will not,and we need the section symbol
-	 * mapped at least in that case.
-	 */
+	 * mapped at least in that case.  */
 	for (asect = abfd->sections; asect; asect = asect->next) {
 		asymbol        *sym = asect->symbol;
 		/* Don't include ignored section symbols.  */
@@ -37428,11 +37220,9 @@ static unsigned int _bfd_elf_section_from_bfd_section(bfd * abfd ATTRIBUTE_UNUSE
 
 	return sec_index;
 }
-/*
- * Compare two elf_strtab_hash_entry structures.  Called via qsort. Won't ever
+/* Compare two elf_strtab_hash_entry structures.  Called via qsort. Won't ever
  * return zero as all entries differ,so there is no issue with qsort stability
- * here.
- */
+ * here.  */
 static int	strrevcmp(const void *a,const void *b)
 {
 	struct elf_strtab_hash_entry *A = *(struct elf_strtab_hash_entry **)a;
@@ -37465,10 +37255,8 @@ static int	is_suffix(const struct elf_strtab_hash_entry *A,
 	return memcmp(A->root.string + (A->len - B->len),
 		      B->root.string,B->len - 1) == 0;
 }
-/*
- * This function assigns final string table offsets for used strings,merging
- * strings matching suffixes of longer strings if possible.
- */
+/* This function assigns final string table offsets for used strings,merging
+ * strings matching suffixes of longer strings if possible.  */
 static void	_bfd_elf_strtab_finalize(struct elf_strtab_hash *tab)
 {
 	struct elf_strtab_hash_entry **array,**a,*e;
@@ -37564,7 +37352,6 @@ static size_t	_bfd_elf_strtab_offset(struct elf_strtab_hash *tab,
 static bool	swap_out_syms(bfd * abfd,struct elf_strtab_hash **sttp,
      		int		relocatable_p,void *info ATTRIBUTE_UNUSED)
 {
-	//const struct elf_backend_data *bed;
 	unsigned int	symcount;
 	asymbol       **syms;
 	struct elf_strtab_hash *stt;
@@ -37597,7 +37384,6 @@ static bool	swap_out_syms(bfd * abfd,struct elf_strtab_hash **sttp,
 	symtab_hdr->sh_size = symtab_hdr->sh_entsize * (symcount + 1);
 	symtab_hdr->sh_info = num_locals + 1;
 	symtab_hdr->sh_addralign = (bfd_vma) 1 << 3;
-	//bed->s->log_file_align;
 
 	symstrtab_hdr = &elf_tdata(abfd)->strtab_hdr;
 	symstrtab_hdr->sh_type = SHT_STRTAB;
@@ -37776,17 +37562,11 @@ Unable to handle section index %x in ELF symbol.  Using ABS instead."),
 				if (shndx == SHN_BAD) {
 					asection       *sec2;
 
-					/*
-					 * Writing this would be a hell of a
-					 * lot easier if we had some decent
-					 * documentation on bfd,and knew what
-					 * to expect of the library,and what
-					 * to demand of applications.  For
-					 * example,it appears that `objcopy'
-					 * might not set the section of a
-					 * symbol to be a section that is
-					 * actually in the output file.
-					 */
+				/* Writing this would be a hell of a lot easier if we had some decent
+				 * documentation on bfd,and knew what to expect of the library,and what
+				 * to demand of applications.  For example,it appears that `objcopy'
+				 * might not set the section of a symbol to be a section that is
+				 * actually in the output file.  */
 					sec2 = bfd_get_section_by_name(abfd,sec->name);
 					if (sec2 != NULL)
 						shndx = _bfd_elf_section_from_bfd_section(abfd,sec2);
@@ -37908,21 +37688,6 @@ Unable to handle section index %x in ELF symbol.  Using ABS instead."),
 		else
 			elfsym->sym.st_name = _bfd_elf_strtab_offset(stt,
 							 elfsym->sym.st_name);
-#if 0
-		if (info && info->callbacks->ctf_new_symbol)
-			info->callbacks->ctf_new_symbol(elfsym->dest_index,
-							&elfsym->sym);
-#endif
-		/* Inform the linker of the addition of this symbol.  */
-#if 0
-		bed->s->swap_symbol_out(abfd,&elfsym->sym,
-					(outbound_syms
-					 + (elfsym->dest_index
-					    * bed->s->sizeof_sym)),
-					NPTR_ADD(outbound_shndx,
-						 (elfsym->dest_index
-					  * sizeof(Elf_External_Sym_Shndx))));
-#else
 		dst = (Elf64_External_Sym *) (outbound_syms + (elfsym->dest_index * sizeof(Elf64_External_Sym)));
 		bfd_putl32(src->st_name,dst->st_name);
 		bfd_putl64(src->st_value,dst->st_value);
@@ -37934,7 +37699,6 @@ Unable to handle section index %x in ELF symbol.  Using ABS instead."),
 			error_handler("Too many sections");
 		}
 		bfd_putl16(tmp,dst->st_shndx);
-#endif
 	}
 	free(symstrtab);
 
@@ -37964,8 +37728,7 @@ static file_ptr	assign_file_position_for_section(Elf_Internal_Shdr * i_shdrp,
 		offset += i_shdrp->sh_size;
 	return offset;
 }
-/*
- * Work out the file positions of all the sections.  This is called by
+/* Work out the file positions of all the sections.  This is called by
  * compute_section_file_positions.  All the section sizes and VMAs must be
  * known before this is called.
  * 
@@ -37978,9 +37741,7 @@ static file_ptr	assign_file_position_for_section(Elf_Internal_Shdr * i_shdrp,
  * nothing else in the file can rely upon) will be handled later by
  * assign_file_positions_for_relocs.
  * 
- * We also don't set the positions of the .symtab and .strtab here.
- */
-
+ * We also don't set the positions of the .symtab and .strtab here.  */
 static bool	assign_file_positions_except_relocs(bfd * abfd,
 	    		struct	bfd_link_info *link_info ATTRIBUTE_UNUSED)
 {
@@ -38405,9 +38166,7 @@ static void	_bfd_stab_cleanup(bfd * abfd ATTRIBUTE_UNUSED,void **pinfo);
 static bool	elf_close_and_cleanup(bfd * abfd)
 {
 	struct elf_obj_tdata *tdata = elf_tdata(abfd);
-	if (tdata != NULL
-	    && (bfd_get_format(abfd) == bfd_object
-		|| bfd_get_format(abfd) == bfd_core)) {
+	if (tdata != NULL) {
 		if (elf_tdata(abfd)->o != NULL && elf_shstrtab(abfd) != NULL)
 			_bfd_elf_strtab_free(elf_shstrtab(abfd));
 #if 0
@@ -38418,28 +38177,9 @@ static bool	elf_close_and_cleanup(bfd * abfd)
 	}
 	return true;
 }
-static void	delete_bfd(bfd * abfd)
-{
-	if (abfd->memory) {
-		bfd_hash_table_free(&abfd->section_htab);
-		objalloc_free((struct objalloc *)abfd->memory);
-	} else
-		free((char *)abfd->filename);
-
-	free((char *)abfd->arelt_data);
-	free(abfd);
-}
 static bool	close_all_done(bfd * abfd)
 {
-	bool		ret = elf_close_and_cleanup(abfd);
-
-	//if (ret && abfd->iovec != NULL) {
-		//ret = abfd->iovec->bclose(abfd) == 0;
-		//
-	//}
-	delete_bfd(abfd);
-
-	return ret;
+	return  elf_close_and_cleanup(abfd);
 }
 //_bfd_elf_init_file_header:elf - strtab.c
 static bool	elf_init_file_header(bfd * abfd,
@@ -38702,84 +38442,11 @@ static bool	assign_section_numbers(bfd * abfd,void *link_info)
 			d->rela.hdr->sh_info = d->this_idx;
 			d->rela.hdr->sh_flags |= SHF_INFO_LINK;
 		}
-#if 0
-		/* We need to set up sh_link for SHF_LINK_ORDER.  */
-		if ((d->this_hdr.sh_flags & SHF_LINK_ORDER) != 0) {
-			s = elf_linked_to_section(sec);
-			/*
-			 * We can now have a NULL linked section pointer. This
-			 * happens when the sh_link field is 0,which is done
-			 * when a linked to section is discarded but the
-			 * linking section has been retained for some reason.
-			 */
-			if (s) {
-				/* Check discarded linkonce section.  */
-				if (discarded_section(s)) {
-					asection       *kept;
-					error_handler
-					/* xgettext:c-format */
-						(("%pB: sh_link of section `%pA' points to"
-					 " discarded section `%pA' of `%pB'"),
-						 abfd,d->this_hdr.bfd_section,s,s->owner);
-					/*
-					 * Point to the kept section if it has
-					 * the same size as the discarded one.
-					 */
-					kept = _bfd_elf_check_kept_section(s,link_info);
-					if (kept == NULL) {
-						bfd_set_error(bfd_error_bad_value);
-						return false;
-					}
-					s = kept;
-				}
-				/* Handle objcopy. */
-				else
-					if (s->output_section == NULL) {
-						error_handler
-						/* xgettext:c-format */
-							(("%pB: sh_link of section `%pA' points to"
-							  " removed section `%pA' of `%pB'"),
-							 abfd,d->this_hdr.bfd_section,s,s->owner);
-						bfd_set_error(bfd_error_bad_value);
-						return false;
-					}
-				s = s->output_section;
-				d->this_hdr.sh_link = elf_section_data(s)->this_idx;
-			}
-		}
-#endif
 
 		switch (d->this_hdr.sh_type) {
 		case SHT_REL:
 		case SHT_RELA:
-#if 0
-			/*
-			 * sh_link is the section index of the symbol table.
-			 * sh_info is the section index of the section to which
-			 * the relocation entries apply.
-			 */
-			if (d->this_hdr.sh_link == 0) {
-				/*
-				 * FIXME maybe: If this is a reloc section
-				 * which we are treating as a normal section
-				 * then we likely should not be assuming its
-				 * sh_link is .dynsym or .symtab.
-				 */
-				if ((sec->flags & SEC_ALLOC) != 0) {
-					s = bfd_get_section_by_name(abfd,".dynsym");
-					if (s != NULL)
-						d->this_hdr.sh_link = elf_section_data(s)->this_idx;
-				} else
-					d->this_hdr.sh_link = elf_onesymtab(abfd);
-			}
-			s = elf_get_reloc_section(sec);
-			if (s != NULL) {
-				d->this_hdr.sh_info = elf_section_data(s)->this_idx;
-				d->this_hdr.sh_flags |= SHF_INFO_LINK;
-			}
-#else
 			gas_assert(0);
-#endif
 			break;
 
 		case SHT_STRTAB:

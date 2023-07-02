@@ -1,30 +1,36 @@
-#define LOCALEDIR "/usr/local/share/locale"
-
-/*
- * Disable code to set FAKE_LABEL_NAME in obj-multi.h,to avoid circular
- * reference.
+/* asm.c: a tiny assembler for riscv machines. This is a digest of the gas assembler
+ * for the same machine. The full copyright notice is in asm.h, the companion
+ * file for this one. I have reformatted the code, and added references to where I 
+ * got each function. Some names are changed.
+ * All the indirections existing in gas have been eliminated. When you see text
+ * like this: "foo(arg);" it is highly likely that that is indeed a call to function
+ * "foo" with argument "arg" and not a #defined symbol that points to a vtable that
+ * renames it to some function elsewhere.
+ * #ifdefs have been eliminated as far as I could do that, to simplify the code
+ * and making  easier to read.
+ * All linker code that was getting pulled in by the vtables is gone. This is an 
+ * assembler, not a linker.
+ * The code has been reformatted to minimize the vertical length. There are already
+ * around 40 000 lines, so the less, the better. Of course readability is more
+ * important than minimizing vertical space.
+ *
+ * jacob navia, Villetaneuse, France, summer 2023 
+ * jacob at jacob dot remcomp dot fr
  */
-#define INITIALIZING_EMULS
-
 #include "asm.h"
 /* ======================================================== Global variables */
 static char    *buffer;		/* 1st char of each buffer of lines is here.  */
 static char    *buffer_limit;	/*->1 + last char in buffer.  */
 
-/*
- * TARGET_BYTES_BIG_ENDIAN is required to be defined to either 0 or 1 in the
- * tc-<CPU>.h file.  See the "Porting GAS" section of the internals manual.
- */
+/* TARGET_BYTES_BIG_ENDIAN is required to be defined to either 0 or 1 in the
+ * tc-<CPU>.h file.  See the "Porting GAS" section of the internals manual. */
 static int	target_big_endian = TARGET_BYTES_BIG_ENDIAN;
 
 /* Variables for handling include file directory table.  */
-
 /* Length of longest in table.  */
 static size_t	include_dir_maxlen;
-/*
- * Record the current function so that we can issue an error message for
- * misplaced .func,.endfunc,and also so that .endfunc needs no arguments.
- */
+/* Record the current function so that we can issue an error message for
+ * misplaced .func,.endfunc,and also so that .endfunc needs no arguments.  */
 static char    *current_name;
 static char    *current_label;
 
@@ -33,8 +39,7 @@ static int	dwarf_line;
 
 /* Used to control final evaluation of expressions.  */
 static int	finalize_syms = 0;
-/*
- * This variable is set to be non-zero if the next string we see might be the
+/* This variable is set to be non-zero if the next string we see might be the
  * name of the source file in DWARF debugging information.  See the comment in
  * emit_expr for the format we look for.
  */
@@ -711,23 +716,8 @@ This program has absolutely no warranty.\n");
 
 				while (*optarg) {
 					switch (*optarg) {
-					case 'c':
-						break;
-					case 'd':
-						break;
-					case 'g':
-						break;
-					case 'h':
-						break;
-					case 'l':
-						break;
-					case 'm':
-						break;
-					case 'n':
-						break;
-					case 's':
-						break;
-					case '=':
+					case 'c': case 'd': case 'g': case 'h': case 'l':
+					case 'm': case 'n': case 's': case '=':
 						break;
 					default:
 						as_fatal(("invalid listing option `%c'"),*optarg);
@@ -739,10 +729,8 @@ This program has absolutely no warranty.\n");
 			break;
 
 		case 'D':
-			/*
-			 * DEBUG is implemented: it debugs different things
-			 * from other people's assemblers.
-			 */
+			/* DEBUG is implemented: it debugs different things
+			 * from other people's assemblers.  */
 			flag_debug = 1;
 			break;
 
@@ -9974,24 +9962,38 @@ static const FLONUM_TYPE flonum_positive_powers_of_ten[] = {
 /*
  * plan for a . b => p(roduct)
  * 
- * +-------+-------+-/   /-+-------+-------+|a	| a	|  ...	| a	| a
- *||  A	|  A-1	|	|  1	|  0	| +-------+-------+-/
- * /-+-------+-------+
- * 
- * +-------+-------+-/   /-+-------+-------+|b	| b	|  ...	| b	| b
- *||  B	|  B-1	|	|  1	|  0	| +-------+-------+-/
- * /-+-------+-------+
- * 
- * +-------+-------+-/   /-+-------+-/   /-+-------+-------+|p	| p	|  ...
- *|p	|  ...	| p	| p	|| A+B+1|  A+B	|	|  N	|
- *| 1	|  0	| +-------+-------+-/   /-+-------+-/   /-+-------+-------+
- * 
- * /^\ (carry) a .b	   ...	    |	   ...	 a .b	 a .b A  B
- * |		  0  1	  0  0|...	    |	   ...	 a .b |		  1  0
- *||	   ...||||		  ___ |		  \ +-----  P  =   >  a .b N
- * /__  i  j
- * 
- * N = 0 ... A+B
+ *  +-------+-------+-/   /-+-------+-------+
+ *  | a | a |  ...  | a | a |
+ *  |  A    |  A-1  |   |  1    |  0    |
+ *  +-------+-------+-/   /-+-------+-------+
+
+ *  +-------+-------+-/   /-+-------+-------+
+ *  | b | b |  ...  | b | b |
+ *  |  B    |  B-1  |   |  1    |  0    |
+ *  +-------+-------+-/   /-+-------+-------+
+
+ *  +-------+-------+-/   /-+-------+-/   /-+-------+-------+
+ *  | p | p |  ...  | p |  ...  | p | p |
+ *  |  A+B+1|  A+B  |   |  N    |   |  1    |  0    |
+ *  +-------+-------+-/   /-+-------+-/   /-+-------+-------+
+
+ *  /^\
+ *  (carry) a .b       ...      |      ...   a .b    a .b
+ *  A  B            |         0  1    0  0
+ *  |
+ *  ...     |      ...   a .b
+ *  |         1  0
+ *  |
+ *  |      ...
+ *  |
+ *  |
+ *  |
+ *  |         ___
+ *  |         \
+ *  +-----  P  =   >  a .b
+ *  N     /__  i  j
+ *
+ *  N = 0 ... A+B
  * 
  * for all i,j where i+j=N [i,j integers > 0]
  * 
@@ -10001,9 +10003,7 @@ static const FLONUM_TYPE flonum_positive_powers_of_ten[] = {
  * I chose the ForTran accent "foo[bar]" instead of the C accent "*garply" because
  * I felt the ForTran way was more intuitive. The C way would probably yield
  * better code on most C compilers. Dean Elsner. (C style also gives deeper
- * insight [to me] ... oh well ...)
- */
-
+ * insight [to me] ... oh well ...) */
 static void	flonum_multip(const FLONUM_TYPE * a,const FLONUM_TYPE * b,
 			  		FLONUM_TYPE *	product)
 {
@@ -10125,11 +10125,9 @@ static void	frag_init(void)
 	predefined_address_frag.fr_type = rs_fill;
 }
 
-/*
- * Check that we're not trying to assemble into a section that can't allocate
+/* Check that we're not trying to assemble into a section that can't allocate
  * frags (currently,this is only possible in the absolute section),or into an
- * mri common.
- */
+ * mri common.  */
 
 static void	frag_alloc_check(const struct obstack *ob)
 {
@@ -10139,11 +10137,8 @@ static void	frag_alloc_check(const struct obstack *ob)
 	}
 }
 
-/*
- * Allocate a frag on the specified obstack. Call this routine from everywhere
- * else,so that all the weird alignment hackery can be done in just one place.
- */
-
+/* Allocate a frag on the specified obstack. Call this routine from everywhere
+ * else,so that all the weird alignment hackery can be done in just one place.  */
 static fragS   *frag_alloc(struct obstack *ob)
 {
 	fragS          *ptr;
@@ -10159,13 +10154,10 @@ static fragS   *frag_alloc(struct obstack *ob)
 	return ptr;
 }
 
-/*
- * Try to augment current frag by nchars chars. If there is no room,close off
+/* Try to augment current frag by nchars chars. If there is no room,close off
  * the current frag with a ".fill 0" and begin a new frag.  Then loop until the
  * new frag has at least nchars chars available.  Does not set up any fields in
- * frag_now.
- */
-
+ * frag_now.  */
 static void	frag_grow(size_t nchars)
 {
 	if (obstack_room(&frchain_now->frch_obstack) < nchars) {
@@ -10214,8 +10206,7 @@ static void	frag_grow(size_t nchars)
 	}
 }
 
-/*
- * Call this to close off a completed frag,and start up a new (empty) frag,in
+/* Call this to close off a completed frag,and start up a new (empty) frag,in
  * the same subsegment as the old frag. [frchain_now remains the same but
  * frag_now is updated.] Because this calculates the correct value of fr_fix by
  * looking at the obstack 'frags',it needs to know how many characters at the
@@ -10227,14 +10218,9 @@ static void	frag_grow(size_t nchars)
  * None of the generic frag handling code makes use of fr_var.
  * 
  * Make a new frag,initialising some components. Link new frag at end of
- * frchain_now.
- */
-
-static void	frag_new(size_t old_frags_var_max_size
-/*
- * Number of chars (already allocated on obstack frags) in variable_length part
- * of frag.
-		      */ )
+ * frchain_now.  */
+static void	frag_new(size_t old_frags_var_max_size)
+/* Number of chars (already allocated on obstack frags) in variable_length part of frag. */ 
 {
 	fragS          *former_last_fragP;
 	frchainS       *frchP;
@@ -10249,10 +10235,8 @@ static void	frag_new(size_t old_frags_var_max_size
 	/* Make sure its type is valid.  */
 	gas_assert(frag_now->fr_type != 0);
 
-	/*
-	 * This will align the obstack so the next struct we allocate on it
-	 * will begin at a correct boundary.
-	 */
+	/* This will align the obstack so the next struct we allocate on it
+	 * will begin at a correct boundary.  */
 	obstack_finish(&frchain_now->frch_obstack);
 	frchP = frchain_now;
 	know(frchP);
@@ -10263,12 +10247,10 @@ static void	frag_new(size_t old_frags_var_max_size
 
 	frag_now->fr_file = as_where(&frag_now->fr_line);
 
-	/*
-	 * Generally,frag_now->points to an address rounded up to next
+	/* Generally,frag_now->points to an address rounded up to next
 	 * alignment.  However,characters will add to obstack frags
 	 * IMMEDIATELY after the struct frag,even if they are not starting at
-	 * an alignment address.
-	 */
+	 * an alignment address.  */
 	former_last_fragP->fr_next = frag_now;
 	frchP->frch_last = frag_now;
 
@@ -10277,14 +10259,11 @@ static void	frag_new(size_t old_frags_var_max_size
 	frag_now->fr_next = NULL;
 }
 
-/*
- * Start a new frag unless we have n more chars of room in the current frag.
+/* Start a new frag unless we have n more chars of room in the current frag.
  * Close off the old frag with a .fill 0.
  * 
  * Return the address of the 1st char to write into. Advance frag_now_growth past
- * the new chars.
- */
-
+ * the new chars.  */
 static char    *frag_more(size_t nchars)
 {
 	char           *retval;
@@ -10296,11 +10275,8 @@ static char    *frag_more(size_t nchars)
 	return retval;
 }
 
-/*
- * Close the current frag,setting its fields for a relaxable frag.  Start a
- * new frag.
- */
-
+/* Close the current frag,setting its fields for a relaxable frag.  Start a
+ * new frag.  */
 static void	frag_var_init(relax_stateT type,size_t max_chars,size_t var,
       		relax_substateT subtype,symbolS * symbol,offsetT offset,
 			  		char         *opcode)
@@ -10319,13 +10295,11 @@ static void	frag_var_init(relax_stateT type,size_t max_chars,size_t var,
 	frag_new(max_chars);
 }
 
-/*
- * Start a new frag unless we have max_chars more chars of room in the current
+/* Start a new frag unless we have max_chars more chars of room in the current
  * frag.  Close off the old frag with a .fill 0.
  * 
  * Set up a machine_dependent relaxable frag,then start a new frag. Return the
- * address of the 1st char of the var part of the old frag to write into.
- */
+ * address of the 1st char of the var part of the old frag to write into.  */
 
 static char    *frag_var(relax_stateT type,size_t max_chars,size_t var,
      		relax_substateT subtype,symbolS * symbol,offsetT offset,
@@ -10348,14 +10322,11 @@ static void	frag_wane(fragS * fragP)
 	fragP->fr_var = 0;
 }
 
-/*
- * Make an alignment frag.  The size of this frag will be adjusted to force the
+/* Make an alignment frag.  The size of this frag will be adjusted to force the
  * next frag to have the appropriate alignment.  ALIGNMENT is the power of two
  * to which to align.  FILL_CHARACTER is the character to use to fill in any
  * bytes which are skipped.  MAX is the maximum number of characters to skip
- * when doing the alignment,or 0 if there is no maximum.
- */
-
+ * when doing the alignment,or 0 if there is no maximum.  */
 static void	frag_align(int alignment,int fill_character,int max)
 {
 	if (now_seg == absolute_section) {
@@ -10375,14 +10346,11 @@ static void	frag_align(int alignment,int fill_character,int max)
 	}
 }
 
-/*
- * Make an alignment frag like frag_align,but fill with a repeating pattern
+/* Make an alignment frag like frag_align,but fill with a repeating pattern
  * rather than a single byte.  ALIGNMENT is the power of two to which to align.
  * FILL_PATTERN is the fill pattern to repeat in the bytes which are skipped.
  * N_FILL is the number of bytes in FILL_PATTERN.  MAX is the maximum number of
- * characters to skip when doing the alignment,or 0 if there is no maximum.
- */
-
+ * characters to skip when doing the alignment,or 0 if there is no maximum.  */
 static void	frag_align_pattern(int alignment,const char *fill_pattern,
 			       		size_t	n_fill,int max)
 {
@@ -10418,7 +10386,6 @@ static void	frag_align_pattern(int alignment,const char *fill_pattern,
 #define MAX_MEM_FOR_RS_ALIGN_CODE  (((size_t) 1 << alignment) - 1)
 #endif
 #endif
-
 static void	frag_align_code(int alignment,int max)
 {
 	char           *p;
@@ -10440,10 +10407,8 @@ static addressT	frag_now_fix_octets(void)
 
 static addressT	frag_now_fix(void)
 {
-	/*
-	 * Symbols whose section has SEC_ELF_OCTETS set,resolve to octets
-	 * instead of target bytes.
-	 */
+	/* Symbols whose section has SEC_ELF_OCTETS set,resolve to octets
+	 * instead of target bytes.  */
 	if (now_seg->flags & SEC_OCTETS)
 		return frag_now_fix_octets();
 	else
@@ -10460,20 +10425,16 @@ static void	frag_append_1_char(int datum)
 	obstack_1grow(&frchain_now->frch_obstack,datum);
 }
 
-/*
- * Return TRUE if FRAG1 and FRAG2 have a fixed relationship between their start
+/* Return TRUE if FRAG1 and FRAG2 have a fixed relationship between their start
  * addresses.  Set OFFSET to the difference in address not already accounted
- * for in the frag FR_ADDRESS.
- */
+ * for in the frag FR_ADDRESS.  */
 static bool	frag_offset_fixed_p(const fragS * frag1,const fragS * frag2,offsetT * offset)
 {
 	const fragS    *frag;
 	offsetT		off;
 
-	/*
-	 * Start with offset initialised to difference between the two frags.
-	 * Prior to assigning frag addresses this will be zero.
-	 */
+	/* Start with offset initialised to difference between the two frags.
+	 * Prior to assigning frag addresses this will be zero.  */
 	off = frag1->fr_address - frag2->fr_address;
 	if (frag1 == frag2) {
 		*offset = off;
@@ -10603,27 +10564,6 @@ static void	output_sframe(segT sframe_seg ATTRIBUTE_UNUSED)
 }
 
 /* ============================================================** hash.c */
-/*
- * hash.c -- gas hash table code Copyright (C) 1987-2023 Free Software
- * Foundation,Inc.
- * 
- * This file is part of GAS,the GNU Assembler.
- * 
- * GAS is free software; you can redistribute it and/or modify it under the terms
- * of the GNU General Public License as published by the Free Software
- * Foundation; either version 3,or (at your option) any later version.
- * 
- * GAS is distributed in the hope that it will be useful,but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU General Public License along with
- * GAS; see the file COPYING.  If not,write to the Free Software Foundation,
- * 51 Franklin Street - Fifth Floor,Boston,MA 02110-1301,USA.
- */
-
-
 /* Hash function for a string_tuple.  */
 
 static hashval_t hash_string_tuple(const void *e)
@@ -10695,19 +10635,9 @@ struct saved_file {
 
 static char    *input_file_give_next_buffer(char *where);
 static size_t	input_file_buffer_size(void);
-static void	input_file_begin(void);
 static void	input_file_close(void);
-static void	input_file_end(void);
 static void	input_file_open(const char *filename,int pre);
 static void	input_file_pop(char *arg);
-static void	input_file_begin(void)
-{
-	f_in = (FILE *) 0;
-}
-
-static void	input_file_end(void)
-{
-}
 
 /* Return BUFFER_SIZE.  */
 static size_t	input_file_buffer_size(void)
@@ -10942,7 +10872,7 @@ static struct input_save *next_saved_file;
 
 static void	input_scrub_reinit(void)
 {
-	input_file_begin();	/* Reinitialize! */
+	f_in = 0;	/* Reinitialize! */
 	logical_input_line = -1u;
 	logical_input_file = NULL;
 	sb_index = -1;
@@ -10997,14 +10927,11 @@ static void	input_scrub_end(void)
 	if (buffer_start) {
 		free(buffer_start);
 		buffer_start = 0;
-		input_file_end();
 	}
 }
 
-/*
- * Start reading input from a new file. Return start of caller's part of
- * buffer.
- */
+/* Start reading input from a new file. Return start of caller's part of
+ * buffer.  */
 static char    *input_scrub_new_file(const char *filename)
 {
 	input_file_open(filename,!flag_no_comments);
@@ -11112,11 +11039,8 @@ read_more:
 	return partial_where;
 }
 
-/*
- * The remaining part of this file deals with line numbers,error messages and
- * so on.  Return TRUE if we opened any file.
- */
-
+/* The remaining part of this file deals with line numbers,error messages and
+ * so on.  Return TRUE if we opened any file.  */
 static int	seen_at_least_1_file(void)
 {
 	return (physical_input_file != NULL);
@@ -11131,13 +11055,10 @@ static void	bump_line_counters(void)
 		++logical_input_line;
 }
 
-/*
- * Tells us what the new logical line number and file are. If the line_number
+/* Tells us what the new logical line number and file are. If the line_number
  * is -1,we don't change the current logical line number. If fname is NULL,we
  * don't change the current logical file name,unless bit 3 of flags is set.
- * Returns nonzero if the filename actually changes.
- */
-
+ * Returns nonzero if the filename actually changes.  */
 static void	new_logical_line_flags(const char *fname,	/* DON'T destroy it!  We
 								 * point to it!  */
 				   		int		line_number,
@@ -11230,10 +11151,8 @@ static const char *as_where_physical(unsigned int *linep)
 	return NULL;
 }
 
-/*
- * Return the file name and line number at the top most macro invocation,
- * unless .file / .line were used inside a macro.
- */
+/* Return the file name and line number at the top most macro invocation,
+ * unless .file / .line were used inside a macro.  */
 static const char *as_where(unsigned int *linep)
 {
 	const char     *file = as_where_top(linep);
@@ -11294,8 +11213,7 @@ static void	as_warn_internal(const char *,unsigned int,char *);
 static void	as_bad_internal(const char *,unsigned int,char *);
 static void	signal_crash(int)ATTRIBUTE_NORETURN;
 
-/*
- * Despite the rest of the comments in this file,(FIXME-SOON),here is the
+/* Despite the rest of the comments in this file,(FIXME-SOON),here is the
  * current scheme for error messages etc:
  * 
  * as_fatal() is used when gas is quite confused and continuing the assembly is
@@ -11324,10 +11242,8 @@ static void	signal_crash(int)ATTRIBUTE_NORETURN;
  * action is almost certainly correct. In this case,we print a message and
  * then assembly continues as though no error occurred.
  * 
- * as_abort () is used for logic failure (assert or abort,signal).
- */
-
-	static void	identify(const char *file)
+ * as_abort () is used for logic failure (assert or abort,signal).  */
+static void	identify(const char *file)
 {
 	static int	identified;
 
@@ -11482,12 +11398,10 @@ static void	as_bad_internal(const char *file,unsigned int line,char *Buffer)
 
 }
 
-/*
- * Send to stderr a string as a warning,and locate warning in input file(s).
+/* Send to stderr a string as a warning,and locate warning in input file(s).
  * Please use when there is no recovery,but we want to continue processing but
  * not produce an object file. Please explain in string (which may have '\n's)
- * what recovery was done.
- */
+ * what recovery was done.  */
 static void	as_bad(const char *format,...)
 {
 	va_list		args;
@@ -11500,11 +11414,9 @@ static void	as_bad(const char *format,...)
 	as_bad_internal((char *)NULL,0,Buffer);
 }
 
-/*
- * Like as_bad but the file name and line number are passed in. Unfortunately,
+/* Like as_bad but the file name and line number are passed in. Unfortunately,
  * we have to repeat the function in order to handle the varargs correctly and
- * portably.
- */
+ * portably.  */
 static void	as_bad_where(const char *file,unsigned int line,const char *format,...)
 {
 	va_list		args;
@@ -11517,11 +11429,9 @@ static void	as_bad_where(const char *file,unsigned int line,const char *format,.
 	as_bad_internal(file,line,Buffer);
 }
 
-/*
- * Send to stderr a string as a fatal message,and print location of error in
+/* Send to stderr a string as a fatal message,and print location of error in
  * input file(s). Please only use this for when we DON'T have some recovery
- * action. It xexit()s with a warning status.
- */
+ * action. It xexit()s with a warning status. */
 static void	as_fatal(const char *format,...)
 {
 	va_list		args;
@@ -11533,20 +11443,16 @@ static void	as_fatal(const char *format,...)
 	(void)putc('\n',stderr);
 	va_end(args);
 	as_report_context();
-	/*
-	 * Delete the output file,if it exists.  This will prevent make from
-	 * thinking that a file was created and hence does not need rebuilding.
-	 */
+	/* Delete the output file,if it exists.  This will prevent make from
+	 * thinking that a file was created and hence does not need rebuilding.  */
 	if (out_file_name != NULL)
 		unlink(out_file_name);
 	xexit(EXIT_FAILURE);
 }
 
-/*
- * Indicate internal constency error. Arguments: Filename,line number,
+/* Indicate internal constency error. Arguments: Filename,line number,
  * optional function name. FILENAME may be NULL,which we use for
- * crash-via-signal.
- */
+ * crash-via-signal.  */
 static void	as_abort(const char *file,int line,const char *fn)
 {
 	as_show_where();
@@ -11576,24 +11482,16 @@ static void	signal_crash(int signo)
 
 static void	signal_init(void)
 {
-#ifdef SIGSEGV
 	signal(SIGSEGV,signal_crash);
-#endif
-#ifdef SIGILL
 	signal(SIGILL,signal_crash);
-#endif
-#ifdef SIGBUS
 	signal(SIGBUS,signal_crash);
-#endif
 #ifdef SIGABRT
 	signal(SIGABRT,signal_crash);
 #endif
 #if defined SIGIOT && (!defined SIGABRT || SIGABRT != SIGIOT)
 	signal(SIGIOT,signal_crash);
 #endif
-#ifdef SIGFPE
 	signal(SIGFPE,signal_crash);
-#endif
 }
 
 /* Support routines.  */
@@ -14845,19 +14743,15 @@ static int	hex_float(int float_type,char *bytes)
 	if (length < 0)
 		return length;
 
-	/*
-	 * It would be nice if we could go through expression to parse the hex
+	/* It would be nice if we could go through expression to parse the hex
 	 * constant,but if we get a bignum it's a pain to sort it into the
-	 * buffer correctly.
-	 */
+	 * buffer correctly.  */
 	i = 0;
 	while (hex_p(*input_line_pointer) || *input_line_pointer == '_') {
 		int		d;
 
-		/*
-		 * The MRI assembler accepts arbitrary underscores strewn about
-		 * through the hex constant,so we ignore them as well.
-		 */
+		/* The MRI assembler accepts arbitrary underscores strewn about
+		 * through the hex constant,so we ignore them as well.  */
 		if (*input_line_pointer == '_') {
 			++input_line_pointer;
 			continue;
@@ -14892,11 +14786,10 @@ static int	hex_float(int float_type,char *bytes)
 	return length + pad;
 }
 
-/*
- * float_cons() CONStruct some more frag chars of .floats .ffloats etc. Makes 0
+/* CONStruct some more frag chars of .floats .ffloats etc. Makes 0
  * or more new frags. If need_pass_2 == 1,no frags are emitted. This
  * understands only floating literals,not expressions. Sorry.
- * 
+ * Defined in gas/read.c:4907
  * A floating constant is defined by atof_generic(),except it is preceded by 0d
  * 0f 0g or 0h. After observing the STRANGE way my BSD AS does its reading,I
  * decided to be incompatible. This always tries to give you rounded bits to
@@ -14905,9 +14798,7 @@ static int	hex_float(int float_type,char *bytes)
  * noise according to which of 2 floating-point scanners you directed AS to
  * use.
  * 
- * In:	input_line_pointer->whitespace before,or '0' of flonum.
- */
-
+ * In:	input_line_pointer->whitespace before,or '0' of flonum.  */
 static void	float_cons(	/* Clobbers input_line-pointer,checks
 				 * end-of-line.  */
 		       		int		float_type	/* 'f':.ffloat ...
@@ -14922,7 +14813,7 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 		return;
 	}
 	if (now_seg == absolute_section) {
-		as_bad(("attempt to store float in absolute section"));
+		as_bad("attempt to store float in absolute section");
 		ignore_rest_of_line();
 		return;
 	}
@@ -14944,7 +14835,6 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 
 			count = 1;
 
-#ifdef REPEAT_CONS_EXPRESSIONS
 			if (*input_line_pointer == ':') {
 				expressionS	count_exp;
 
@@ -14957,38 +14847,32 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 				else
 					count = count_exp.X_add_number;
 			}
-#endif
-
 			while (--count >= 0) {
 				p = frag_more(length);
 				memcpy(p,temp,(unsigned int)length);
 			}
 		}
 		SKIP_WHITESPACE();
-	}
-	while (*input_line_pointer++ == ',');
+	} while (*input_line_pointer++ == ',');
 
 	/* Put terminator back into stream.  */
 	--input_line_pointer;
 	demand_empty_rest_of_line();
 }
 
-/*
- * LEB128 Encoding.
+/* LEB128 Encoding.
  * 
  * Note - we are using the DWARF standard's definition of LEB128 encoding where
  * each 7-bit value is a stored in a byte,*not* an octet.  This means that on
  * targets where a byte contains multiple octets there is a *huge waste of
  * space*.  (This also means that we do not have to have special versions of
  * these functions for when OCTETS_PER_BYTE_POWER is non-zero).
- * 
+ * Defined in gas/read.c:5005
  * If the 7-bit values were to be packed into N-bit bytes (where N > 8) we would
  * then have to consider whether multiple,successive LEB128 values should be
  * packed into the bytes without padding (bad idea) or whether each LEB128
  * number is padded out to a whole number of bytes. Plus you have to decide on
- * the endianness of packing octets into a byte.
- */
-
+ * the endianness of packing octets into a byte.  */
 /* Return the size of a LEB128 value in bytes.  */
 static unsigned int sizeof_sleb128(offsetT value)
 {
@@ -15033,7 +14917,7 @@ static unsigned int sizeof_leb128(valueT value,int sign)
 		return sizeof_uleb128(value);
 }
 
-/* Output a LEB128 value.  Returns the number of bytes used.  */
+/* Output a LEB128 value.  Returns the number of bytes used. gas/read.c:5051 */
 static inline unsigned int output_sleb128(char *p,offsetT value)
 {
 	char           *orig = p;
@@ -15042,12 +14926,10 @@ static inline unsigned int output_sleb128(char *p,offsetT value)
 	do {
 		unsigned	byte = (value & 0x7f);
 
-		/*
-		 * Sadly,we cannot rely on typical arithmetic right shift
+		/* Sadly,we cannot rely on typical arithmetic right shift
 		 * behaviour. Fortunately,we can structure things so that the
 		 * extra work reduces to a noop on systems that do things
-		 * "properly".
-		 */
+		 * "properly".  */
 		value = (value >> 7)|~(-(offsetT) 1 >> 7);
 
 		more = !((((value == 0) && ((byte & 0x40) == 0))
@@ -15089,12 +14971,9 @@ static unsigned int output_leb128(char *p,valueT value,int sign)
 		return output_uleb128(p,value);
 }
 
-/*
- * Do the same for bignums.  We combine sizeof with output here in that we
+/* Do the same for bignums.  We combine sizeof with output here in that we
  * don't output for NULL values of P.  It isn't really as critical as for
- * "normal" values that this be streamlined.  Returns the number of bytes used.
- */
-
+ * "normal" values that this be streamlined. Returns the number of bytes used. */
 static unsigned	output_big_sleb128(char *p,LITTLENUM_TYPE * bignum,unsigned size)
 {
 	char           *orig = p;
@@ -15190,10 +15069,8 @@ static unsigned	output_big_leb128(char *p,LITTLENUM_TYPE * bignum,unsigned size,
 		return output_big_uleb128(p,bignum,size);
 }
 
-/*
- * Generate the appropriate fragments for a given expression to emit a leb128
- * value.  SIGN is 1 for sleb,0 for uleb.
- */
+/* Generate the appropriate fragments for a given expression to emit a leb128
+ * value.  SIGN is 1 for sleb,0 for uleb. gas/read.c:5220  */
 static void	emit_leb128_expr(expressionS * exp,int sign)
 {
 	operatorT	op = exp->X_op;
@@ -15216,30 +15093,25 @@ static void	emit_leb128_expr(expressionS * exp,int sign)
 				if (op == O_constant
 				    && sign
 				    && (exp->X_add_number < 0) == !exp->X_extrabit) {
-					/*
-					 * We're outputting a signed leb128 and
-					 * the sign of X_add_number doesn't
-					 * reflect the sign of the original
-					 * value.  Convert EXP to a
-					 * correctly-extended bignum instead.
-					 */
+					/* * We're outputting a signed leb128 and the sign of 
+					 * X_add_number doesn't reflect the sign of the original 
+					 * value. Convert EXP to a correctly-extended bignum 
+					 * instead. */
 					convert_to_bignum(exp,exp->X_extrabit);
 					op = O_big;
 				}
 	if (now_seg == absolute_section) {
 		if (op != O_constant || exp->X_add_number != 0)
-			as_bad(("attempt to store value in absolute section"));
+			as_bad("attempt to store value in absolute section");
 		abs_section_offset++;
 		return;
 	}
 	if ((op != O_constant || exp->X_add_number != 0) && in_bss())
-		as_bad(("attempt to store non-zero value in section `%s'"),
+		as_bad("attempt to store non-zero value in section `%s'",
 		       segment_name(now_seg));
 
-	/*
-	 * Let check_eh_frame know that data is being emitted.  nbytes == -1 is
-	 * a signal that this is leb128 data.  It shouldn't optimize this away.
-	 */
+	/* Let check_eh_frame know that data is being emitted.  nbytes == -1 is
+	 * a signal that this is leb128 data.  It shouldn't optimize this away. */
 	nbytes = (unsigned int)-1;
 	if (check_eh_frame(exp,&nbytes))
 		abort();
@@ -15265,12 +15137,10 @@ static void	emit_leb128_expr(expressionS * exp,int sign)
 			unsigned int	size;
 			char           *p;
 
-			/*
-			 * If the leading littenum is 0xffff,prepend a 0 to
+			/* If the leading littenum is 0xffff,prepend a 0 to
 			 * avoid confusion with a signed number.  Unary
 			 * operators like - or ~ always extend the bignum to
-			 * its largest size.
-			 */
+			 * its largest size.  */
 			if (exp->X_unsigned
 			    && nbr_digits < SIZE_OF_LARGE_NUMBER
 			  && generic_bignum[nbr_digits - 1] == LITTLENUM_MASK)
@@ -15281,17 +15151,15 @@ static void	emit_leb128_expr(expressionS * exp,int sign)
 			if (output_big_leb128(p,generic_bignum,nbr_digits,sign) > size)
 				abort();
 		} else {
-			/*
-			 * Otherwise,we have to create a variable sized
-			 * fragment and resolve things later.
-			 */
+			/* Otherwise,we have to create a variable sized
+			 * fragment and resolve things later. */
 
 			frag_var(rs_leb128,sizeof_uleb128(~(valueT) 0),0,sign,
 				 make_expr_symbol(exp),0,(char *)NULL);
 		}
 }
 
-/* Parse the .sleb128 and .uleb128 pseudos.  */
+/* Parse the .sleb128 and .uleb128 pseudos. gas/read.c:5321  */
 static void	s_leb128(int sign)
 {
 	expressionS	exp;
@@ -15415,8 +15283,7 @@ static void	stringer(int bits_appendzero)
 	demand_empty_rest_of_line();
 }
 
-/*
- * FIXME-SOMEDAY: I had trouble here on characters with the high bits set.
+/* FIXME-SOMEDAY: I had trouble here on characters with the high bits set.
  * We'll probably also have trouble with multibyte chars,wide chars,etc.
  * Also be careful about returning values bigger than 1 byte.  xoxorich.
  */
@@ -15445,44 +15312,22 @@ static unsigned int next_char_of_string(void)
 		if (!TC_STRING_ESCAPES)
 			break;
 		switch (c = *input_line_pointer++ & CHAR_MASK) {
-		case 'b':
-			c = '\b';
-			break;
+		case 'b': c = '\b'; break;
 
-		case 'f':
-			c = '\f';
-			break;
+		case 'f': c = '\f'; break;
 
-		case 'n':
-			c = '\n';
-			break;
+		case 'n': c = '\n'; break;
 
-		case 'r':
-			c = '\r';
-			break;
+		case 'r': c = '\r'; break;
 
-		case 't':
-			c = '\t';
-			break;
+		case 't': c = '\t'; break;
 
-		case 'v':
-			c = '\013';
-			break;
+		case 'v': c = '\013'; break;
 
-		case '\\':
-		case '"':
-			break;	/* As itself.  */
+		case '\\': case '"': break;	/* As itself.  */
 
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
-		case '8':
-		case '9':
+		case '0': case '1': case '2': case '3': case '4': case '5':
+		case '6': case '7': case '8': case '9':
 			{
 				unsigned	number;
 				int		i;
@@ -15498,8 +15343,7 @@ static unsigned int next_char_of_string(void)
 			--input_line_pointer;
 			break;
 
-		case 'x':
-		case 'X':
+		case 'x': case 'X':
 			{
 				unsigned	number;
 
@@ -15521,11 +15365,9 @@ static unsigned int next_char_of_string(void)
 			break;
 
 		case '\n':
-			/*
-			 * To be compatible with BSD 4.2 as: give the luser a
-			 * linefeed!!
-			 */
-			as_warn(("unterminated string; newline inserted"));
+			/* To be compatible with BSD 4.2 as: give the luser a
+			 * linefeed!!  */
+			as_warn("unterminated string; newline inserted");
 			c = '\n';
 			bump_line_counters();
 			break;
@@ -15537,12 +15379,8 @@ static unsigned int next_char_of_string(void)
 			break;
 
 		default:
-
-#ifdef ONLY_STANDARD_ESCAPES
 			as_bad(("bad escaped character in string"));
 			c = '?';
-#endif				/* ONLY_STANDARD_ESCAPES */
-
 			break;
 		}
 		break;
@@ -15624,10 +15462,8 @@ static char    *demand_copy_C_string(int *len_pointer)
 	return s;
 }
 
-/*
- * Demand string,but return a safe (=private) copy of the string. Return NULL
- * if we can't read a string here.
- */
+/* Demand string,but return a safe (=private) copy of the string. Return NULL
+ * if we can't read a string here. gas/read.c:5708 */
 static char    *demand_copy_string(int *lenP)
 {
 	unsigned int	c;
@@ -15658,14 +15494,9 @@ static char    *demand_copy_string(int *lenP)
 	return (retval);
 }
 
-/*
- * In:	Input_line_pointer->next character.
- * 
+/* In:	Input_line_pointer->next character.
  * Do:	Skip input_line_pointer over all whitespace.
- * 
- * Out:	1 if input_line_pointer->end-of-line.
- */
-
+ * Out:	1 if input_line_pointer->end-of-line. */
 static int	is_it_end_of_statement(void)
 {
 	SKIP_WHITESPACE();
@@ -15687,12 +15518,10 @@ static void	equals(char *sym_name,int reassign)
 
 }
 
-/*
- * Open FILENAME,first trying the unadorned file name,then if that fails and
+/* Open FILENAME,first trying the unadorned file name,then if that fails and
  * the file name is not an absolute path,attempt to open the file in current
  * -I include paths.  PATH is a preallocated buffer which will be set to the
- * file opened,or FILENAME if no file is found.
- */
+ * file opened,or FILENAME if no file is found. */
 static FILE    *search_and_open(const char *filename,char *path)
 {
 	FILE           *f = fopen(filename,"rb");
@@ -15800,39 +15629,30 @@ static void	generate_file_debug(void)
 static void	generate_lineno_debug(void)
 {
 	switch (debug_type) {
-	case DEBUG_UNSPECIFIED:
-	case DEBUG_NONE:
-	case DEBUG_DWARF:
+	case DEBUG_UNSPECIFIED: case DEBUG_NONE: case DEBUG_DWARF:
 		break;
 	case DEBUG_STABS:
 		stabs_generate_asm_lineno();
 		break;
-	case DEBUG_ECOFF:
-		break;
+	case DEBUG_ECOFF: break;
 	case DEBUG_DWARF2:
-		/*
-		 * ??? We could here indicate to dwarf2dbg.c that something has
+		/* ??? We could here indicate to dwarf2dbg.c that something has
 		 * changed.  However,since there is additional backend support
 		 * that is required (calling dwarf2_emit_insn),we let
-		 * dwarf2dbg.c call as_where on its own.
-		 */
+		 * dwarf2dbg.c call as_where on its own.  */
 		break;
 	}
 }
 
-/*
- * Output debugging information to mark a function entry point or end point.
- * END_P is zero for .func,and non-zero for .endfunc.
- */
+/* Output debugging information to mark a function entry point or end point.
+ * END_P is zero for .func,and non-zero for .endfunc.  */
 static void	s_func(int end_p)
 {
 	do_s_func(end_p,NULL);
 }
 
-/*
- * Subroutine of s_func so targets can choose a different default prefix. If
- * DEFAULT_PREFIX is NULL,use the target's "leading char".
- */
+/* Subroutine of s_func so targets can choose a different default prefix. If
+ * DEFAULT_PREFIX is NULL,use the target's "leading char".  */
 static void	do_s_func(int end_p,const char *default_prefix)
 {
 	if (end_p) {
@@ -17004,12 +16824,9 @@ struct xsymbol	dot_symbol_x;
 #endif
 
 
-/*
- * Utility functions to allocate and duplicate memory on the notes obstack,
+/* Utility functions to allocate and duplicate memory on the notes obstack,
  * each like the corresponding function without "notes_" prefix.  All of these
- * exit on an allocation failure.
- */
-
+ * exit on an allocation failure.  */
 static void    *notes_alloc(size_t size)
 {
 	return obstack_alloc(&notes,size);
@@ -17058,26 +16875,20 @@ static char    *notes_concat(const char *first,...)
 	return obstack_finish(&notes);
 }
 
-/*
- * Use with caution!  Frees PTR and all more recently allocated memory on the
- * notes obstack.
- */
-
+/* Use with caution!  Frees PTR and all more recently allocated memory on the
+ * notes obstack.  */
 static void	notes_free(void *ptr)
 {
 	obstack_free(&notes,ptr);
 }
 
-/*
- * Return a pointer to a new symbol.  Die if we can't make a new symbol.  Fill
+/* Return a pointer to a new symbol.  Die if we can't make a new symbol.  Fill
  * in the symbol's values.  Add symbol to end of symbol chain.
  * 
  * This function should be called in the general case of creating a symbol.
  * However,if the output file symbol table has already been set,and you are
  * certain that this symbol won't be wanted in the output file,you can call
- * symbol_create.
- */
-
+ * symbol_create.  */
 static symbolS *symbol_new(const char *name,segT segment,fragS * frag,valueT valu)
 {
 	symbolS        *symbolP = symbol_create(name,segment,frag,valu);
@@ -17088,10 +16899,8 @@ static symbolS *symbol_new(const char *name,segT segment,fragS * frag,valueT val
 	return symbolP;
 }
 
-/*
- * Save a symbol name on a permanent obstack,and convert it according to the
- * object file format.
- */
+/* Save a symbol name on a permanent obstack,and convert it according to the
+ * object file format.  */
 static const char *save_symbol_name(const char *name)
 {
 	char           *ret;
@@ -17178,18 +16987,13 @@ static symbolS *symbol_create(const char *name,segT segment,fragS * frag,valueT 
 }
 
 
-/*
- * Local symbol support.  If we can get away with it,we keep only a small
- * amount of information for local symbols.
- */
-
+/* Local symbol support.  If we can get away with it,we keep only a small
+ * amount of information for local symbols.  */
 /* Used for statistics.  */
-
 static unsigned long local_symbol_count;
 static unsigned long local_symbol_conversion_count;
 
 /* Create a local symbol and insert it into the local hash table.  */
-
 static struct local_symbol *local_symbol_make(const char *name,
 		  		segT		section,fragS * frag,valueT val)
 {
@@ -17198,9 +17002,7 @@ static struct local_symbol *local_symbol_make(const char *name,
 	struct symbol_flags flags = {.local_symbol = 1,.resolved = 0};
 
 	++local_symbol_count;
-
 	name_copy = save_symbol_name(name);
-
 	ret = notes_alloc(sizeof *ret);
 	ret->flags = flags;
 	ret->hash = 0;
@@ -17208,16 +17010,12 @@ static struct local_symbol *local_symbol_make(const char *name,
 	ret->frag = frag;
 	ret->section = section;
 	ret->value = val;
-
 	htab_insert(sy_hash,ret,1);
-
 	return ret;
 }
 
 /* Convert a local symbol into a real symbol.  */
-
-static symbolS *
-		local_symbol_convert(void *sym)
+static symbolS * local_symbol_convert(void *sym)
 {
 	symbol_entry_t *ent = (symbol_entry_t *) sym;
 	struct xsymbol *xtra;
@@ -17249,11 +17047,8 @@ static void	define_sym_at_dot(symbolS * symbolP)
 	S_SET_SEGMENT(symbolP,now_seg);
 }
 
-/*
- * We have just seen "<name>:". Creates a struct symbol unless it already
- * exists. Gripes if we are redefining a symbol incompatibly (and ignores it).
- */
-
+/* We have just seen "<name>:". Creates a struct symbol unless it already
+ * exists. Gripes if we are redefining a symbol incompatibly (and ignores it).  */
 static symbolS *colon(		/* Just seen "x:" - rattle symbols & frags.  */
 		      		const		char  *sym_name	/* Symbol name,as a
 								 * canonical string.  */
@@ -17261,16 +17056,8 @@ static symbolS *colon(		/* Just seen "x:" - rattle symbols & frags.  */
 {
 	symbolS        *symbolP;/* Symbol we are working with.  */
 
-#ifdef obj_frob_colon
-	obj_frob_colon(sym_name);
-#endif
-
 	if ((symbolP = symbol_find(sym_name)) != 0) {
 		S_CLEAR_WEAKREFR(symbolP);
-#ifdef RESOLVE_SYMBOL_REDEFINITION
-		if (RESOLVE_SYMBOL_REDEFINITION(symbolP))
-			return symbolP;
-#endif
 		/* Now check for undefined symbols.  */
 		if (symbolP->flags.local_symbol) {
 			struct local_symbol *locsym = (struct local_symbol *)symbolP;
@@ -17289,13 +17076,11 @@ static symbolS *colon(		/* Just seen "x:" - rattle symbols & frags.  */
 			if (!(S_IS_DEFINED(symbolP) || symbol_equated_p(symbolP))
 			    || S_IS_COMMON(symbolP)
 			    || S_IS_VOLATILE(symbolP)) {
-#if 1
 				if (S_IS_VOLATILE(symbolP)) {
 					symbolP = symbol_clone(symbolP,1);
 					S_SET_VALUE(symbolP,0);
 					S_CLEAR_VOLATILE(symbolP);
 				}
-#endif
 				if (S_GET_VALUE(symbolP) == 0) {
 					define_sym_at_dot(symbolP);
 #ifdef N_UNDF
@@ -17303,21 +17088,14 @@ static symbolS *colon(		/* Just seen "x:" - rattle symbols & frags.  */
 #endif				/* if we have one,it better be zero.  */
 
 				} else {
-					/*
-					 * There are still several cases to
-					 * check:
-					 * 
-					 * A .comm/.lcomm symbol being redefined
-					 * as initialized data is OK
-					 * 
-					 * A .comm/.lcomm symbol being redefined
-					 * with a larger size is also OK
-					 * 
-					 * This only used to be allowed on VMS
-					 * gas,but Sun cc on the sparc also
-					 * depends on it.
-					 */
-
+				/* There are still several cases to * check:
+				 * 
+				 * A .comm/.lcomm symbol being redefined * as 
+				 * initialized data is OK
+				 * A .comm/.lcomm symbol being redefined with a 
+				 * larger size is also OK
+				 * This only used to be allowed on VMS gas,but 
+				 * Sun cc on the sparc also depends on it.  */
 					if (((!S_IS_DEBUG(symbolP)
 					      && (!S_IS_DEFINED(symbolP) || S_IS_COMMON(symbolP))
 					      && S_IS_EXTERNAL(symbolP))
@@ -17325,45 +17103,23 @@ static symbolS *colon(		/* Just seen "x:" - rattle symbols & frags.  */
 					    && (now_seg == data_section
 						|| now_seg == bss_section
 						|| now_seg == S_GET_SEGMENT(symbolP))) {
-						/*
-						 * Select which of the 2 cases
-						 * this is.
-						 */
+						/* Select which of the 2 cases * this is.  */
 						if (now_seg != data_section) {
-							/*
-							 * New .comm for prev
-							 * .comm symbol.
-							 * 
-							 * If the new size is
-							 * larger we just
-							 * change its value.
-							 * If the new size is
-							 * smaller,we ignore
-							 * this symbol.
-							 */
+						/* New .comm for prev .comm symbol.
+						 * If the new size is larger we just
+						 * change its value. If the new size is
+						 * smaller,we ignore this symbol.  */
 							if (S_GET_VALUE(symbolP)
 							    < ((unsigned)frag_now_fix())) {
 								S_SET_VALUE(symbolP,(valueT) frag_now_fix());
 							}
 						} else {
-							/*
-							 * It is a .comm/.lcomm
-							 * being converted to
-							 * initialized data.
-							 */
+							/* It is a .comm/.lcomm being converted to
+						 	 * initialized data.  */
 							define_sym_at_dot(symbolP);
 						}
 					} else {
-#if (!defined (OBJ_AOUT) && !defined (OBJ_MAYBE_AOUT))
 						static const char *od_buf = "";
-#else
-						char		od_buf    [100];
-						od_buf[0] = '\0';
-						if (OUTPUT_FLAVOR == bfd_target_aout_flavour)
-							sprintf(od_buf,"%d.%d.",
-							 S_GET_OTHER(symbolP),
-							 S_GET_DESC(symbolP));
-#endif
 						as_bad(("symbol `%s' is already defined as \"%s\"/%s%ld"),
 						       sym_name,
 						       segment_name(S_GET_SEGMENT(symbolP)),
@@ -17402,10 +17158,8 @@ static void	symbol_table_insert(symbolS * symbolP)
 	htab_insert(sy_hash,symbolP,1);
 }
 
-/*
- * If a symbol name does not exist,create it as undefined,and insert it into
- * the symbol table.  Return a pointer to it.
- */
+/* If a symbol name does not exist,create it as undefined,and insert it into
+ * the symbol table.  Return a pointer to it.  */
 static symbolS *symbol_find_or_make(const char *name)
 {
 	symbolS        *symbolP;
@@ -17454,12 +17208,10 @@ static symbolS *symbol_clone(symbolS * orgsymP,int replace)
 	/* Make sure we never clone the dot special symbol.  */
 	gas_assert(orgsymP != &dot_symbol);
 
-	/*
-	 * When cloning a local symbol it isn't absolutely necessary to convert
+	/* When cloning a local symbol it isn't absolutely necessary to convert
 	 * the original,but converting makes the code much simpler to cover
 	 * this unexpected case.  As of 2020-08-21 symbol_clone won't be called
-	 * on a local symbol.
-	 */
+	 * on a local symbol.  */
 	if (orgsymP->flags.local_symbol)
 		orgsymP = local_symbol_convert(orgsymP);
 	bsymorg = orgsymP->bsym;
@@ -17478,13 +17230,7 @@ static symbolS *symbol_clone(symbolS * orgsymP,int replace)
 	//bfd_copy_private_symbol_data(bfd_asymbol_bfd(bsymorg),bsymorg,
 				       //bfd_asymbol_bfd(bsymnew),bsymnew);
 
-#ifdef obj_symbol_clone_hook
-	obj_symbol_clone_hook(newsymP,orgsymP);
-#endif
-
-#ifdef tc_symbol_clone_hook
-	tc_symbol_clone_hook(newsymP,orgsymP);
-#endif
+	elf_obj_symbol_clone_hook(newsymP,orgsymP);
 
 	if (replace) {
 		if (symbol_rootP == orgsymP)
@@ -17515,12 +17261,9 @@ static symbolS *symbol_clone(symbolS * orgsymP,int replace)
 	return newsymP;
 }
 
-/*
- * Referenced symbols,if they are forward references,need to be cloned
+/* Referenced symbols,if they are forward references,need to be cloned
  * (without replacing the original) so that the value of the referenced symbols
- * at the point of use is saved by the clone.
- */
-
+ * at the point of use is saved by the clone.  */
 #undef symbol_clone_if_forward_ref
 static symbolS *symbol_clone_if_forward_ref(symbolS * symbolP,int is_forward)
 {
@@ -17536,21 +17279,17 @@ static symbolS *symbol_clone_if_forward_ref(symbolS * symbolP,int is_forward)
 			is_forward = 1;
 
 		if (is_forward) {
-			/*
-			 * assign_symbol() clones volatile symbols;
+			/* assign_symbol() clones volatile symbols;
 			 * pre-existing expressions hold references to the
 			 * original instance,but want the current value.  Just
-			 * repeat the lookup.
-			 */
+			 * repeat the lookup.  */
 			if (add_symbol && S_IS_VOLATILE(add_symbol))
 				add_symbol = symbol_find_exact(S_GET_NAME(add_symbol));
 			if (op_symbol && S_IS_VOLATILE(op_symbol))
 				op_symbol = symbol_find_exact(S_GET_NAME(op_symbol));
 		}
-		/*
-		 * Re-using resolving here,as this routine cannot get called
-		 * from symbol resolution code.
-		 */
+		/* Re-using resolving here,as this routine cannot get called
+		 * from symbol resolution code.  */
 		if ((symbolP->bsym->section == expr_section
 		     || symbolP->flags.forward_ref)
 		    && !symbolP->flags.resolving) {
@@ -17567,9 +17306,6 @@ static symbolS *symbol_clone_if_forward_ref(symbolS * symbolP,int is_forward)
 				symbolP->flags.resolving = 0;
 			} else {
 				symbolP = symbol_temp_new_now();
-#ifdef tc_new_dot_label
-				tc_new_dot_label(symbolP);
-#endif
 			}
 		}
 		symbolP->x->value.X_add_symbol = add_symbol;
@@ -17599,12 +17335,9 @@ static symbolS *symbol_temp_make(void)
 	return symbol_make(FAKE_LABEL_NAME);
 }
 
-/*
- * Implement symbol table lookup. In:	A symbol's name as a string: '\0' can't
+/* Implement symbol table lookup. In:	A symbol's name as a string: '\0' can't
  * be part of a symbol name. Out:	NULL if the name was not in the symbol
- * table,else the address of a struct symbol associated with that name.
- */
-
+ * table,else the address of a struct symbol associated with that name.  */
 static symbolS *symbol_find_exact(const char *name)
 {
 	return symbol_find_exact_noref(name,0);
@@ -17614,13 +17347,11 @@ static symbolS *symbol_find_exact_noref(const char *name,int noref)
 {
 	symbolS        *sym = symbol_entry_find(sy_hash,name);
 
-	/*
-	 * Any references to the symbol,except for the reference in .weakref,
+	/* Any references to the symbol,except for the reference in .weakref,
 	 * must clear this flag,such that the symbol does not turn into a weak
 	 * symbol.  Note that we don't have to handle the local_symbol case,
 	 * since a weakrefd is always promoted out of the local_symbol table
-	 * when it is turned into a weak symbol.
-	 */
+	 * when it is turned into a weak symbol.  */
 	if (sym && !noref)
 		S_CLEAR_WEAKREFD(sym);
 
@@ -17660,12 +17391,10 @@ static symbolS *symbol_find_noref(const char *name,int noref)
 	return result;
 }
 
-/*
- * Once upon a time,symbols were kept in a singly linked list.  At least coff
+/* Once upon a time,symbols were kept in a singly linked list.  At least coff
  * needs to be able to rearrange them from time to time,for which a doubly
  * linked list is much more convenient.  Loic did these as macros which seemed
- * dangerous to me so they're now functions. xoxorich.
- */
+ * dangerous to me so they're now functions. xoxorich.  */
 /* Link symbol ADDME after symbol TARGET in chain. gas/symbols.c:1017 */
 static void	symbol_append(symbolS * addme,symbolS * target,
 		      		symbolS **	rootPP,symbolS ** lastPP)
@@ -17701,7 +17430,7 @@ static void	symbol_append(symbolS * addme,symbolS * target,
 }
 
 /* Set the chain pointers of SYMBOL to null.  */
-/* this is inlined in the original */
+/* this is inlined in the original. jacob */
 static void	symbol_clear_list_pointers(symbolS * symbolP)
 {
 	if (symbolP->flags.local_symbol)
@@ -17794,104 +17523,56 @@ static void	report_op_error(symbolS * symp,
 	const char     *opname;
 
 	switch (op) {
-	default:
-		abort();
-		return;
+	default: abort(); return;
 
-	case O_uminus:
-		opname = "-";
-		break;
-	case O_bit_not:
-		opname = "~";
-		break;
-	case O_logical_not:
-		opname = "!";
-		break;
-	case O_multiply:
-		opname = "*";
-		break;
-	case O_divide:
-		opname = "/";
-		break;
-	case O_modulus:
-		opname = "%";
-		break;
-	case O_left_shift:
-		opname = "<<";
-		break;
-	case O_right_shift:
-		opname = ">>";
-		break;
-	case O_bit_inclusive_or:
-		opname = "|";
-		break;
-	case O_bit_or_not:
-		opname = "|~";
-		break;
-	case O_bit_exclusive_or:
-		opname = "^";
-		break;
-	case O_bit_and:
-		opname = "&";
-		break;
-	case O_add:
-		opname = "+";
-		break;
-	case O_subtract:
-		opname = "-";
-		break;
-	case O_eq:
-		opname = "==";
-		break;
-	case O_ne:
-		opname = "!=";
-		break;
-	case O_lt:
-		opname = "<";
-		break;
-	case O_le:
-		opname = "<=";
-		break;
-	case O_ge:
-		opname = ">=";
-		break;
-	case O_gt:
-		opname = ">";
-		break;
-	case O_logical_and:
-		opname = "&&";
-		break;
-	case O_logical_or:
-		opname = "||";
-		break;
+	case O_uminus: opname = "-"; break;
+	case O_bit_not: opname = "~"; break;
+	case O_logical_not: opname = "!"; break;
+	case O_multiply: opname = "*"; break;
+	case O_divide: opname = "/"; break;
+	case O_modulus: opname = "%"; break;
+	case O_left_shift: opname = "<<"; break;
+	case O_right_shift: opname = ">>"; break;
+	case O_bit_inclusive_or: opname = "|"; break;
+	case O_bit_or_not: opname = "|~"; break;
+	case O_bit_exclusive_or: opname = "^"; break;
+	case O_bit_and: opname = "&"; break;
+	case O_add: opname = "+"; break;
+	case O_subtract: opname = "-"; break;
+	case O_eq: opname = "=="; break;
+	case O_ne: opname = "!="; break;
+	case O_lt: opname = "<"; break;
+	case O_le: opname = "<="; break;
+	case O_ge: opname = ">="; break;
+	case O_gt: opname = ">"; break;
+	case O_logical_and: opname = "&&"; break;
+	case O_logical_or: opname = "||"; break;
 	}
 
 	if (expr_symbol_where(symp,&file,&line)) {
 		if (left)
 			as_bad_where(file,line,
-			   ("invalid operands (%s and %s sections) for `%s'"),
+			   "invalid operands (%s and %s sections) for `%s'",
 				     seg_left->name,seg_right->name,opname);
 		else
 			as_bad_where(file,line,
-				     ("invalid operand (%s section) for `%s'"),
+				     "invalid operand (%s section) for `%s'",
 				     seg_right->name,opname);
 	} else {
 		const char     *sname = S_GET_NAME(symp);
 
 		if (left)
-			as_bad(("invalid operands (%s and %s sections) for `%s' when setting `%s'"),
+			as_bad("invalid operands (%s and %s sections) for `%s' when setting `%s'",
 			       seg_left->name,seg_right->name,opname,sname);
 		else
-			as_bad(("invalid operand (%s section) for `%s' when setting `%s'"),
+			as_bad("invalid operand (%s section) for `%s' when setting `%s'",
 			       seg_right->name,opname,sname);
 	}
 }
 
-/*
- * Resolve the value of a symbol.  This is called during the final pass over
+/* Resolve the value of a symbol.  This is called during the final pass over
  * the symbol table to resolve any symbols with complex values.
- * gas/symbols.c:1285
- */
+ * gas/symbols.c:1285 */
 static valueT	resolve_symbol_value(symbolS * symp)
 {
 	int		resolved;
@@ -17905,10 +17586,8 @@ static valueT	resolve_symbol_value(symbolS * symp)
 		if (locsym->flags.resolved)
 			return final_val;
 
-		/*
-		 * Symbols whose section has SEC_ELF_OCTETS set,resolve to
-		 * octets instead of target bytes.
-		 */
+		/* Symbols whose section has SEC_ELF_OCTETS set,resolve to
+		 * octets instead of target bytes.  */
 		if (locsym->section->flags & SEC_OCTETS)
 			final_val += locsym->frag->fr_address;
 		else
@@ -17944,125 +17623,45 @@ static valueT	resolve_symbol_value(symbolS * symp)
 
 	if (symp->flags.resolving) {
 		if (finalize_syms)
-			as_bad(("symbol definition loop encountered at `%s'"),
+			as_bad("symbol definition loop encountered at `%s'",
 			       S_GET_NAME(symp));
 		final_val = 0;
 		resolved = 1;
 	}
-#ifdef OBJ_COMPLEX_RELC
-	else
-		if (final_seg == expr_section
-		    && use_complex_relocs_for(symp)) {
-			symbolS        *relc_symbol = NULL;
-			char           *relc_symbol_name = NULL;
+	else {
+		symbolS        *add_symbol,*op_symbol;
+		offsetT		left  ,right;
+		segT		seg_left ,seg_right;
+		operatorT	op;
+		int		move_seg_ok;
 
-			relc_symbol_name = symbol_relc_make_expr(&symp->x->value);
+		symp->flags.resolving = 1;
 
-			/* For debugging,print out conversion input & output.  */
-#ifdef DEBUG_SYMS
-			print_expr(&symp->x->value);
-			if (relc_symbol_name)
-				fprintf(stderr,"-> relc symbol: %s\n",relc_symbol_name);
-#endif
+		/* Help out with CSE.  */
+		add_symbol = symp->x->value.X_add_symbol;
+		op_symbol = symp->x->value.X_op_symbol;
+		final_val = symp->x->value.X_add_number;
+		op = symp->x->value.X_op;
 
-			if (relc_symbol_name != NULL)
-				relc_symbol = symbol_new(relc_symbol_name,undefined_section,
-						       &zero_address_frag,0);
+		switch (op) {
+		default: BAD_CASE(op); break;
 
-			if (relc_symbol == NULL) {
-				as_bad(("cannot convert expression symbol %s to complex relocation"),
-				       S_GET_NAME(symp));
-				resolved = 0;
-			} else {
-				symbol_table_insert(relc_symbol);
-
-				/* S_CLEAR_EXTERNAL (relc_symbol); */
-				if (symp->bsym->flags & BSF_SRELC)
-					relc_symbol->bsym->flags |= BSF_SRELC;
-				else
-					relc_symbol->bsym->flags |= BSF_RELC;
-				/* symp->bsym->flags |= BSF_RELC; */
-				copy_symbol_attributes(symp,relc_symbol);
-				symp->x->value.X_op = O_symbol;
-				symp->x->value.X_add_symbol = relc_symbol;
-				symp->x->value.X_add_number = 0;
-				resolved = 1;
-			}
-
-			final_val = 0;
-			final_seg = undefined_section;
-			goto exit_dont_set_value;
-		}
-#endif
-		else {
-			symbolS        *add_symbol,*op_symbol;
-			offsetT		left  ,right;
-			segT		seg_left ,seg_right;
-			operatorT	op;
-			int		move_seg_ok;
-
-			symp->flags.resolving = 1;
-
-			/* Help out with CSE.  */
-			add_symbol = symp->x->value.X_add_symbol;
-			op_symbol = symp->x->value.X_op_symbol;
-			final_val = symp->x->value.X_add_number;
-			op = symp->x->value.X_op;
-
-			switch (op) {
-			default:
-				BAD_CASE(op);
-				break;
-
-			case O_md1:
-			case O_md2:
-			case O_md3:
-			case O_md4:
-			case O_md5:
-			case O_md6:
-			case O_md7:
-			case O_md8:
-			case O_md9:
-			case O_md10:
-			case O_md11:
-			case O_md12:
-			case O_md13:
-			case O_md14:
-			case O_md15:
-			case O_md16:
-			case O_md17:
-			case O_md18:
-			case O_md19:
-			case O_md20:
-			case O_md21:
-			case O_md22:
-			case O_md23:
-			case O_md24:
-			case O_md25:
-			case O_md26:
-			case O_md27:
-			case O_md28:
-			case O_md29:
-			case O_md30:
-			case O_md31:
-			case O_md32:
-#ifdef md_resolve_symbol
-				resolved = md_resolve_symbol(symp,&final_val,&final_seg);
-				if (resolved)
-					break;
-#endif
+		case O_md1: case O_md2: case O_md3: case O_md4: case O_md5:
+		case O_md6: case O_md7: case O_md8: case O_md9: case O_md10:
+		case O_md11: case O_md12: case O_md13: case O_md14: case O_md15:
+		case O_md16: case O_md17: case O_md18: case O_md19: case O_md20:
+		case O_md21: case O_md22: case O_md23: case O_md24: case O_md25:
+		case O_md26: case O_md27: case O_md28: case O_md29: case O_md30:
+		case O_md31: case O_md32:
 				goto exit_dont_set_value;
 
 			case O_absent:
 				final_val = 0;
 				/* Fall through.  */
-
 			case O_constant:
-				/*
-				 * Symbols whose section has SEC_ELF_OCTETS
+				/* * Symbols whose section has SEC_ELF_OCTETS
 				 * set,resolve to octets instead of target
-				 * bytes.
-				 */
+				 * bytes.  */
 				if (symp->bsym->section->flags & SEC_OCTETS)
 					final_val += symp->frag->fr_address;
 				else
@@ -18070,14 +17669,11 @@ static valueT	resolve_symbol_value(symbolS * symp)
 				if (final_seg == expr_section)
 					final_seg = absolute_section;
 				/* Fall through.  */
-
 			case O_register:
 				resolved = 1;
 				break;
 
-			case O_symbol:
-			case O_symbol_rva:
-			case O_secidx:
+			case O_symbol: case O_symbol_rva: case O_secidx:
 				left = resolve_symbol_value(add_symbol);
 				seg_left = S_GET_SEGMENT(add_symbol);
 				if (finalize_syms)
@@ -18105,15 +17701,13 @@ static valueT	resolve_symbol_value(symbolS * symp)
 						add_symbol = local_symbol_convert(add_symbol);
 					copy_symbol_attributes(symp,add_symbol);
 				}
-				/*
-				 * If we have equated this symbol to an
+				/* If we have equated this symbol to an
 				 * undefined or common symbol,keep X_op set to
 				 * O_symbol,and don't change X_add_number.
 				 * This permits the routine which writes out
 				 * relocation to detect this case,and convert
 				 * the relocation to be against the symbol to
-				 * which this symbol is equated.
-				 */
+				 * which this symbol is equated.  */
 				if (seg_left == undefined_section
 				    || bfd_is_com_section(seg_left)
 				    || (finalize_syms
@@ -18151,9 +17745,7 @@ static valueT	resolve_symbol_value(symbolS * symp)
 				}
 				break;
 
-			case O_uminus:
-			case O_bit_not:
-			case O_logical_not:
+			case O_uminus: case O_bit_not: case O_logical_not:
 				left = resolve_symbol_value(add_symbol);
 				seg_left = S_GET_SEGMENT(add_symbol);
 
@@ -18184,35 +17776,19 @@ static valueT	resolve_symbol_value(symbolS * symp)
 				resolved = symbol_resolved_p(add_symbol);
 				break;
 
-			case O_multiply:
-			case O_divide:
-			case O_modulus:
-			case O_left_shift:
-			case O_right_shift:
-			case O_bit_inclusive_or:
-			case O_bit_or_not:
-			case O_bit_exclusive_or:
-			case O_bit_and:
-			case O_add:
-			case O_subtract:
-			case O_eq:
-			case O_ne:
-			case O_lt:
-			case O_le:
-			case O_ge:
-			case O_gt:
-			case O_logical_and:
-			case O_logical_or:
+			case O_multiply: case O_divide: case O_modulus: case O_left_shift:
+			case O_right_shift: case O_bit_inclusive_or: case O_bit_or_not:
+			case O_bit_exclusive_or: case O_bit_and: case O_add:
+			case O_subtract: case O_eq: case O_ne: case O_lt: case O_le:
+			case O_ge: case O_gt: case O_logical_and: case O_logical_or:
 				left = resolve_symbol_value(add_symbol);
 				right = resolve_symbol_value(op_symbol);
 				seg_left = S_GET_SEGMENT(add_symbol);
 				seg_right = S_GET_SEGMENT(op_symbol);
 
-				/*
-				 * Simplify addition or subtraction of a
+				/* Simplify addition or subtraction of a
 				 * constant by folding the constant into
-				 * X_add_number.
-				 */
+				 * X_add_number.  */
 				if (op == O_add) {
 					if (seg_right == absolute_section) {
 						final_val += right;
@@ -18233,18 +17809,14 @@ static valueT	resolve_symbol_value(symbolS * symp)
 						}
 					}
 				move_seg_ok = 1;
-				/*
-				 * Equality and non-equality tests are
-				 * permitted on anything. Subtraction,and
-				 * other comparison operators are permitted if
-				 * both operands are in the same section.
+				/* Equality and non-equality tests are permitted on 
+				 * anything. Subtraction,and other comparison operators 
+				 * are permitted if both operands are in the same section.
 				 * Otherwise,both operands must be absolute.
-				 * We already handled the case of addition or
-				 * subtraction of a constant above.  This will
-				 * probably need to be changed for an object
-				 * file format which supports arbitrary
-				 * expressions.
-				 */
+				 * We already handled the case of addition or subtraction 
+				 * of a constant above.  This will probably need to be 
+				 * changed for an object file format which supports arbitrary
+				 * expressions.  */
 				if (!(seg_left == absolute_section
 				      && seg_right == absolute_section)
 				    && !(op == O_eq || op == O_ne)
@@ -18253,22 +17825,15 @@ static valueT	resolve_symbol_value(symbolS * symp)
 					 && seg_left == seg_right
 					 && (seg_left != undefined_section
 					     || add_symbol == op_symbol))) {
-					/*
-					 * Don't emit messages unless we're
-					 * finalizing the symbol value,
-					 * otherwise we may get the same
-					 * message multiple times.
-					 */
+					/* Don't emit messages unless we're finalizing the symbol 
+					 * value, otherwise we may get the same message multiple 
+					 * times.  */
 					if (finalize_syms)
 						report_op_error(symp,add_symbol,op,op_symbol);
-					/*
-					 * However do not move the symbol into
-					 * the absolute section if it cannot
-					 * currently be resolved - this would
-					 * confuse other parts of the assembler
-					 * into believing that the expression
-					 * had been evaluated to zero.
-					 */
+					/* However do not move the symbol into the absolute section 
+					 * if it cannot currently be resolved - this would
+					 * confuse other parts of the assembler into believing that 
+					 * the expression had been evaluated to zero.  */
 					else
 						move_seg_ok = 0;
 				}
@@ -18278,12 +17843,8 @@ static valueT	resolve_symbol_value(symbolS * symp)
 
 				/* Check for division by zero.  */
 				if ((op == O_divide || op == O_modulus) && right == 0) {
-					/*
-					 * If seg_right is not
-					 * absolute_section,then we've already
-					 * issued a warning about using a bad
-					 * symbol.
-					 */
+					/* If seg_right is not absolute_section,then we've already
+					 * issued a warning about using a bad symbol.  */
 					if (seg_right == absolute_section && finalize_syms) {
 						const char     *file;
 						unsigned int	line;
@@ -18304,41 +17865,18 @@ static valueT	resolve_symbol_value(symbolS * symp)
 					left = right = 0;
 				}
 				switch (symp->x->value.X_op) {
-				case O_multiply:
-					left *= right;
-					break;
-				case O_divide:
-					left /= right;
-					break;
-				case O_modulus:
-					left %= right;
-					break;
-				case O_left_shift:
-					left = (valueT) left << (valueT) right;
-					break;
-				case O_right_shift:
-					left = (valueT) left >> (valueT) right;
-					break;
-				case O_bit_inclusive_or:
-					left |= right;
-					break;
-				case O_bit_or_not:
-					left |= ~right;
-					break;
-				case O_bit_exclusive_or:
-					left ^= right;
-					break;
-				case O_bit_and:
-					left &= right;
-					break;
-				case O_add:
-					left += right;
-					break;
-				case O_subtract:
-					left -= right;
-					break;
-				case O_eq:
-				case O_ne:
+				case O_multiply: left *= right; break;
+				case O_divide: left /= right; break;
+				case O_modulus: left %= right; break;
+				case O_left_shift: left = (valueT) left << (valueT) right; break;
+				case O_right_shift: left = (valueT) left >> (valueT) right; break;
+				case O_bit_inclusive_or: left |= right; break;
+				case O_bit_or_not: left |= ~right; break;
+				case O_bit_exclusive_or: left ^= right; break;
+				case O_bit_and: left &= right; break;
+				case O_add: left += right; break;
+				case O_subtract: left -= right; break;
+				case O_eq: case O_ne:
 					left = (left == right && seg_left == seg_right
 					     && (seg_left != undefined_section
 						 || add_symbol == op_symbol)
@@ -18346,28 +17884,14 @@ static valueT	resolve_symbol_value(symbolS * symp)
 					if (symp->x->value.X_op == O_ne)
 						left = ~left;
 					break;
-				case O_lt:
-					left = left < right ? ~(offsetT) 0 : 0;
-					break;
-				case O_le:
-					left = left <= right ? ~(offsetT) 0 : 0;
-					break;
-				case O_ge:
-					left = left >= right ? ~(offsetT) 0 : 0;
-					break;
-				case O_gt:
-					left = left > right ? ~(offsetT) 0 : 0;
-					break;
-				case O_logical_and:
-					left = left && right;
-					break;
-				case O_logical_or:
-					left = left || right;
-					break;
+				case O_lt: left = left < right ? ~(offsetT) 0 : 0; break;
+				case O_le: left = left <= right ? ~(offsetT) 0 : 0; break;
+				case O_ge: left = left >= right ? ~(offsetT) 0 : 0; break;
+				case O_gt: left = left > right ? ~(offsetT) 0 : 0; break;
+				case O_logical_and: left = left && right; break;
+				case O_logical_or: left = left || right; break;
 
-				case O_illegal:
-				case O_absent:
-				case O_constant:
+				case O_illegal: case O_absent: case O_constant:
 					/* See PR 20895 for a reproducer.  */
 					as_bad(("Invalid operation on symbol"));
 					goto exit_dont_set_value;
@@ -18391,16 +17915,11 @@ static valueT	resolve_symbol_value(symbolS * symp)
 					    && symbol_resolved_p(op_symbol));
 				break;
 
-			case O_big:
-			case O_illegal:
-				/*
-				 * Give an error (below) if not in
-				 * expr_section.  We don't want to worry about
-				 * expr_section symbols,because they are
-				 * fictional (they are created as part of
-				 * expression resolution),and any problems may
-				 * not actually mean anything.
-				 */
+			case O_big: case O_illegal:
+			/* Give an error (below) if not in expr_section.  We don't 
+			 * want to worry about expr_section symbols,because they are
+			 * fictional (they are created as part of expression resolution),
+			 * and any problems may not actually mean anything.  */
 				break;
 			}
 
@@ -18411,10 +17930,8 @@ static valueT	resolve_symbol_value(symbolS * symp)
 		S_SET_VALUE(symp,final_val);
 
 exit_dont_set_value:
-	/*
-	 * Always set the segment,even if not finalizing the value. The
-	 * segment is used to determine whether a symbol is defined.
-	 */
+	/* Always set the segment,even if not finalizing the value. The
+	 * segment is used to determine whether a symbol is defined.  */
 	S_SET_SEGMENT(symp,final_seg);
 
 	/* Don't worry if we can't resolve an expr_section symbol.  */
@@ -18432,7 +17949,6 @@ exit_dont_set_value:
 }
 
 /* A static function passed to hash_traverse.  */
-
 static int	resolve_local_symbol(void **slot,void *arg ATTRIBUTE_UNUSED)
 {
 	symbol_entry_t *entry = *((symbol_entry_t **) slot);
@@ -18441,11 +17957,9 @@ static int	resolve_local_symbol(void **slot,void *arg ATTRIBUTE_UNUSED)
 	return 1;
 }
 
-/*
- * This function scans over the entire hash table calling CALLBACK for each
+/* This function scans over the entire hash table calling CALLBACK for each
  * live entry.  If CALLBACK returns false,the iteration stops.  INFO is passed
- * as CALLBACK's second argument.
- */
+ * as CALLBACK's second argument.  */
 static void	htab_traverse_noresize(htab_t htab,htab_trav callback,void *info)
 {
 	void          **slot;
@@ -18469,11 +17983,8 @@ static void	resolve_local_symbol_values(void)
 	htab_traverse_noresize(sy_hash,resolve_local_symbol,NULL);
 }
 
-/*
- * Obtain the current value of a symbol without changing any sub-expressions
- * used.
- */
-
+/* Obtain the current value of a symbol without changing any sub-expressions
+ * used.  */
 static int	snapshot_symbol(symbolS ** symbolPP,valueT * valueP,segT * segP,fragS ** fragPP)
 {
 	symbolS        *symbolP = *symbolPP;
@@ -18514,10 +18025,8 @@ static int	snapshot_symbol(symbolS ** symbolPP,valueT * valueP,segT * segP,fragS
 		}
 		*symbolPP = symbolP;
 
-		/*
-		 * A bogus input file can result in resolve_expression()
-		 * generating a local symbol,so we have to check again.
-		 */
+		/* A bogus input file can result in resolve_expression()
+		 * generating a local symbol,so we have to check again.  */
 		if (symbolP->flags.local_symbol) {
 			struct local_symbol *locsym = (struct local_symbol *)symbolP;
 
@@ -18546,8 +18055,7 @@ static int	snapshot_symbol(symbolS ** symbolPP,valueT * valueP,segT * segP,fragS
 	return 1;
 }
 
-/*
- * Somebody else's idea of local labels. They are made by "n:" where n is any
+/* Somebody else's idea of local labels. They are made by "n:" where n is any
  * decimal digit. Refer to them with "nb" for previous (backward) n: or "nf"
  * for next (forward) n:.
  * 
@@ -18560,8 +18068,7 @@ static int	snapshot_symbol(symbolS ** symbolPP,valueT * valueP,segT * segP,fragS
  * implies that one can refer to a label in another segment,and indeed some
  * crufty compilers have done just that.
  * 
- * Since there could be a LOT of these things,treat them as a sparse array.
- */
+ * Since there could be a LOT of these things,treat them as a sparse array.  */
 
 #define FB_LABEL_SPECIAL (10)
 
@@ -18581,7 +18088,6 @@ static void	fb_label_init(void)
 }
 
 /* Add one to the instance number of this fb label.  */
-
 static void	fb_label_instance_inc(unsigned int label)
 {
 	fb_ent         *i;
@@ -18633,15 +18139,12 @@ static unsigned int fb_label_instance(unsigned int label)
 				return (fb_label_instances[i - fb_labels]);
 		}
 	}
-	/*
-	 * We didn't find the label,so this must be a reference to the first
-	 * instance.
-	 */
+	/* We didn't find the label,so this must be a reference to the first
+	 * instance.  */
 	return 0;
 }
 
-/*
- * Caller must copy returned name: we re-use the area for the next name.
+/* Caller must copy returned name: we re-use the area for the next name.
  * 
  * The mth occurrence of label n: is turned into the symbol "Ln^Bm" where n is the
  * label number and m is the instance number. "L" makes it a label discarded
@@ -18651,9 +18154,7 @@ static unsigned int fb_label_instance(unsigned int label)
  * 
  * dollar labels get the same treatment,except that ^A is used in place of ^B.
  * 
- * AUGEND is 0 for nb,1 for n:,nf.
- */
-
+ * AUGEND is 0 for nb,1 for n:,nf.  */
 static char    *fb_label_name(unsigned int n,unsigned int augend)
 {
 	/* Returned to caller,then copied.  Used for created names ("4f").  */
@@ -18783,14 +18284,7 @@ static void	copy_symbol_attributes(symbolS * dest,symbolS * src)
 #define COPIED_SYMFLAGS	(BSF_FUNCTION|BSF_OBJECT \
 			|BSF_GNU_INDIRECT_FUNCTION)
 	dest->bsym->flags |= src->bsym->flags & COPIED_SYMFLAGS;
-
-#ifdef OBJ_COPY_SYMBOL_ATTRIBUTES
 	OBJ_COPY_SYMBOL_ATTRIBUTES(dest,src);
-#endif
-
-#ifdef TC_COPY_SYMBOL_ATTRIBUTES
-	TC_COPY_SYMBOL_ATTRIBUTES(dest,src);
-#endif
 }
 
 static int	S_IS_FUNCTION(symbolS * s)
@@ -18819,12 +18313,10 @@ static int	S_IS_WEAK(symbolS * s)
 {
 	if (s->flags.local_symbol)
 		return 0;
-	/*
-	 * Conceptually,a weakrefr is weak if the referenced symbol is.  We
+	/* Conceptually,a weakrefr is weak if the referenced symbol is.  We
 	 * could probably handle a WEAKREFR as always weak though.  E.g.,if
 	 * the referenced symbol has lost its weak status,there's no reason to
-	 * keep handling the weakrefr as if it was weak.
-	 */
+	 * keep handling the weakrefr as if it was weak.  */
 	if (S_IS_WEAKREFR(s))
 		return S_IS_WEAK(s->x->value.X_add_symbol);
 	return (s->bsym->flags & BSF_WEAK) != 0;
@@ -18863,10 +18355,8 @@ static int	S_IS_DEFINED(symbolS * s)
 #define EXTERN_FORCE_RELOC IS_ELF
 #endif
 
-/*
- * Return true for symbols that should not be reduced to section symbols or
- * eliminated from expressions,because they may be overridden by the linker.
- */
+/* Return true for symbols that should not be reduced to section symbols or
+ * eliminated from expressions,because they may be overridden by the linker.  */
 static int	S_FORCE_RELOC(symbolS * s,int strict)
 {
 	segT		sec;
@@ -19009,12 +18499,10 @@ static void	S_SET_EXTERNAL(symbolS * s)
 		as_warn(("can't make section symbol global"));
 		return;
 	}
-#ifndef TC_GLOBAL_REGISTER_SYMBOL_OK
 	if (S_GET_SEGMENT(s) == reg_section) {
 		as_bad(("can't make register symbol global"));
 		return;
 	}
-#endif
 	s->bsym->flags |= BSF_GLOBAL;
 	s->bsym->flags &= ~(BSF_LOCAL|BSF_WEAK);
 
@@ -19036,9 +18524,6 @@ static void	S_SET_WEAK(symbolS * s)
 {
 	if (s->flags.local_symbol)
 		s = local_symbol_convert(s);
-#ifdef obj_set_weak_hook
-	obj_set_weak_hook(s);
-#endif
 	s->bsym->flags |= BSF_WEAK;
 	s->bsym->flags &= ~(BSF_GLOBAL|BSF_LOCAL);
 }
@@ -19087,9 +18572,6 @@ static void	S_CLEAR_WEAKREFD(symbolS * s)
 		 * later turned into a global,like any other undefined symbol.
 		 */
 		if (s->bsym->flags & BSF_WEAK) {
-#ifdef obj_clear_weak_hook
-			obj_clear_weak_hook(s);
-#endif
 			s->bsym->flags &= ~BSF_WEAK;
 			s->bsym->flags |= BSF_LOCAL;
 		}
@@ -19114,7 +18596,7 @@ static void	S_SET_THREAD_LOCAL(symbolS * s)
 			       S_GET_NAME(s));
 }
 
-void		S_SET_NAME(symbolS * s,const char *name)
+static void	S_SET_NAME(symbolS * s,const char *name)
 {
 	s->name = name;
 	if (s->flags.local_symbol)
@@ -19202,7 +18684,6 @@ static void	symbol_set_frag(symbolS * s,fragS * f)
 }
 
 /* Return the frag of a symbol.  */
-
 static fragS   *symbol_get_frag(symbolS * s)
 {
 	if (s->flags.local_symbol)
@@ -19221,7 +18702,6 @@ static void	symbol_mark_used(symbolS * s)
 }
 
 /* Return whether a symbol has been used.  */
-
 static int	symbol_used_p(symbolS * s)
 {
 	if (s->flags.local_symbol)
@@ -19297,10 +18777,8 @@ static int	symbol_equated_p(symbolS * s)
 	return s->x->value.X_op == O_symbol;
 }
 
-/*
- * Return whether a symbol is equated to another symbol,and should be treated
- * specially when writing out relocs.
- */
+/* Return whether a symbol is equated to another symbol,and should be treated
+ * specially when writing out relocs.  */
 static int	symbol_equated_reloc_p(symbolS * s)
 {
 	if (s->flags.local_symbol)
@@ -19323,10 +18801,8 @@ static int	symbol_constant_p(symbolS * s)
 	return s->x->value.X_op == O_constant;
 }
 
-/*
- * Return whether a symbol was cloned and thus removed from the global symbol
- * list.
- */
+/* Return whether a symbol was cloned and thus removed from the global symbol
+ * list.  */
 static int	symbol_shadow_p(symbolS * s)
 {
 	if (s->flags.local_symbol)
@@ -19368,7 +18844,6 @@ static void	symbol_set_bfdsym(symbolS * s,asymbol * bsym)
 	/* else XXX - What do we do now ?  */
 }
 
-#ifdef OBJ_SYMFIELD_TYPE
 /* Get a pointer to the object format information for a symbol.  */
 static OBJ_SYMFIELD_TYPE *symbol_get_obj(symbolS * s)
 {
@@ -19377,8 +18852,6 @@ static OBJ_SYMFIELD_TYPE *symbol_get_obj(symbolS * s)
 	return &s->x->obj;
 }
 
-#endif				/* OBJ_SYMFIELD_TYPE */
-
 static void	symbol_begin(void)
 {
 	symbol_lastP = NULL;
@@ -19386,9 +18859,7 @@ static void	symbol_begin(void)
 	sy_hash = htab_create_alloc(16,hash_symbol_entry,eq_symbol_entry,
 				    NULL,xcalloc,free);
 
-#if defined (EMIT_SECTION_SYMBOLS) || !defined (RELOC_REQUIRES_SYMBOL)
 	abs_symbol.bsym = bfd_abs_section_ptr->symbol;
-#endif
 	abs_symbol.x = &abs_symbol_x;
 	abs_symbol.x->value.X_op = O_constant;
 	abs_symbol.frag = &zero_address_frag;
@@ -19416,9 +18887,7 @@ static void	dot_symbol_init(void)
 
 static int	indent_level;
 
-/*
- * Maximum indent level. Available for modification inside a gdb session.
- */
+/* Maximum indent level. Available for modification inside a gdb session.  */
 static int	max_indent_level = 8;
 
 static void	print_symbol_value_1(FILE * file,symbolS * sym)
@@ -19504,14 +18973,9 @@ static void	print_expr_1(FILE * file,expressionS * exp)
 {
 	fprintf(file,"expr %p ",exp);
 	switch (exp->X_op) {
-	case O_illegal:
-		fprintf(file,"illegal");
-		break;
-	case O_absent:
-		fprintf(file,"absent");
-		break;
-	case O_constant:
-		fprintf(file,"constant %" PRIx64,(uint64_t) exp->X_add_number);
+	case O_illegal: fprintf(file,"illegal"); break;
+	case O_absent: fprintf(file,"absent"); break;
+	case O_constant: fprintf(file,"constant %" PRIx64,(uint64_t)exp->X_add_number);
 		break;
 	case O_symbol:
 		indent_level++;
@@ -19527,66 +18991,30 @@ maybe_print_addnum:
 	case O_register:
 		fprintf(file,"register #%d",(int)exp->X_add_number);
 		break;
-	case O_big:
-		fprintf(file,"big");
-		break;
+	case O_big: fprintf(file,"big"); break;
 	case O_uminus:
 		fprintf(file,"uminus -<");
 		indent_level++;
 		print_symbol_value_1(file,exp->X_add_symbol);
 		fprintf(file,">");
 		goto maybe_print_addnum;
-	case O_bit_not:
-		fprintf(file,"bit_not");
-		break;
-	case O_multiply:
-		print_binary(file,"multiply",exp);
-		break;
-	case O_divide:
-		print_binary(file,"divide",exp);
-		break;
-	case O_modulus:
-		print_binary(file,"modulus",exp);
-		break;
-	case O_left_shift:
-		print_binary(file,"lshift",exp);
-		break;
-	case O_right_shift:
-		print_binary(file,"rshift",exp);
-		break;
-	case O_bit_inclusive_or:
-		print_binary(file,"bit_ior",exp);
-		break;
-	case O_bit_exclusive_or:
-		print_binary(file,"bit_xor",exp);
-		break;
-	case O_bit_and:
-		print_binary(file,"bit_and",exp);
-		break;
-	case O_eq:
-		print_binary(file,"eq",exp);
-		break;
-	case O_ne:
-		print_binary(file,"ne",exp);
-		break;
-	case O_lt:
-		print_binary(file,"lt",exp);
-		break;
-	case O_le:
-		print_binary(file,"le",exp);
-		break;
-	case O_ge:
-		print_binary(file,"ge",exp);
-		break;
-	case O_gt:
-		print_binary(file,"gt",exp);
-		break;
-	case O_logical_and:
-		print_binary(file,"logical_and",exp);
-		break;
-	case O_logical_or:
-		print_binary(file,"logical_or",exp);
-		break;
+	case O_bit_not: fprintf(file,"bit_not"); break;
+	case O_multiply: print_binary(file,"multiply",exp); break;
+	case O_divide: print_binary(file,"divide",exp); break;
+	case O_modulus: print_binary(file,"modulus",exp); break;
+	case O_left_shift: print_binary(file,"lshift",exp); break;
+	case O_right_shift: print_binary(file,"rshift",exp); break;
+	case O_bit_inclusive_or: print_binary(file,"bit_ior",exp); break;
+	case O_bit_exclusive_or: print_binary(file,"bit_xor",exp); break;
+	case O_bit_and: print_binary(file,"bit_and",exp); break;
+	case O_eq: print_binary(file,"eq",exp); break;
+	case O_ne: print_binary(file,"ne",exp); break;
+	case O_lt: print_binary(file,"lt",exp); break;
+	case O_le: print_binary(file,"le",exp); break;
+	case O_ge: print_binary(file,"ge",exp); break;
+	case O_gt: print_binary(file,"gt",exp); break;
+	case O_logical_and: print_binary(file,"logical_and",exp); break;
+	case O_logical_or: print_binary(file,"logical_or",exp); break;
 	case O_add:
 		indent_level++;
 		fprintf(file,"add\n%*s<",indent_level * 4,"");
@@ -19610,14 +19038,6 @@ maybe_print_addnum:
 	fflush(stdout);
 }
 
-#ifdef NOTUSED
-void		print_expr(expressionS * exp)
-{
-	print_expr_1(stderr,exp);
-	fprintf(stderr,"\n");
-}
-#endif
-
 static void	symbol_print_statistics(FILE * file)
 {
 	htab_print_statistics(file,"symbol table",sy_hash);
@@ -19628,8 +19048,7 @@ static void	symbol_print_statistics(FILE * file)
 /* ============================================================* write.c */
 /*
  * write.c - emit .o file This thing should be set up to do byte ordering
- * correctly.  But...
- */
+ * correctly.  But...  */
 
 #define TC_FORCE_RELOCATION(FIX) (generic_force_reloc (FIX))
 
@@ -19693,13 +19112,11 @@ static void	symbol_print_statistics(FILE * file)
 #define TC_FAKE_LABEL(NAME) (strcmp ((NAME),FAKE_LABEL_NAME) == 0)
 #endif
 
-/*
- * Positive values of TC_FX_SIZE_SLACK allow a target to define fixups that far
+/* Positive values of TC_FX_SIZE_SLACK allow a target to define fixups that far
  * past the end of a frag.  Having such fixups is of course most most likely a
  * bug in setting fx_size correctly. A negative value disables the fixup check
  * entirely,which is appropriate for something like the Renesas / SuperH
- * SH_COUNT reloc.
- */
+ * SH_COUNT reloc.  */
 #ifndef TC_FX_SIZE_SLACK
 #define TC_FX_SIZE_SLACK(FIX) 0
 #endif
@@ -19712,18 +19129,14 @@ static fragS   *dot_frag;
 /* Relocs generated by ".reloc" pseudo.  */
 static struct reloc_list *reloc_list;
 
-/*
- * We generally attach relocs to frag chains.  However,after we have chained
+/* We generally attach relocs to frag chains.  However,after we have chained
  * these all together into a segment,any relocs we add after that must be
  * attached to a segment.  This will include relocs added in
- * md_estimate_size_before_relax,for example.
- */
+ * md_estimate_size_before_relax,for example.  */
 static bool	frags_chained = false;
-
 static unsigned int n_fixups;
 
 #define RELOC_ENUM enum bfd_reloc_code_real
-
 /* Create a fixS in obstack 'notes'.  */
 static fixS    *fix_new_internal(fragS * frag,	/* Which frag?  */
 				 		unsigned	long	where,	/* Where in that frag?  */
@@ -19765,15 +19178,8 @@ static fixS    *fix_new_internal(fragS * frag,	/* Which frag?  */
 	fixP->fx_no_overflow = 0;
 	fixP->fx_signed = 0;
 
-
-#ifdef TC_FIX_TYPE
-	TC_INIT_FIX_DATA(fixP);
-#endif
-
 	fixP->fx_file = as_where(&fixP->fx_line);
-
 	{
-
 		fixS          **seg_fix_rootP = (frags_chained
 						 ? &seg_info(now_seg)->fix_root
 						 : &frchain_now->fix_root);
@@ -19812,12 +19218,9 @@ static fixS    *fix_new(fragS * frag,	/* Which frag?  */
 			      (symbolS *) NULL,offset,pcrel,r_type,false);
 }
 
-/*
- * Create a fixup for an expression.  Currently we only support fixups for
+/* Create a fixup for an expression.  Currently we only support fixups for
  * difference expressions.  That is itself more than most object file formats
- * support anyhow.
- */
-
+ * support anyhow.  */
 static fixS    *fix_new_exp(fragS * frag,	/* Which frag?  */
 			    		unsigned	long	where,	/* Where in that frag?  */
 			    		unsigned	long	size,	/* 1,2,or 4 usually.  */
@@ -19839,10 +19242,8 @@ static fixS    *fix_new_exp(fragS * frag,	/* Which frag?  */
 		break;
 
 	case O_add:
-		/*
-		 * This comes up when _GLOBAL_OFFSET_TABLE_+(.-L0) is read,if
-		 * the difference expression cannot immediately be reduced.
-		 */
+		/* This comes up when _GLOBAL_OFFSET_TABLE_+(.-L0) is read,if
+		 * the difference expression cannot immediately be reduced.  */
 		{
 			symbolS        *stmp = make_expr_symbol(exp);
 
@@ -19880,8 +19281,7 @@ static fixS    *fix_new_exp(fragS * frag,	/* Which frag?  */
 		break;
 	}
 
-	return fix_new_internal(frag,where,size,add,sub,off,pcrel,
-				r_type,false);
+	return fix_new_internal(frag,where,size,add,sub,off,pcrel, r_type,false);
 }
 
 /* Generic function to determine whether a fixup requires a relocation.  */
@@ -19897,18 +19297,14 @@ static int	generic_force_reloc(fixS * fix)
 	return S_FORCE_RELOC(fix->fx_addsy,fix->fx_subsy == NULL);
 }
 
-/*
- * This routine records the largest alignment seen for each segment. If the
+/* This routine records the largest alignment seen for each segment. If the
  * beginning of the segment is aligned on the worst-case boundary,all of the
  * other alignments within it will work.  At least one object format really
- * uses this info.
- */
+ * uses this info.  */
 static void	record_alignment(	/* Segment to which alignment pertains.  */
 			     		segT		seg    ,
-/*
- * Alignment,as a power of 2 (e.g.,1 => 2-byte boundary,2 => 4-byte
- * boundary,etc.)
- */
+/* Alignment,as a power of 2 (e.g.,1 => 2-byte boundary,2 => 4-byte
+ * boundary,etc.) */
 			     		unsigned	int	align)
 {
 	if (seg == absolute_section)
@@ -19963,19 +19359,15 @@ static void	chain_frchains_together(segT section,void *xxx ATTRIBUTE_UNUSED)
 {
 	segment_info_type *info;
 
-	/*
-	 * BFD may have introduced its own sections without using subseg_new,
-	 * so it is possible that seg_info is NULL.
-	 */
+	/* BFD may have introduced its own sections without using subseg_new,
+	 * so it is possible that seg_info is NULL.  */
 	info = seg_info(section);
 	if (info != NULL)
 		info->frchainP->frch_last
 			= chain_frchains_together_1(section,info->frchainP);
 
-	/*
-	 * Now that we've chained the frags together,we must add new fixups to
-	 * the segment,not to the frag chain.
-	 */
+	/* Now that we've chained the frags together,we must add new fixups to
+	 * the segment,not to the frag chain.  */
 	frags_chained = true;
 }
 
@@ -19984,14 +19376,9 @@ static void	cvt_frag_to_fill(segT sec ATTRIBUTE_UNUSED,fragS * fragP)
 	switch (fragP->fr_type) {
 	case rs_space_nop:
 		goto skip_align;
-	case rs_align:
-	case rs_align_code:
-	case rs_align_test:
-	case rs_org:
-	case rs_space:
-#ifdef HANDLE_ALIGN
+	case rs_align: case rs_align_code: case rs_align_test:
+	case rs_org: case rs_space:
 		HANDLE_ALIGN(fragP);
-#endif
 skip_align:
 		know(fragP->fr_next != NULL);
 		fragP->fr_offset = (fragP->fr_next->fr_address
@@ -20009,10 +19396,7 @@ skip_align:
 			fragP->fr_type = rs_fill;
 		break;
 
-	case rs_fill:
-	case rs_fill_nop:
-		break;
-
+	case rs_fill: case rs_fill_nop: break;
 	case rs_leb128:
 		{
 			valueT		value = S_GET_VALUE(fragP->fr_symbol);
@@ -20053,11 +19437,9 @@ skip_align:
 			   || (fragP->fr_next->fr_address - fragP->fr_address
 			       == fragP->fr_fix));
 
-		/*
-		 * After md_convert_frag,we make the frag into a ".space 0".
+		/* After md_convert_frag,we make the frag into a ".space 0".
 		 * md_convert_frag() should set up any fixSs and constants
-		 * required.
-		 */
+		 * required.  */
 		frag_wane(fragP);
 		break;
 
@@ -20065,15 +19447,9 @@ skip_align:
 		BAD_CASE(fragP->fr_type);
 		break;
 	}
-#ifdef md_frag_check
-	md_frag_check(fragP);
-#endif
 }
 
-struct relax_seg_info {
-	int		pass;
-	int		changed;
-};
+struct relax_seg_info { int	pass; int	changed; };
 
 static void	relax_seg(asection * sec,void *xxx)
 {
@@ -20118,10 +19494,8 @@ static void	size_seg(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 
 	sec->flags = flags;
 
-	/*
-	 * If permitted,allow the backend to pad out the section to some
-	 * alignment boundary.
-	 */
+	/* If permitted,allow the backend to pad out the section to some
+	 * alignment boundary.  */
 	if (do_not_pad_sections_to_alignment)
 		newsize = size;
 	else
@@ -20129,10 +19503,8 @@ static void	size_seg(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	x = set_section_size(sec,newsize);
 	gas_assert(x);
 
-	/*
-	 * If the size had to be rounded up,add some padding in the last
-	 * non-empty frag.
-	 */
+	/* If the size had to be rounded up,add some padding in the last
+	 * non-empty frag.  */
 	gas_assert(newsize >= size);
 	if (size != newsize) {
 		fragS          *last = seginfo->frchainP->frch_last;
@@ -20143,20 +19515,12 @@ static void	size_seg(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		if ((newsize - size) % fragp->fr_var == 0)
 			fragp->fr_offset += (newsize - size) / fragp->fr_var;
 		else
-			/*
-			 * If we hit this abort,it's likely due to
+			/* If we hit this abort,it's likely due to
 			 * subsegs_finish not providing sufficient alignment on
 			 * the last frag,and the machine dependent code using
-			 * alignment frags with fr_var greater than 1.
-			 */
+			 * alignment frags with fr_var greater than 1.  */
 			abort();
 	}
-#ifdef tc_frob_section
-	tc_frob_section(sec);
-#endif
-#ifdef obj_frob_section
-	obj_frob_section(sec);
-#endif
 }
 
 #ifdef DEBUG2
@@ -20191,10 +19555,8 @@ static void	dump_section_relocs(bfd * abfd ATTRIBUTE_UNUSED,asection * sec,FILE 
 #define EMIT_SECTION_SYMBOLS 1
 #endif
 
-/*
- * Resolve U.A.OFFSET_SYM and U.A.SYM fields of RELOC_LIST entries,and check
- * for validity.  Convert RELOC_LIST from using U.A fields to U.B fields.
- */
+/* Resolve U.A.OFFSET_SYM and U.A.SYM fields of RELOC_LIST entries,and check
+ * for validity.  Convert RELOC_LIST from using U.A fields to U.B fields.  */
 static void	resolve_reloc_expr_symbols(void)
 {
 	bfd_vma		addr_mask = 1;
@@ -20252,17 +19614,11 @@ static void	resolve_reloc_expr_symbols(void)
 				sec = NULL;
 			} else
 				if (sym != NULL && sec != NULL) {
-					/*
-					 * Convert relocs against local symbols
-					 * to refer to the corresponding
-					 * section symbol plus offset instead.
-					 * Keep PC-relative relocs of the REL
-					 * variety intact though to prevent the
-					 * offset from overflowing the
-					 * relocated field,unless it has
-					 * enough bits to cover the whole
-					 * address space.
-					 */
+				/* Convert relocs against local symbols to refer to the corresponding
+				 * section symbol plus offset instead. Keep PC-relative relocs of the REL
+				 * variety intact though to prevent the offset from overflowing the
+				 * relocated field,unless it has enough bits to cover the whole
+				 * address space.  */
 					if (S_IS_LOCAL(sym)
 					    && S_IS_DEFINED(sym)
 					    && !symbol_section_p(sym)
@@ -20295,10 +19651,8 @@ static void	resolve_reloc_expr_symbols(void)
 	}
 }
 
-/*
- * This pass over fixups decides whether symbols can be replaced with section
- * symbols.
- */
+/* This pass over fixups decides whether symbols can be replaced with section
+ * symbols.  */
 static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 {
 	segment_info_type *seginfo = seg_info(sec);
@@ -20325,23 +19679,19 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 
 				sym = fixp->fx_addsy;
 
-				/*
-				 * All symbols should have already been
+				/* All symbols should have already been
 				 * resolved at this point.  It is possible to
 				 * see unresolved expression symbols,though,
 				 * since they are not in the regular symbol
-				 * table.
-				 */
+				 * table.  */
 				resolve_symbol_value(sym);
 
 				if (fixp->fx_subsy != NULL)
 					resolve_symbol_value(fixp->fx_subsy);
 
-				/*
-				 * If this symbol is equated to an undefined or
+				/* If this symbol is equated to an undefined or
 				 * common symbol,convert the fixup to being
-				 * against that symbol.
-				 */
+				 * against that symbol.  */
 				while (symbol_equated_reloc_p(sym)
 				       || S_IS_WEAKREFR(sym)) {
 					symbolS        *newsym = symbol_get_value_expression(sym)->X_add_symbol;
@@ -20352,37 +19702,26 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 					sym = newsym;
 				}
 
-
-				/*
-				 * If the symbol is undefined,common,weak,or
+				/* If the symbol is undefined,common,weak,or
 				 * global (ELF shared libs),we can't replace
-				 * it with the section symbol.
-				 */
+				 * it with the section symbol.  */
 				if (S_FORCE_RELOC(fixp->fx_addsy,1))
 					continue;
 
-				/*
-				 * Is there some other (target cpu dependent)
+				/* Is there some other (target cpu dependent)
 				 * reason we can't adjust this one?  (E.g.
 				 * relocations involving function addresses on
-				 * the PA.
-				 */
-#ifdef tc_fix_adjustable
+				 * the PA.  */
 				if (!tc_fix_adjustable(fixp))
 					continue;
-#endif
 
-				/*
-				 * Since we're reducing to section symbols,
+				/* Since we're reducing to section symbols,
 				 * don't attempt to reduce anything that's
-				 * already using one.
-				 */
+				 * already using one.  */
 				if (symbol_section_p(sym)) {
-					/*
-					 * Mark the section symbol used in
+					/* Mark the section symbol used in
 					 * relocation so that it will be
-					 * included in the symbol table.
-					 */
+					 * included in the symbol table.  */
 					symbol_mark_used_in_reloc(sym);
 					continue;
 				}
@@ -20392,53 +19731,41 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 
 				if (bfd_is_abs_section(symsec)
 				    || symsec == reg_section) {
-					/*
-					 * The fixup_segment routine normally
+					/* The fixup_segment routine normally
 					 * will not use this symbol in a
-					 * relocation.
-					 */
+					 * relocation.  */
 					continue;
 				}
-				/*
-				 * Don't try to reduce relocs which refer to
+				/* Don't try to reduce relocs which refer to
 				 * non-local symbols in .linkonce sections.  It
 				 * can lead to confusion when a debugging
 				 * section refers to a .linkonce section.  I
-				 * hope this will always be correct.
-				 */
+				 * hope this will always be correct.  */
 				if (symsec != sec && !S_IS_LOCAL(sym)) {
 					if ((symsec->flags & SEC_LINK_ONCE) != 0
 					    || (IS_ELF
-					/*
-					 * The GNU toolchain uses an extension
+					/* The GNU toolchain uses an extension
 					 * for ELF: a section beginning with
 					 * the magic string .gnu.linkonce is a
-					 * linkonce section.
-					 */
+					 * linkonce section.  */
 						&& startswith(segment_name(symsec),".gnu.linkonce")))
 						continue;
 				}
-				/*
-				 * Never adjust a reloc against local symbol in
-				 * a merge section with non-zero addend.
-				 */
+				/* Never adjust a reloc against local symbol in
+				 * a merge section with non-zero addend.  */
 				if ((symsec->flags & SEC_MERGE) != 0
 				    && (fixp->fx_offset != 0 || fixp->fx_subsy != NULL))
 					continue;
 
-				/*
-				 * Never adjust a reloc against TLS local
-				 * symbol.
-				 */
+				/* Never adjust a reloc against TLS local
+				 * symbol.  */
 				if ((symsec->flags & SEC_THREAD_LOCAL) != 0)
 					continue;
 
-				/*
-				 * We refetch the segment when calling
+				/* We refetch the segment when calling
 				 * section_symbol,rather than using symsec,
 				 * because S_GET_VALUE may wind up changing the
-				 * section when it calls resolve_symbol_value.
-				 */
+				 * section when it calls resolve_symbol_value.  */
 				fixp->fx_offset += S_GET_VALUE(sym);
 				fixp->fx_addsy = section_symbol(S_GET_SEGMENT(sym));
 #ifdef DEBUG5
@@ -20457,16 +19784,13 @@ static void	as_bad_subtract(fixS * fixp)
 		     S_GET_NAME(fixp->fx_subsy));
 }
 
-/*
- * fixup_segment()
+/* fixup_segment()
  * 
  * Go through all the fixS's in a segment and see which ones can be handled now.
  * (These consist of fixS where we have since discovered the value of a symbol,
  * or the address of the frag involved.) For each one,call md_apply_fix to put
  * the fix into the frag data. Ones that we couldn't completely handle here
- * will be output later by emit_relocations.
- */
-
+ * will be output later by emit_relocations.  */
 static void	fixup_segment(fixS * fixP,segT this_segment)
 {
 	valueT		add_number;
@@ -20534,10 +19858,6 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 				fixP->fx_offset = add_number;
 				fixP->fx_addsy = NULL;
 				fixP->fx_subsy = NULL;
-#ifdef TC_M68K
-				/* See the comment below about 68k weirdness.  */
-				fixP->fx_pcrel = 0;
-#endif
 			} else
 				if (sub_symbol_segment == absolute_section
 				    && !S_FORCE_RELOC(fixP->fx_subsy,0)
@@ -20553,27 +19873,10 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 						fixP->fx_offset = (add_number + fixP->fx_dot_value
 								   + fixP->fx_dot_frag->fr_address);
 
-						/*
-						 * Make it pc-relative.  If the
-						 * back-end code has not
-						 * selected a pc-relative
-						 * reloc,cancel the adjustment
-						 * we do later on all
-						 * pc-relative relocs.
-						 */
-						if (0
-#ifdef TC_M68K
-						/*
-						 * Do this for m68k even if
-						 * it's already described as
-						 * pc-relative.  On the m68k,
-						 * an operand of "pc@(foo-.-2)"
-						 * should address "foo" in a
-						 * pc-relative mode.
-						 */
-						    || 1
-#endif
-						    || !fixP->fx_pcrel)
+						/* Make it pc-relative.  If the back-end code has not
+						 * selected a pc-relative reloc,cancel the adjustment
+						 * we do later on all pc-relative relocs.  */
+						if (!fixP->fx_pcrel)
 							add_number += MD_PCREL_FROM_SECTION(fixP,this_segment);
 						fixP->fx_subsy = NULL;
 						fixP->fx_pcrel = 1;
@@ -20624,13 +19927,11 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 		if (fixP->fx_pcrel) {
 			add_number -= MD_PCREL_FROM_SECTION(fixP,this_segment);
 			if (!fixP->fx_done && fixP->fx_addsy == NULL) {
-				/*
-				 * There was no symbol required by this
+				/* There was no symbol required by this
 				 * relocation. However,BFD doesn't really
 				 * handle relocations without symbols well. So
 				 * fake up a local symbol in the absolute
-				 * section.
-				 */
+				 * section.  */
 				fixP->fx_addsy = abs_section_sym;
 			}
 		}
@@ -20671,12 +19972,10 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 				}	/* Generic error checking.  */
 			}
 #ifdef WARN_SIGNED_OVERFLOW_WORD
-			/*
-			 * Warn if a .word value is too large when treated as a
+			/* Warn if a .word value is too large when treated as a
 			 * signed number.  We already know it is not too
 			 * negative.  This is to catch over-large switches
-			 * generated by gcc on the 68k.
-			 */
+			 * generated by gcc on the 68k.  */
 			if (!flag_signed_overflow_ok
 			    && fixP->fx_size == 2
 			    && add_number > 0x7fff)
@@ -20716,11 +20015,9 @@ bfd_check_overflow(enum complain_overflow how,
 	if (bitsize == 0)
 		return flag;
 
-	/*
-	 * Note: BITSIZE should always be <= ADDRSIZE,but in case it's not,
+	/* Note: BITSIZE should always be <= ADDRSIZE,but in case it's not,
 	 * we'll be permissive: extra bits in the field mask will automatically
-	 * extend the address mask for purposes of the overflow check.
-	 */
+	 * extend the address mask for purposes of the overflow check.  */
 	fieldmask = N_ONES(bitsize);
 	signmask = ~fieldmask;
 	addrmask = N_ONES(addrsize)|(fieldmask << rightshift);
@@ -20731,31 +20028,25 @@ bfd_check_overflow(enum complain_overflow how,
 		break;
 
 	case complain_overflow_signed:
-		/*
-		 * If any sign bits are set,all sign bits must be set.  That
-		 * is,A must be a valid negative address after shifting.
-		 */
+		/* If any sign bits are set,all sign bits must be set.  That
+		 * is,A must be a valid negative address after shifting.  */
 		signmask = ~(fieldmask >> 1);
 		/* Fall thru */
 
 	case complain_overflow_bitfield:
-		/*
-		 * Bitfields are sometimes signed,sometimes unsigned.  We
+		/* Bitfields are sometimes signed,sometimes unsigned.  We
 		 * explicitly allow an address wrap too,which means a bitfield
 		 * of n bits is allowed to store -2**n to 2**n-1.  Thus
 		 * overflow if the value has some,but not all,bits set
-		 * outside the field.
-		 */
+		 * outside the field.  */
 		ss = a & signmask;
 		if (ss != 0 && ss != ((addrmask >> rightshift) & signmask))
 			flag = bfd_reloc_overflow;
 		break;
 
 	case complain_overflow_unsigned:
-		/*
-		 * We have an overflow if the address does not fit in the
-		 * field.
-		 */
+		/* We have an overflow if the address does not fit in the
+		 * field.  */
 		if ((a & signmask) != 0)
 			flag = bfd_reloc_overflow;
 		break;
@@ -20766,10 +20057,8 @@ bfd_check_overflow(enum complain_overflow how,
 
 	return flag;
 }
-/*
- * Read and return the section contents at DATA converted to a host integer
- * (bfd_vma).  The number of bytes read is given by the HOWTO.
- */
+/* Read and return the section contents at DATA converted to a host integer
+ * (bfd_vma).  The number of bytes read is given by the HOWTO.  */
 static bfd_vma	read_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_byte * data,reloc_howto_type * howto)
 {
 	switch (bfd_get_reloc_size(howto)) {
@@ -20790,10 +20079,8 @@ static bfd_vma	read_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_byte * data,reloc_howt
 	}
 	return 0;
 }
-/*
- * Convert VAL to target format and write to DATA.  The number of bytes written
- * is given by the HOWTO.
- */
+/* Convert VAL to target format and write to DATA.  The number of bytes written
+ * is given by the HOWTO.  */
 static void	write_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_vma val,bfd_byte * data,reloc_howto_type * howto)
 {
 	switch (bfd_get_reloc_size(howto)) {
@@ -20832,11 +20119,8 @@ static void	apply_reloc(bfd * abfd,bfd_byte * data,reloc_howto_type * howto,
 
 	write_reloc(abfd,val,data,howto);
 }
-/*
- * HOWTO describes a relocation,at offset OCTET.  Return whether the
- * relocation field is within SECTION of ABFD.
- */
-
+/* HOWTO describes a relocation,at offset OCTET.  Return whether the
+ * relocation field is within SECTION of ABFD.  */
 static bool	bfd_reloc_offset_in_range(reloc_howto_type * howto,
 				      		bfd *		abfd  ,
 				      		asection *	section,
@@ -20845,11 +20129,9 @@ static bool	bfd_reloc_offset_in_range(reloc_howto_type * howto,
 	size_t		octet_end = bfd_get_section_limit_octets(abfd,section);
 	size_t		reloc_size = bfd_get_reloc_size(howto);
 
-	/*
-	 * The reloc field must be contained entirely within the section. Allow
+	/* The reloc field must be contained entirely within the section. Allow
 	 * zero length fields (marker relocs or NONE relocs where no relocation
-	 * will be performed) at the end of the section.
-	 */
+	 * will be performed) at the end of the section.  */
 	return octet <= octet_end && reloc_size <= octet_end - octet;
 }
 
@@ -20869,20 +20151,16 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 
 	symbol = *(reloc_entry->sym_ptr_ptr);
 
-	/*
-	 * If there is a function supplied to handle this relocation type,call
+	/* If there is a function supplied to handle this relocation type,call
 	 * it.  It'll return `bfd_reloc_continue' if further processing can be
-	 * done.
-	 */
+	 * done.  */
 	if (howto && howto->special_function) {
 		bfd_reloc_status_type cont;
 
-		/*
-		 * Note - we do not call bfd_reloc_offset_in_range here as the
+		/* Note - we do not call bfd_reloc_offset_in_range here as the
 		 * reloc_entry->address field might actually be valid for the
 		 * backend concerned.  It is up to the special_function itself
-		 * to call bfd_reloc_offset_in_range if needed.
-		 */
+		 * to call bfd_reloc_offset_in_range if needed.  */
 		cont = howto->special_function(abfd,reloc_entry,symbol,
 		/* XXX - Non-portable! */
 					       ((bfd_byte *) data_start
@@ -20897,10 +20175,8 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 		if (bfd_is_abs_section(symbol->section))
 			return bfd_reloc_ok;
 
-		/*
-		 * Work out which section the relocation is targeted at and the
-		 * initial relocation command value.
-		 */
+		/* Work out which section the relocation is targeted at and the
+		 * initial relocation command value.  */
 
 		/* Get symbol value.  (Common symbols are special.)  */
 		if (bfd_is_com_section(symbol->section))
@@ -20924,10 +20200,8 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 		/* Add in supplied addend.  */
 		relocation += reloc_entry->addend;
 
-		/*
-		 * Here the variable relocation holds the final address of the
-		 * symbol we are relocating against,plus any addend.
-		 */
+		/* Here the variable relocation holds the final address of the
+		 * symbol we are relocating against,plus any addend.  */
 
 		if (howto->pc_relative) {
 			relocation -= input_section->vma;
@@ -20948,12 +20222,10 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 	if (!bfd_reloc_offset_in_range(howto,abfd,input_section,octets))
 		return bfd_reloc_outofrange;
 
-	/*
-	 * FIXME: This overflow checking is incomplete,because the value might
+	/* FIXME: This overflow checking is incomplete,because the value might
 	 * have overflowed before we get here.  For a correct check we need to
 	 * compute the value in a size larger than bitsize,but we can't
-	 * reasonably do that for a reloc the same size as a host machine word.
-	 */
+	 * reasonably do that for a reloc the same size as a host machine word.  */
 	if (howto->complain_on_overflow != complain_overflow_dont)
 		flag = bfd_check_overflow(howto->complain_on_overflow,
 					  howto->bitsize,
@@ -21050,10 +20322,6 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		if (!fixp->fx_done)
 			n++;
 
-#ifdef RELOC_EXPANSION_POSSIBLE
-	n *= MAX_RELOC_EXPANSION;
-#endif
-
 	/* Extract relocs for this section from reloc_list.  */
 	rp = &reloc_list;
 
@@ -21077,11 +20345,9 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		int		fx_size   ,slack;
 		valueT		loc;
 		arelent       **reloc;
-#ifndef RELOC_EXPANSION_POSSIBLE
 		arelent        *rel;
 
 		reloc = &rel;
-#endif
 
 		if (fixp->fx_done)
 			continue;
@@ -21095,18 +20361,11 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 			as_bad_where(fixp->fx_file,fixp->fx_line,
 			 ("internal error: fixup not contained within frag"));
 
-#ifdef obj_fixup_removed_symbol
 		if (fixp->fx_addsy && symbol_removed_p(fixp->fx_addsy))
 			obj_fixup_removed_symbol(&fixp->fx_addsy);
 		if (fixp->fx_subsy && symbol_removed_p(fixp->fx_subsy))
 			obj_fixup_removed_symbol(&fixp->fx_subsy);
-#endif
-
-#ifndef RELOC_EXPANSION_POSSIBLE
 		*reloc = tc_gen_reloc(sec,fixp);
-#else
-		reloc = tc_gen_reloc(sec,fixp);
-#endif
 
 		while (*reloc) {
 			while (r != NULL && r->u.b.r.address < (*reloc)->address) {
@@ -21118,7 +20377,6 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				}
 				r = r->next;
 			}
-#ifdef GAS_SORT_RELOCS
 			if (n != 0 && (*reloc)->address < relocs[n - 1]->address) {
 				size_t		lo = 0;
 				size_t		hi = n - 1;
@@ -21140,15 +20398,10 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				n++;
 				relocs[lo] = *reloc;
 			} else
-#endif
 				relocs[n++] = *reloc;
 			install_reloc(sec,*reloc,fixp->fx_frag,
 				      fixp->fx_file,fixp->fx_line);
-#ifndef RELOC_EXPANSION_POSSIBLE
 			break;
-#else
-			reloc++;
-#endif
 		}
 	}
 
@@ -21297,10 +20550,8 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	char           *header = last_newf->fr_literal;
 	size_t		compressed_size = header_size;
 
-	/*
-	 * Stream the frags through the compression engine,adding new frags as
-	 * necessary to accommodate the compressed output.
-	 */
+	/* Stream the frags through the compression engine,adding new frags as
+	 * necessary to accommodate the compressed output.  */
 	for (fragS * f = seginfo->frchainP->frch_root;
 	     f;
 	     f = f->fr_next) {
@@ -21338,10 +20589,8 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		char           *next_out;
 		int		out_size;
 
-		/*
-		 * Reserve all the space available in the current chunk. If
-		 * none is available,start a new frag.
-		 */
+		/* Reserve all the space available in the current chunk. If
+		 * none is available,start a new frag.  */
 		avail_out = obstack_room(ob);
 		if (avail_out <= 0) {
 			fragS          *newf;
@@ -21372,10 +20621,8 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 			break;
 	}
 
-	/*
-	 * PR binutils/18087: If compression didn't make the section smaller,
-	 * just keep it uncompressed.
-	 */
+	/* PR binutils/18087: If compression didn't make the section smaller,
+	 * just keep it uncompressed.  */
 	if (compressed_size >= uncompressed_size)
 		return;
 
@@ -21394,9 +20641,7 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	}
 }
 
-#ifndef md_generate_nops
-/*
- * Genenerate COUNT bytes of no-op instructions to WHERE.  A target backend
+/* Genenerate COUNT bytes of no-op instructions to WHERE.  A target backend
  * must override this with proper no-op instructions.
  */
 
@@ -21407,7 +20652,6 @@ static void	md_generate_nops(fragS * f ATTRIBUTE_UNUSED,
 {
 	as_bad(("unimplemented .nops directive"));
 }
-#endif
 
 static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 {
@@ -21551,11 +20795,9 @@ static void	set_symtab(void)
 	symbolS        *symp;
 	bool		result;
 
-	/*
-	 * Count symbols.  We can't rely on a count made by the loop in
+	/* Count symbols.  We can't rely on a count made by the loop in
 	 * write_object_file,because *_frob_file may add a new symbol or two.
-	 * Generate unused section symbols only if needed.
-	 */
+	 * Generate unused section symbols only if needed.  */
 	nsyms = 0;
 	for (symp = symbol_rootP; symp; symp = symbol_next(symp))
 		if (!symbol_removed_p(symp)
@@ -21581,10 +20823,7 @@ static void	set_symtab(void)
 				  && asympp[i]->section->symbol == asympp[i]))
 					asympp[i]->flags |= BSF_KEEP;
 				symbol_mark_written(symp);
-				/*
-				 * Include this section symbol in the symbol
-				 * table.
-				 */
+				/* Include this section symbol in the symbol table. */
 				if (symbol_section_p(symp))
 					asympp[i]->flags |= BSF_SECTION_SYM_USED;
 				i++;
@@ -21596,30 +20835,21 @@ static void	set_symtab(void)
 	symbol_table_frozen = 1;
 }
 
-/*
- * Finish the subsegments.  After every sub-segment,we fake an ".align ...".
+/* Finish the subsegments.  After every sub-segment,we fake an ".align ...".
  * This conforms to BSD4.2 brain-damage.  We then fake ".fill 0" because that
  * is the kind of frag that requires least thought.  ".align" frags like to
  * have a following frag since that makes calculating their intended length
  * trivial.
  */
 
-#ifndef SUB_SEGMENT_ALIGN
-#ifdef HANDLE_ALIGN
-/*
- * The last subsegment gets an alignment corresponding to the alignment of the
+/* The last subsegment gets an alignment corresponding to the alignment of the
  * section.  This allows proper nop-filling at the end of code-bearing
- * sections.
- */
+ * sections.  */
 #define SUB_SEGMENT_ALIGN(SEG,FRCHAIN)					\
   (!(FRCHAIN)->frch_next && subseg_text_p (SEG)				\
    && !do_not_pad_sections_to_alignment					\
    ? get_recorded_alignment (SEG)					\
    : 0)
-#else
-#define SUB_SEGMENT_ALIGN(SEG,FRCHAIN) 0
-#endif
-#endif
 
 static void	subsegs_finish_section(asection * s)
 {
@@ -21635,11 +20865,9 @@ static void	subsegs_finish_section(asection * s)
 
 		subseg_set(s,frchainP->frch_subseg);
 
-		/*
-		 * This now gets called even if we had errors.  In that case,
+		/* This now gets called even if we had errors.  In that case,
 		 * any alignment is meaningless,and,moreover,will look weird
-		 * if we are generating a listing.
-		 */
+		 * if we are generating a listing.  */
 		if (had_errors())
 			do_not_pad_sections_to_alignment = 1;
 
@@ -21662,13 +20890,11 @@ static void	subsegs_finish_section(asection * s)
 		else
 			frag_align(alignment,0,0);
 
-		/*
-		 * frag_align will have left a new frag. Use this last frag for
+		/* frag_align will have left a new frag. Use this last frag for
 		 * an empty ".fill".
 		 * 
 		 * For this segment ... Create a last frag. Do not leave a "being
-		 * filled in frag".
-		 */
+		 * filled in frag".  */
 		frag_wane(frag_now);
 		frag_now->fr_fix = 0;
 		know(frag_now->fr_next == NULL);
@@ -21691,11 +20917,9 @@ static const char *vendor_obj_attr_name(bfd * abfd ATTRIBUTE_UNUSED,int vendor)
 		//get_elf_backend_data(abfd)->obj_attrs_vendor
 		"riscv" : "gnu");
 }
-/*
- * Return the size of the object attributes section for VENDOR (OBJ_ATTR_PROC
+/* Return the size of the object attributes section for VENDOR (OBJ_ATTR_PROC
  * or OBJ_ATTR_GNU),or 0 if there are no attributes for that vendor to record
- * and the vendor is OBJ_ATTR_GNU.
- */
+ * and the vendor is OBJ_ATTR_GNU.  */
 static bfd_vma	vendor_obj_attr_size(bfd * abfd,int vendor)
 {
 	bfd_vma		size;
@@ -21927,10 +21151,8 @@ static void	maybe_generate_build_notes(void)
 	sec->flags = (SEC_READONLY|SEC_HAS_CONTENTS|SEC_DATA|SEC_OCTETS);
 	bfd_set_section_alignment(sec,2);
 
-	/*
-	 * Work out the size of the notes that we will create,and the
-	 * relocation we should use.
-	 */
+	/* Work out the size of the notes that we will create,and the
+	 * relocation we should use.  */
 	{
 		note_size = 36;
 		desc_size = 16;	/* Two  8-byte offsets.  */
@@ -21938,10 +21160,8 @@ static void	maybe_generate_build_notes(void)
 		desc_reloc = BFD_RELOC_64;
 	}
 
-	/*
-	 * We have to create a note for *each* code section. Linker garbage
-	 * collection might discard some.
-	 */
+	/* We have to create a note for *each* code section. Linker garbage
+	 * collection might discard some.  */
 	total_size = 0;
 	note = NULL;
 
@@ -21973,17 +21193,13 @@ static void	maybe_generate_build_notes(void)
 				note[9] = NT_GNU_BUILD_ATTRIBUTE_OPEN >> 8;
 			}
 
-			/*
-			 * The a1 version number indicates that this note was
+			/* The a1 version number indicates that this note was
 			 * generated by the assembler and not the gcc annobin
-			 * plugin.
-			 */
+			 * plugin.  */
 			memcpy(note + 12,"GA$3a1",8);
 
-			/*
-			 * Create a relocation to install the start address of
-			 * the note...
-			 */
+			/* Create a relocation to install the start address of
+			 * the note...  */
 			create_note_reloc(sec,sym,total_size,20,desc_size / 2,desc_reloc,0,note);
 
 			/* ...and another one to install the end address.  */
@@ -21993,17 +21209,13 @@ static void	maybe_generate_build_notes(void)
 					  bfd_section_size(bsym->section),
 					  note);
 
-			/*
-			 * Mark the section symbol used in relocation so that
-			 * it will be included in the symbol table.
-			 */
+			/* Mark the section symbol used in relocation so that
+			 * it will be included in the symbol table.  */
 			symbol_mark_used_in_reloc(sym);
 
 			total_size += note_size;
-			/*
-			 * FIXME: Maybe add a note recording the assembler
-			 * command line and version ?
-			 */
+			/* FIXME: Maybe add a note recording the assembler
+			 * command line and version ?  */
 		}
 	/* Install the note(s) into the section.  */
 	if (total_size)
@@ -32617,20 +31829,15 @@ static void	obj_elf_change_section(const char *name,
 		|((attr & SHF_STRINGS) ? SEC_STRINGS : 0)
 		|((attr & SHF_EXCLUDE) ? SEC_EXCLUDE : 0)
 		|((attr & SHF_TLS) ? SEC_THREAD_LOCAL : 0));
-#ifdef md_elf_section_flags
-	flags = md_elf_section_flags(flags,attr,type);
-#endif
 
 	if (linkonce)
 		flags |= SEC_LINK_ONCE|SEC_LINK_DUPLICATES_DISCARD;
 
-	/*
-	 * PR 28054: Set the SEC_ELF_OCTETS flag for debugging sections. Based
+	/* PR 28054: Set the SEC_ELF_OCTETS flag for debugging sections. Based
 	 * on the code in bfd/elf.c:_bfd_elf_make_section_from_shdr().
 	 * 
 	 * FIXME: We do not set the SEC_DEBUGGING flag because that causes
-	 * problems for the FT32 and MSP430 targets.  Investigate and fix.
-	 */
+	 * problems for the FT32 and MSP430 targets.  Investigate and fix.  */
 	if ((flags & SEC_ALLOC) == 0 && name[0] == '.') {
 		if (startswith(name,".debug")
 		    || startswith(name,".zdebug")
@@ -32747,39 +31954,17 @@ static bfd_vma	obj_elf_parse_section_letters(char *str,size_t len,
 				}
 			}
 			break;
-		case 'e':
-			attr |= SHF_EXCLUDE;
-			break;
-		case 'o':
-			attr |= SHF_LINK_ORDER;
-			break;
-		case 'w':
-			attr |= SHF_WRITE;
-			break;
-		case 'x':
-			attr |= SHF_EXECINSTR;
-			break;
-		case 'M':
-			attr |= SHF_MERGE;
-			break;
-		case 'S':
-			attr |= SHF_STRINGS;
-			break;
-		case 'G':
-			attr |= SHF_GROUP;
-			break;
-		case 'T':
-			attr |= SHF_TLS;
-			break;
-		case 'd':
-			*gnu_attr |= SHF_GNU_MBIND;
-			break;
-		case 'R':
-			*gnu_attr |= SHF_GNU_RETAIN;
-			break;
-		case '?':
-			*is_clone = true;
-			break;
+		case 'e': attr |= SHF_EXCLUDE; break;
+		case 'o': attr |= SHF_LINK_ORDER; break;
+		case 'w': attr |= SHF_WRITE; break;
+		case 'x': attr |= SHF_EXECINSTR; break;
+		case 'M': attr |= SHF_MERGE; break;
+		case 'S': attr |= SHF_STRINGS; break;
+		case 'G': attr |= SHF_GROUP; break;
+		case 'T': attr |= SHF_TLS; break;
+		case 'd': *gnu_attr |= SHF_GNU_MBIND; break;
+		case 'R': *gnu_attr |= SHF_GNU_RETAIN; break;
+		case '?': *is_clone = true; break;
 		default:
 			{
 				const char     *bad_msg = ("unrecognized .section attribute:"
@@ -32827,38 +32012,24 @@ static bfd_vma	obj_elf_parse_section_letters(char *str,size_t len,
 
 static int	obj_elf_section_type(char *str,size_t len,bool warn)
 {
-	if (len == 8 && startswith(str,"progbits"))
-		return SHT_PROGBITS;
-	if (len == 6 && startswith(str,"nobits"))
-		return SHT_NOBITS;
-	if (len == 4 && startswith(str,"note"))
-		return SHT_NOTE;
-	if (len == 10 && startswith(str,"init_array"))
-		return SHT_INIT_ARRAY;
-	if (len == 10 && startswith(str,"fini_array"))
-		return SHT_FINI_ARRAY;
-	if (len == 13 && startswith(str,"preinit_array"))
-		return SHT_PREINIT_ARRAY;
-
-#ifdef md_elf_section_type
-	{
-		int		md_type = md_elf_section_type(str,len);
-		if (md_type >= 0)
-			return md_type;
-	}
-#endif
+	if (len == 8 && startswith(str,"progbits")) return SHT_PROGBITS;
+	if (len == 6 && startswith(str,"nobits")) return SHT_NOBITS;
+	if (len == 4 && startswith(str,"note")) return SHT_NOTE;
+	if (len == 10 && startswith(str,"init_array")) return SHT_INIT_ARRAY;
+	if (len == 10 && startswith(str,"fini_array")) return SHT_FINI_ARRAY;
+	if (len == 13 && startswith(str,"preinit_array")) return SHT_PREINIT_ARRAY;
 
 	if (ISDIGIT(*str)) {
 		char           *end;
 		int		type = strtoul(str,&end,0);
 
 		if (warn && (size_t) (end - str) != len)
-			as_warn(("extraneous characters at end of numeric section type"));
+			as_warn("extraneous characters at end of numeric section type");
 
 		return type;
 	}
 	if (warn)
-		as_warn(("unrecognized section type"));
+		as_warn("unrecognized section type");
 	return 0;
 }
 
@@ -32882,7 +32053,7 @@ static const char *obj_elf_section_name(void)
 		while (0 == strchr("\n\t,; ",*end))
 			end++;
 		if (end == input_line_pointer) {
-			as_bad(("missing name"));
+			as_bad("missing name");
 			ignore_rest_of_line();
 			return NULL;
 		}
@@ -32919,11 +32090,11 @@ static void	obj_elf_attach_to_group(int dummy ATTRIBUTE_UNUSED)
 	const char     *gname = obj_elf_section_name();
 
 	if (gname == NULL) {
-		as_warn(("group name not parseable"));
+		as_warn("group name not parseable");
 		return;
 	}
 	if (elf_group_name(now_seg)) {
-		as_warn(("section %s already has a group (%s)"),
+		as_warn("section %s already has a group (%s)",
 			bfd_section_name(now_seg),elf_group_name(now_seg));
 		return;
 	}
@@ -32931,6 +32102,7 @@ static void	obj_elf_attach_to_group(int dummy ATTRIBUTE_UNUSED)
 	elf_section_flags(now_seg) |= SHF_GROUP;
 }
 
+/* gas/config/obj-elf.c:1101 */
 static void	obj_elf_section(int push)
 {
 	const char     *name;
@@ -32956,7 +32128,7 @@ static void	obj_elf_section(int push)
 	    && S_IS_DEFINED(sym)
 	    && !S_IS_VOLATILE(sym)
 	    && !S_CAN_BE_REDEFINED(sym)) {
-		as_bad(("section name '%s' already defined as another symbol"),name);
+		as_bad("section name '%s' already defined as another symbol",name);
 		ignore_rest_of_line();
 		return;
 	}
@@ -33178,10 +32350,8 @@ done:
 	if (linked_to_section_index != -1UL) {
 		elf_section_flags(now_seg) |= SHF_LINK_ORDER;
 		elf_section_data(now_seg)->this_hdr.sh_link = linked_to_section_index;
-		/*
-		 * FIXME: Should we perform some sanity checking on the section
-		 * index ?
-		 */
+		/* FIXME: Should we perform some sanity checking on the section
+		 * index ?  */
 	}
 	if (push && new_subsection != -1)
 		subseg_set(now_seg,new_subsection);
@@ -33193,7 +32363,6 @@ static void	obj_elf_bss(int i ATTRIBUTE_UNUSED)
 	int		temp;
 
 	obj_elf_section_change_hook();
-
 	temp = get_absolute_expression();
 	subseg_set(bss_section,(subsegT) temp);
 	demand_empty_rest_of_line();
@@ -33201,7 +32370,6 @@ static void	obj_elf_bss(int i ATTRIBUTE_UNUSED)
 }
 
 /* Change to the .data section.  */
-
 static void	obj_elf_data(int i)
 {
 	obj_elf_section_change_hook();
@@ -33210,7 +32378,6 @@ static void	obj_elf_data(int i)
 }
 
 /* Change to the .text section.  */
-
 static void	obj_elf_text(int i)
 {
 	obj_elf_section_change_hook();
@@ -33218,7 +32385,6 @@ static void	obj_elf_text(int i)
 }
 
 /* Change to the *ABS* section.  */
-
 static void	obj_elf_struct(int i)
 {
 	obj_elf_section_change_hook();
@@ -33236,9 +32402,7 @@ static void	obj_elf_subsection(int ignore ATTRIBUTE_UNUSED)
 	demand_empty_rest_of_line();
 }
 
-/*
- * This can be called from the processor backends if they change sections.
- */
+/* This can be called from the processor backends if they change sections. */
 static void	obj_elf_section_change_hook(void)
 {
 	previous_section = now_seg;
@@ -33251,7 +32415,7 @@ static void	obj_elf_previous(int ignore ATTRIBUTE_UNUSED)
 	int		new_subsection;
 
 	if (previous_section == 0) {
-		as_warn((".previous without corresponding .section; ignored"));
+		as_warn(".previous without corresponding .section; ignored");
 		return;
 	}
 	new_section = previous_section;
@@ -33266,7 +32430,7 @@ static void	obj_elf_popsection(int xxx ATTRIBUTE_UNUSED)
 	struct section_stack *top = section_stack;
 
 	if (top == NULL) {
-		as_warn((".popsection without corresponding .pushsection; ignored"));
+		as_warn(".popsection without corresponding .pushsection; ignored");
 		return;
 	}
 
@@ -33296,24 +32460,10 @@ static struct elf_versioned_name_list *
 
 	for (p = ver + 1; *p == ELF_VER_CHR; p++);
 
-#if 0
-	/*
-	 * NB: Since some tests in ld/testsuite/ld-elfvers have no version
-	 * names,we have to disable this.
-	 */
-	if (*p == '\0') {
-		as_bad(("missing version name in `%s' for symbol `%s'"),
-		       version_name,sym_name);
-		return NULL;
-	}
-#endif
-
 	versioned_name = sy_obj->versioned_name;
 
 	switch (p - ver) {
-	case 1:
-	case 2:
-		break;
+	case 1: case 2: break;
 	case 3:
 		if (sy_obj->rename) {
 			if (strcmp(versioned_name->name,version_name) == 0)
@@ -33332,9 +32482,7 @@ static struct elf_versioned_name_list *
 		return NULL;
 	}
 
-	for (;
-	     versioned_name != NULL;
-	     versioned_name = versioned_name->next)
+	for (; versioned_name != NULL; versioned_name = versioned_name->next)
 		if (strcmp(versioned_name->name,version_name) == 0)
 			return versioned_name;
 
@@ -33366,7 +32514,7 @@ static void	obj_elf_symver(int ignore ATTRIBUTE_UNUSED)
 	sym = get_sym_from_input_line_and_check();
 
 	if (*input_line_pointer != ',') {
-		as_bad(("expected comma after name in .symver"));
+		as_bad("expected comma after name in .symver");
 		ignore_rest_of_line();
 		return;
 	}
@@ -33439,22 +32587,19 @@ struct fix     *obj_elf_get_vtable_inherit(void)
 	c = get_symbol_name(&cname);
 	csym = symbol_find(cname);
 
-	/*
-	 * GCFIXME: should check that we don't have two .vtable_inherits for
+	/* GCFIXME: should check that we don't have two .vtable_inherits for
 	 * the same child symbol.  Also,we can currently only do this if the
-	 * child symbol is already exists and is placed in a fragment.
-	 */
-
+	 * child symbol is already exists and is placed in a fragment.  */
 	if (csym == NULL || symbol_get_frag(csym) == NULL) {
-		as_bad(("expected `%s' to have already been set for .vtable_inherit"),
-		       cname);
+		as_bad("expected `%s' to have already been set for .vtable_inherit",
+				cname);
 		bad = 1;
 	}
 	*input_line_pointer = c;
 
 	SKIP_WHITESPACE_AFTER_NAME();
 	if (*input_line_pointer != ',') {
-		as_bad(("expected comma after name in .vtable_inherit"));
+		as_bad("expected comma after name in .vtable_inherit");
 		ignore_rest_of_line();
 		return NULL;
 	}
@@ -33540,11 +32685,9 @@ static inline int skip_past_char(char **str,char c)
 		return -1;
 }
 #define skip_past_comma(str) skip_past_char (str,',')
-/*
- * A list of attributes that have been explicitly set by the assembly code.
+/* A list of attributes that have been explicitly set by the assembly code.
  * VENDOR is the vendor id,BASE is the tag shifted right by the number of bits
- * in MASK,and bit N of MASK is set if tag BASE+N has been set.
- */
+ * in MASK,and bit N of MASK is set if tag BASE+N has been set.  */
 struct recorded_attribute_info {
 	struct recorded_attribute_info *next;
 	int		vendor;
@@ -33553,10 +32696,8 @@ struct recorded_attribute_info {
 };
 static struct recorded_attribute_info *recorded_attributes;
 
-/*
- * Record that we have seen an explicit specification of attribute TAG for
- * vendor VENDOR.
- */
+/* Record that we have seen an explicit specification of attribute TAG for
+ * vendor VENDOR.  */
 static void	record_attribute(int vendor,unsigned int tag)
 {
 	unsigned int	base;
@@ -33800,10 +32941,8 @@ static void	elf_obj_symbol_new_hook(symbolS * symbolP)
 
 }
 
-/*
- * Deduplicate size expressions.  We might get into trouble with multiple
- * freeing or use after free if we leave them pointing to the same expressionS.
- */
+/* Deduplicate size expressions.  We might get into trouble with multiple
+ * freeing or use after free if we leave them pointing to the same expressionS.  */
 static void	elf_obj_symbol_clone_hook(symbolS * newsym,symbolS * orgsym ATTRIBUTE_UNUSED)
 {
 	struct elf_obj_sy *newelf = symbol_get_obj(newsym);
@@ -33910,8 +33049,7 @@ static void	obj_elf_size(int ignore ATTRIBUTE_UNUSED)
 	demand_empty_rest_of_line();
 }
 
-/*
- * Handle the ELF .type pseudo-op.  This sets the type of a symbol. There are
+/* Handle the ELF .type pseudo-op.  This sets the type of a symbol. There are
  * six syntaxes:
  * 
  * The first (used on Solaris) is .type SYM,#function The second (used on
@@ -33919,8 +33057,7 @@ static void	obj_elf_size(int ignore ATTRIBUTE_UNUSED)
  * 6.0) is .type SYM STT_FUNC The fourth (used on NetBSD/Arm and Linux/ARM) is
  * .type SYM,%function The fifth (used on SVR4/860) is .type SYM,"function" The
  * sixth (emitted by recent SunPRO under Solaris) is .type SYM,[0-9] where the
- * integer is the STT_* value.
- */
+ * integer is the STT_* value.  */
 static char    *obj_elf_type_name(char *cp)
 {
 	char           *p;
@@ -33989,7 +33126,6 @@ static void	obj_elf_type(int ignore ATTRIBUTE_UNUSED)
 						type = BSF_OBJECT;
 
 						if (!S_IS_COMMON(sym)) {
-#if 1
 							if (S_IS_VOLATILE(sym)) {
 								sym = symbol_clone(sym,1);
 								S_SET_SEGMENT(sym,bfd_com_section_ptr);
@@ -33998,7 +33134,6 @@ static void	obj_elf_type(int ignore ATTRIBUTE_UNUSED)
 								symbol_set_frag(sym,&zero_address_frag);
 								S_CLEAR_VOLATILE(sym);
 							}
-#endif
 							else
 								if (S_IS_DEFINED(sym) || symbol_equated_p(sym))
 									as_bad(("symbol '%s' is already defined"),S_GET_NAME(sym));
@@ -34020,21 +33155,13 @@ static void	obj_elf_type(int ignore ATTRIBUTE_UNUSED)
 								elf_tdata(stdoutput)->has_gnu_osabi |= elf_gnu_osabi_unique;
 								type = BSF_OBJECT|BSF_GNU_UNIQUE;
 							}
-#ifdef md_elf_symbol_type
-							else
-								if ((type = md_elf_symbol_type(type_name,sym,elfsym)) != -1);
-#endif
-								else
-									as_bad(("unrecognized symbol type \"%s\""),type_name);
+							else as_bad(("unrecognized symbol type \"%s\""),type_name);
 
 	*input_line_pointer = c;
 
 	if (*input_line_pointer == '"')
 		++input_line_pointer;
 
-#ifdef md_elf_symbol_type_change
-	if (!md_elf_symbol_type_change(sym,elfsym,type))
-#endif
 	{
 		uint32_t	mask = BSF_FUNCTION|BSF_OBJECT;
 
@@ -34075,9 +33202,6 @@ static void	obj_elf_ident(int ignore ATTRIBUTE_UNUSED)
 		comment_section->flags = (SEC_READONLY|SEC_HAS_CONTENTS
 					 |SEC_MERGE|SEC_STRINGS);
 		comment_section->entsize = 1;
-#ifdef md_elf_section_change_hook
-		md_elf_section_change_hook();
-#endif
 		p = frag_more(1);
 		*p = 0;
 	} else
@@ -34354,15 +33478,12 @@ static void	elf_adjust_symtab(void)
 	groups.head = NULL;
 	groups.indexes = htab_create_alloc(16,hash_string_tuple,eq_string_tuple,
 					free_section_idx,notes_calloc,NULL);
-	map_over_sections(build_additional_section_info,
-			  &groups);
+	map_over_sections(build_additional_section_info, &groups);
 
-	/*
-	 * Make the SHT_GROUP sections that describe each section group.  We
+	/* Make the SHT_GROUP sections that describe each section group.  We
 	 * can't set up the section contents here yet,because elf section
 	 * indices have yet to be calculated.  elf.c:set_group_contents does
-	 * the rest of the work.
-	 */
+	 * the rest of the work.  */
 	for (i = 0; i < groups.num_group; i++) {
 		const char     *group_name = elf_group_name(groups.head[i]);
 		const char     *sec_name;
@@ -34401,17 +33522,7 @@ static void	elf_adjust_symtab(void)
 		if (!sy || !symbol_on_chain(sy,symbol_rootP,symbol_lastP)) {
 			/* Create the symbol now.  */
 			sy = symbol_new(group_name,now_seg,frag_now,0);
-#ifdef TE_SOLARIS
-			/*
-			 * Before Solaris 11 build 154,Sun ld rejects local
-			 * group signature symbols,so make them weak hidden
-			 * instead.
-			 */
-			symbol_get_bfdsym(sy)->flags |= BSF_WEAK;
-			S_SET_OTHER(sy,STV_HIDDEN);
-#else
 			symbol_get_obj(sy)->local = 1;
-#endif
 			symbol_table_insert(sy);
 		}
 		elf_group_id(s) = symbol_get_bfdsym(sy);
@@ -34423,13 +33534,11 @@ static void	elf_adjust_symtab(void)
 	}
 }
 
+/* gas/config/obj-elf.c:2892 */
 static void	elf_frob_file(void)
 {
 	map_over_sections(adjust_stab_sections,NULL);
-
-#ifdef elf_tc_final_processing
-	elf_tc_final_processing();
-#endif
+	riscv_elf_final_processing();
 }
 
 /* It removes any unneeded versioned symbols from the symbol table.  */
@@ -34447,33 +33556,24 @@ static void	elf_frob_file_before_adjust(void)
 							   ELF_VER_CHR);
 
 				if (sy_obj->rename) {
-					/*
-					 * The @@@ syntax is a special case. If
-					 * the symbol is not defined,2 `@'s
-					 * will be removed from the
-					 * versioned_name. Otherwise,1 `@'
-					 * will be removed.
-					 */
+					/* The @@@ syntax is a special case. If the symbol is not
+					 * defined,2 `@'s * will be removed from the versioned_name. 
+					 * Otherwise,1 `@' * will be removed.  */
 					size_t		l = strlen(&p[3]) + 1;
 					memmove(&p[1 + is_defined],&p[3],l);
 				}
 				if (!is_defined) {
-					/*
-					 * Verify that the name isn't using the
-					 * @@ syntax--this is reserved for
-					 * definitions of the default version
-					 * to link against.
-					 */
+					/* Verify that the name isn't using the @@ syntax--this is 
+					 * reserved for * definitions of the default version
+					 * to link against.  */
 					if (!sy_obj->rename && p[1] == ELF_VER_CHR) {
 						as_bad(("invalid attempt to declare external "
 							"version name as default in symbol `%s'"),
 						sy_obj->versioned_name->name);
 						return;
 					}
-					/*
-					 * Only one version symbol is allowed
-					 * for undefined symbol.
-					 */
+					/* Only one version symbol is allowed
+					 * for undefined symbol.  */
 					if (sy_obj->versioned_name->next) {
 						as_bad(("multiple versions [`%s'|`%s'] for "
 							"symbol `%s'"),
@@ -34485,10 +33585,8 @@ static void	elf_frob_file_before_adjust(void)
 					sy_obj->rename = true;
 				}
 			}
-			/*
-			 * If there was .symver or .weak,but symbol was
-			 * neither defined nor used anywhere,remove it.
-			 */
+			/* If there was .symver or .weak,but symbol was
+			 * neither defined nor used anywhere,remove it.  */
 			if (!is_defined
 			    && (sy_obj->versioned_name || S_IS_WEAK(symp))
 			    && symbol_used_p(symp) == 0
@@ -34498,12 +33596,10 @@ static void	elf_frob_file_before_adjust(void)
 	}
 }
 
-/*
- * It is required that we let write_relocs have the opportunity to optimize
+/* It is required that we let write_relocs have the opportunity to optimize
  * away fixups before output has begun,since it is possible to eliminate all
  * fixups for a section and thus we never should have generated the relocation
- * section.
- */
+ * section.  */
 static void	elf_frob_file_after_relocs(void)
 {
 	unsigned int	i;
@@ -34528,7 +33624,6 @@ static void	elf_frob_file_after_relocs(void)
 }
 
 /* This is called when the assembler starts.  */
-
 static void	elf_begin(void)
 {
 	asection       *s;
@@ -34569,7 +33664,6 @@ static void	elf_end(void)
 
 /* Flonums returned here.  */
 extern FLONUM_TYPE generic_floating_point_number;
-
 /* Precision in LittleNums.  */
 /* Don't count the gap in the m68k extended precision format.  */
 #define MAX_PRECISION  5
@@ -34652,7 +33746,7 @@ static void	unget_bits(int num)
 
 static void	make_invalid_floating_point_number(LITTLENUM_TYPE * words)
 {
-	as_bad(("cannot create floating-point number"));
+	as_bad("cannot create floating-point number");
 	/* Zero the leftmost bit.  */
 	words[0] = (LITTLENUM_TYPE) ((unsigned)-1) >> 1;
 	words[1] = (LITTLENUM_TYPE) - 1;
@@ -34662,8 +33756,7 @@ static void	make_invalid_floating_point_number(LITTLENUM_TYPE * words)
 	words[5] = (LITTLENUM_TYPE) - 1;
 }
 
-/*
- * Build a floating point constant at str into a IEEE floating point number.
+/* Build a floating point constant at str into a IEEE floating point number.
  * This function does the same thing as atof_ieee however it allows more
  * control over the exact format,i.e. explicitly specifying the precision and
  * number of exponent bits instead of relying on this infomation being deduced
@@ -34672,30 +33765,25 @@ static void	make_invalid_floating_point_number(LITTLENUM_TYPE * words)
  * If generic_float_info is not NULL then it will be set to contain generic
  * infomation about the parsed floating point number.
  * 
- * Returns pointer past text consumed.
- */
+ * Returns pointer past text consumed.  */
 static char    *atof_ieee_detail(char *str,
 				 		int		precision,
 				 		int		exponent_bits,
 				 		LITTLENUM_TYPE * words,
 			    		FLONUM_TYPE *	generic_float_info)
 {
-	/*
-	 * Extra bits for zeroed low-order bits. The 1st MAX_PRECISION are
-	 * zeroed,the last contain flonum bits.
-	 */
+	/* Extra bits for zeroed low-order bits. The 1st MAX_PRECISION are
+	 * zeroed,the last contain flonum bits.  */
 	static LITTLENUM_TYPE bits[MAX_PRECISION + MAX_PRECISION + GUARD];
 	char           *return_value;
 
 	/* Number of 16-bit words in the format.  */
 	FLONUM_TYPE	save_gen_flonum;
 
-	/*
-	 * We have to save the generic_floating_point_number because it
+	/* We have to save the generic_floating_point_number because it
 	 * contains storage allocation about the array of LITTLENUMs where the
 	 * value is actually stored.  We will allocate our own array of
-	 * littlenums below,but have to restore the global one on exit.
-	 */
+	 * littlenums below,but have to restore the global one on exit.  */
 	save_gen_flonum = generic_floating_point_number;
 
 	return_value = str;
@@ -34705,10 +33793,8 @@ static char    *atof_ieee_detail(char *str,
 	generic_floating_point_number.exponent = 0;
 	generic_floating_point_number.sign = '\0';
 
-	/*
-	 * Use more LittleNums than seems necessary: the highest flonum may
-	 * have 15 leading 0 bits,so could be useless.
-	 */
+	/* Use more LittleNums than seems necessary: the highest flonum may
+	 * have 15 leading 0 bits,so could be useless.  */
 
 	memset(bits,'\0',sizeof(LITTLENUM_TYPE) * MAX_PRECISION);
 
@@ -34725,25 +33811,19 @@ static char    *atof_ieee_detail(char *str,
 
 	gen_to_words(words,precision,exponent_bits);
 
-	/*
-	 * Restore the generic_floating_point_number's storage alloc (and
-	 * everything else).
-	 */
+	/* Restore the generic_floating_point_number's storage alloc (and
+	 * everything else).  */
 	generic_floating_point_number = save_gen_flonum;
 
 	return return_value;
 }
 
-/*
- * Warning: This returns 16-bit LITTLENUMs.  It is up to the caller to figure
+/* Warning: This returns 16-bit LITTLENUMs.  It is up to the caller to figure
  * out any alignment problems and to conspire for the bytes/word to be emitted
- * in the right order.  Bigendians beware!
- */
+ * in the right order.  Bigendians beware!  */
 
-/*
- * Note that atof-ieee always has X and P precisions enabled.  it is up to
- * md_atof to filter them out if the target machine does not support them.
- */
+/* Note that atof-ieee always has X and P precisions enabled.  it is up to
+ * md_atof to filter them out if the target machine does not support them.  */
 
 /* Returns pointer past text consumed.  */
 static char    *atof_ieee(char *str,	/* Text to convert to binary.  */
@@ -34754,44 +33834,32 @@ static char    *atof_ieee(char *str,	/* Text to convert to binary.  */
 	long		exponent_bits;
 
 	switch (what_kind) {
-	case 'h':
-	case 'H':
+	case 'h': case 'H':
 		precision = H_PRECISION;
 		exponent_bits = 5;
 		break;
 
-	case 'b':
-	case 'B':
+	case 'b': case 'B':
 		precision = B_PRECISION;
 		exponent_bits = 8;
 		break;
 
-	case 'f':
-	case 'F':
-	case 's':
-	case 'S':
+	case 'f': case 'F': case 's': case 'S':
 		precision = F_PRECISION;
 		exponent_bits = 8;
 		break;
 
-	case 'd':
-	case 'D':
-	case 'r':
-	case 'R':
+	case 'd': case 'D': case 'r': case 'R':
 		precision = D_PRECISION;
 		exponent_bits = 11;
 		break;
 
-	case 'x':
-	case 'X':
-	case 'e':
-	case 'E':
+	case 'x': case 'X': case 'e': case 'E':
 		precision = X_PRECISION;
 		exponent_bits = 15;
 		break;
 
-	case 'p':
-	case 'P':
+	case 'p': case 'P':
 		precision = P_PRECISION;
 		exponent_bits = -1;
 		break;
@@ -34805,7 +33873,7 @@ static char    *atof_ieee(char *str,	/* Text to convert to binary.  */
 }
 
 /* Turn generic_floating_point_number into a real float/double/extended.  */
-
+/* gas/config/atof-ieee.c:308 */
 static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 {
 	int		return_value = 0;
@@ -34833,11 +33901,7 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 	}
 	switch (generic_floating_point_number.sign) {
 		/* NaN:  Do the right thing.  */
-	case 0:
-	case 'Q':
-	case 'q':
-	case 'S':
-	case 's':
+	case 0: case 'Q': case 'q': case 'S': case 's':
 		if (TC_LARGEST_EXPONENT_IS_NORMAL(precision))
 			as_warn(("NaNs are not supported by this target"));
 
@@ -34867,8 +33931,7 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 
 		return return_value;
 
-	case 'P':
-	case 'N':
+	case 'P': case 'N':
 		if (TC_LARGEST_EXPONENT_IS_NORMAL(precision))
 			as_warn(("Infinities are not supported by this target"));
 
@@ -34895,14 +33958,12 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 		return return_value;
 	}
 
-	/*
-	 * The floating point formats we support have: Bit 15 is sign bit. Bits
+	/* The floating point formats we support have: Bit 15 is sign bit. Bits
 	 * 14:n are excess-whatever exponent. Bits n-1:0 (if any) are most
 	 * significant bits of fraction. Bits 15:0 of the next word(s) are the
 	 * next most significant bits.
 	 * 
-	 * So we need: number of bits of exponent,number of bits of mantissa.
-	 */
+	 * So we need: number of bits of exponent,number of bits of mantissa.  */
 	bits_left_in_littlenum = LITTLENUM_NUMBER_OF_BITS;
 	littlenum_pointer = generic_floating_point_number.leader;
 	littlenums_left = (1
@@ -34916,10 +33977,8 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 		      + 1
 		      - generic_floating_point_number.low);
 
-	/*
-	 * Radix LITTLENUM_RADIX,point just higher than
-	 * generic_floating_point_number.leader.
-	 */
+	/* Radix LITTLENUM_RADIX,point just higher than
+	 * generic_floating_point_number.leader.  */
 	exponent_2 = exponent_1 * LITTLENUM_NUMBER_OF_BITS;
 
 	/* Radix 2.  */
@@ -35057,23 +34116,19 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 
 	if (next_bits(1)) {
 		unsigned long	carry;
-		/*
-		 * Since the NEXT bit is a 1,round UP the mantissa. The
+		/* Since the NEXT bit is a 1,round UP the mantissa. The
 		 * cunning design of these hidden-1 floats permits us to let
 		 * the mantissa overflow into the exponent,and it 'does the
 		 * right thing'. However,we lose if the highest-order bit of
-		 * the lowest-order word flips. Is that clear?
-		 */
+		 * the lowest-order word flips. Is that clear?  */
 
-		/*
-		 * #if (sizeof(carry)) < ((sizeof(bits[0]) * BITS_PER_CHAR) +
+		/* #if (sizeof(carry)) < ((sizeof(bits[0]) * BITS_PER_CHAR) +
 		 * 2) Please allow at least 1 more bit in carry than is in a
 		 * LITTLENUM. We need that extra bit to hold a carry during a
 		 * LITTLENUM carry propagation. Another extra bit (kept 0) will
 		 * assure us that we don't get a sticky sign bit after shifting
 		 * right,and that permits us to propagate the carry without
-		 * any masking of bits. #endif
-		 */
+		 * any masking of bits. #endif */
 		for (carry = 1,lp--; carry; lp--) {
 			carry = *lp + carry;
 			*lp = carry;
@@ -35082,39 +34137,33 @@ static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
 				break;
 		}
 		if (precision == X_PRECISION && exponent_bits == 15) {
-			/*
-			 * Extended precision numbers have an explicit integer
-			 * bit that we may have to restore.
-			 */
+			/* Extended precision numbers have an explicit integer
+			 * bit that we may have to restore.  */
 			if (lp == words) {
 				/* Put back the integer bit.  */
 				lp[1] |= 1 << (LITTLENUM_NUMBER_OF_BITS - 1);
 			}
 		}
 		if ((word1 ^ *words) & (1 << (LITTLENUM_NUMBER_OF_BITS - 1))) {
-			/*
-			 * We leave return_value alone: admit we read the
+			/* We leave return_value alone: admit we read the
 			 * number,but return a floating exception because we
-			 * can't encode the number.
-			 */
+			 * can't encode the number.  */
 			*words &= ~(1 << (LITTLENUM_NUMBER_OF_BITS - 1));
 		}
 	}
 	return return_value;
 }
 
-/*
- * This is a utility function called from various tc-*.c files.  It is here in
+/* This is a utility function called from various tc-*.c files.  It is here in
  * order to reduce code duplication.
  * 
-  Turn a string at input_line_pointer into a floating point constant of type TYPE
+ * Turn a string at input_line_pointer into a floating point constant of type TYPE
  * (a character found in the FLT_CHARS macro),and store it as LITTLENUMS in
  * the bytes buffer LITP.  The number of chars emitted is stored in *SIZEP.
  * BIG_WORDIAN is TRUE if the littlenums should be emitted most significant
  * littlenum first.
  * 
- * An error message is returned,or a NULL pointer if everything went OK.
- */
+ * An error message is returned,or a NULL pointer if everything went OK.  */
 static const char *ieee_md_atof(int type,
 						char         *litP,
 						int          *sizeP,
@@ -35127,42 +34176,30 @@ static const char *ieee_md_atof(int type,
 
 	if (strchr(FLT_CHARS,type) != NULL) {
 		switch (type) {
-		case 'H':
-		case 'h':
+		case 'H': case 'h':
 			prec = H_PRECISION;
 			break;
 
-		case 'B':
-		case 'b':
+		case 'B': case 'b':
 			prec = B_PRECISION;
 			break;
 
-		case 'f':
-		case 'F':
-		case 's':
-		case 'S':
+		case 'f': case 'F': case 's': case 'S':
 			prec = F_PRECISION;
 			break;
 
-		case 'd':
-		case 'D':
-		case 'r':
-		case 'R':
+		case 'd': case 'D': case 'r': case 'R':
 			prec = D_PRECISION;
 			break;
 
-		case 't':
-		case 'T':
+		case 't': case 'T':
 			prec = X_PRECISION;
 			pad = X_PRECISION_PAD;
 			type = 'x';	/* This is what atof_ieee()
 					 * understands.  */
 			break;
 
-		case 'x':
-		case 'X':
-		case 'p':
-		case 'P':
+		case 'x': case 'X': case 'p': case 'P':
 			prec = P_PRECISION;
 			pad = P_PRECISION_PAD;
 			break;
@@ -35171,8 +34208,7 @@ static const char *ieee_md_atof(int type,
 			break;
 		}
 	}
-	/*
-	 * The 'f' and 'd' types are always recognised,even if the target has
+	/* The 'f' and 'd' types are always recognised,even if the target has
 	 * not put them into the FLT_CHARS macro.  This is because the 'f' type
 	 * can come from the .dc.s,.dcb.s,.float or .single pseudo-ops and
 	 * the 'd' type from the .dc.d,.dbc.d or .double pseudo-ops.
@@ -35180,8 +34216,7 @@ static const char *ieee_md_atof(int type,
 	 * The 'x' type is not implicitly recognised however,even though it can
 	 * be generated by the .dc.x and .dbc.x pseudo-ops because not all
 	 * targets can support floating point values that big.  ie the target
-	 * has to explicitly allow them by putting them into FLT_CHARS.
-	 */
+	 * has to explicitly allow them by putting them into FLT_CHARS.  */
 	else
 		if (type == 'f')
 			prec = F_PRECISION;
@@ -35219,8 +34254,7 @@ static const char *ieee_md_atof(int type,
 	return NULL;
 }
 /* ============================================================**** hashtab.c */
-/*
- * An expandable hash tables datatype.  This package implements basic hash
+/* An expandable hash tables datatype.  This package implements basic hash
  * table functionality.  It is possible to search for an entry,create an entry
  * and destroy an entry.
  * 
@@ -35232,8 +34266,7 @@ static const char *ieee_md_atof(int type,
  * The abstract data implementation is based on generalized Algorithm D from
  * Knuth's book "The art of computer programming".  Hash table is expanded by
  * creation of new hash table and transferring elements from the old table to
- * the new table.
- */
+ * the new table.  */
 
 static unsigned int higher_prime_index(unsigned long);
 static hashval_t htab_mod_1(hashval_t,hashval_t,hashval_t,int);
@@ -35242,15 +34275,13 @@ static hashval_t htab_mod_m2(hashval_t,htab_t);
 static int	htab_expand(htab_t);
 static void   **find_empty_slot_for_expand(htab_t,hashval_t);
 
-/*
- * Table of primes and multiplicative inverses. Note that these are not
+/* Table of primes and multiplicative inverses. Note that these are not
  * minimally reduced inverses.  Unlike when generating code to divide by a
  * constant,we want to be able to use the same algorithm all the time.  All of
  * these inverses (are implied to) have bit 32 set.
  * 
  * For the record,here's the function that computed the table; it's a vastly
- * simplified version of the function of the same name from gcc.
- */
+ * simplified version of the function of the same name from gcc.  */
 
 struct prime_ent {
 	hashval_t	prime;
@@ -35293,11 +34324,8 @@ static struct prime_ent const prime_tab[] = {
 	{0xfffffffb,0x00000006,0x00000008,31}
 };
 
-/*
- * The following function returns an index into the above table of the nearest
- * prime number which is greater than N,and near a power of two.
- */
-
+/* The following function returns an index into the above table of the nearest
+ * prime number which is greater than N,and near a power of two.  */
 static unsigned int higher_prime_index(unsigned long n)
 {
 	unsigned int	low = 0;
@@ -35319,41 +34347,32 @@ static unsigned int higher_prime_index(unsigned long n)
 	return low;
 }
 
-/*
- * The parens around the function names in the next two definitions are
+/* The parens around the function names in the next two definitions are
  * essential in order to prevent macro expansions of the name. The bodies,
- * however,are expanded as expected,so they are not recursive definitions.
- */
+ * however,are expanded as expected,so they are not recursive definitions.  */
 
 /* Return the current size of given hash table.  */
-
 #define htab_size(htab)  ((htab)->size)
-
 static		size_t  (htab_size) (htab_t htab)
 {
 	return htab_size(htab);
 }
 
 /* Return the current number of elements in given hash table. */
-
 #define htab_elements(htab)  ((htab)->n_elements - (htab)->n_deleted)
-
-static		size_t
-                (htab_elements) (htab_t htab) {
+static		size_t (htab_elements) (htab_t htab) {
 	return htab_elements(htab);
 }
 
 /* Return X % Y.  */
-
-static inline	hashval_t
-		htab_mod_1    (hashval_t x,hashval_t y,hashval_t inv ATTRIBUTE_UNUSED,
+static inline	hashval_t htab_mod_1(hashval_t x,hashval_t y,
+				hashval_t inv ATTRIBUTE_UNUSED,
 		 		int		shift	ATTRIBUTE_UNUSED)
 {
-	/*
-	 * The multiplicative inverses computed above are for 32-bit types,and
-	 * requires that we be able to compute a highpart multiply.
-	 */
+	/* The multiplicative inverses computed above are for 32-bit types,and
+	 * requires that we be able to compute a highpart multiply.  */
 #ifdef UNSIGNED_64BIT_TYPE
+ssss
 	__extension__ typedef UNSIGNED_64BIT_TYPE ull;
 	if (sizeof(hashval_t) * CHAR_BIT <= 32) {
 		hashval_t	t1   ,t2,t3,t4,q,r;
@@ -35387,12 +34406,10 @@ static inline hashval_t htab_mod_m2(hashval_t hash,htab_t htab)
 	return 1 + htab_mod_1(hash,p->prime - 2,p->inv_m2,p->shift);
 }
 
-/*
- * This function creates table with length slightly longer than given source
+/* This function creates table with length slightly longer than given source
  * length.  Created hash table is initiated as empty (all the hash table
  * entries are HTAB_EMPTY_ENTRY).  The function returns the created hash table,
- * or NULL if memory allocation fails.
- */
+ * or NULL if memory allocation fails.  */
 static htab_t	htab_create_alloc(size_t size,htab_hash hash_f,htab_eq eq_f,
   		htab_del	del_f,htab_alloc alloc_f,htab_free free_f)
 {
@@ -35400,24 +34417,14 @@ static htab_t	htab_create_alloc(size_t size,htab_hash hash_f,htab_eq eq_f,
 				       free_f);
 }
 
-/*
- * @deftypefn Supplemental htab_t htab_create_typed_alloc (size_t @var{size},@
- * htab_hash @var{hash_f},htab_eq @var{eq_f},htab_del @var{del_f},@
- * htab_alloc @var{alloc_tab_f},htab_alloc @var{alloc_f},@ htab_free
- * @var{free_f})
- * 
- * This function creates a hash table that uses two different allocators
- * @var{alloc_tab_f} and @var{alloc_f} to use for allocating the table itself
+/* This function creates a hash table that uses two different allocators
+ * alloc_tab_f and alloc_f to use for allocating the table itself
  * and its entries respectively.  This is useful when variables of different
  * types need to be allocated with different allocators.
  * 
  * The created hash table is slightly larger than @var{size} and it is initially
- * empty (all the hash table entries are @code{HTAB_EMPTY_ENTRY}). The function
- * returns the created hash table,or @code{NULL} if memory allocation fails.
- * 
- * @end deftypefn
- * 
- */
+ * empty (all the hash table entries are HTAB_EMPTY_ENTRY). The function
+ * returns the created hash table,or NULL if memory allocation fails.  */
 static htab_t	htab_create_typed_alloc(size_t size,htab_hash hash_f,htab_eq eq_f,
 		      		htab_del	del_f,htab_alloc alloc_tab_f,
 			  		htab_alloc	alloc_f,htab_free free_f)
@@ -35450,11 +34457,8 @@ static htab_t	htab_create_typed_alloc(size_t size,htab_hash hash_f,htab_eq eq_f,
 
 /* These functions exist solely for backward compatibility.  */
 #undef htab_create
-/*
- * This function frees all memory allocated for given hash table. Naturally the
- * hash table must already exist.
- */
-
+/* This function frees all memory allocated for given hash table. Naturally the
+ * hash table must already exist.  */
 static void	htab_delete(htab_t htab)
 {
 	size_t		size = htab_size(htab);
@@ -35476,14 +34480,11 @@ static void	htab_delete(htab_t htab)
 		}
 }
 
-/*
- * Similar to htab_find_slot,but without several unwanted side effects: - Does
+/* Similar to htab_find_slot,but without several unwanted side effects: - Does
  * not call htab->eq_f when it finds an existing entry. - Does not change the
  * count of elements/searches/collisions in the hash table. This function also
  * assumes there are no deleted entries in the table. HASH is the hash value
- * for the element to be inserted.
- */
-
+ * for the element to be inserted.  */
 static void   **find_empty_slot_for_expand(htab_t htab,hashval_t hash)
 {
 	hashval_t	index = htab_mod(hash,htab);
@@ -35512,15 +34513,13 @@ static void   **find_empty_slot_for_expand(htab_t htab,hashval_t hash)
 	}
 }
 
-/*
- * The following function changes size of memory allocated for the entries and
+/* The following function changes size of memory allocated for the entries and
  * repeatedly inserts the table elements.  The occupancy of the table after the
  * call will be about 50%.  Naturally the hash table must already exist.
  * Remember also that the place of the table entries is changed.  If memory
  * allocation failures are allowed,this function will return zero,indicating
  * that the table could not be expanded.  If all goes well,it will return a
- * non-zero value.
- */
+ * non-zero value.  */
 static int	htab_expand(htab_t htab)
 {
 	void          **oentries;
@@ -35536,10 +34535,8 @@ static int	htab_expand(htab_t htab)
 	olimit = oentries + osize;
 	elts = htab_elements(htab);
 
-	/*
-	 * Resize only when table after removal of unused elements is either
-	 * too full or too empty.
-	 */
+	/* Resize only when table after removal of unused elements is either
+	 * too full or too empty. */
 	if (elts * 2 > osize || (elts * 8 < osize && osize > 32)) {
 		nindex = higher_prime_index(elts * 2);
 		nsize = prime_tab[nindex].prime;
@@ -35582,10 +34579,8 @@ static int	htab_expand(htab_t htab)
 	return 1;
 }
 
-/*
- * This function searches for a hash table entry equal to the given element.
- * It cannot be used to insert or delete an element.
- */
+/* This function searches for a hash table entry equal to the given element.
+ * It cannot be used to insert or delete an element.  */
 static void    *htab_find_with_hash(htab_t htab,const void *element,hashval_t hash)
 {
 	hashval_t	index,hash2;
@@ -35615,23 +34610,18 @@ static void    *htab_find_with_hash(htab_t htab,const void *element,hashval_t ha
 	}
 }
 
-/*
- * Like htab_find_slot_with_hash,but compute the hash value from the element.
- */
-
+/* Like htab_find_slot_with_hash,but compute the hash value from the element. */
 static void    *htab_find(htab_t htab,const void *element)
 {
 	return htab_find_with_hash(htab,element,(*htab->hash_f) (element));
 }
 
-/*
- * This function searches for a hash table slot containing an entry equal to
+/* This function searches for a hash table slot containing an entry equal to
  * the given element.  To delete an entry,call this with insert=NO_INSERT,
  * then call htab_clear_slot on the slot returned (possibly after doing some
  * checks).  To insert an entry,call this with insert=INSERT,then write the
  * value you want into the returned slot.  When inserting an entry,NULL may be
- * returned if memory allocation fails.
- */
+ * returned if memory allocation fails. */
 
 static void   **htab_find_slot_with_hash(htab_t htab,const void *element,
 	       		hashval_t	hash,enum insert_option insert)
@@ -35694,33 +34684,24 @@ empty_entry:
 	return &htab->entries[index];
 }
 
-/*
- * Like htab_find_slot_with_hash,but compute the hash value from the element.
- */
-
+/* Like htab_find_slot_with_hash,but compute the hash value from the element.*/
 static void   **htab_find_slot(htab_t htab,const void *element,enum insert_option insert)
 {
 	return htab_find_slot_with_hash(htab,element,(*htab->hash_f) (element),
 					insert);
 }
 
-/*
- * This function deletes an element with the given value from hash table (the
+/* This function deletes an element with the given value from hash table (the
  * hash is computed from the element).  If there is no matching element in the
- * hash table,this function does nothing.
- */
-
+ * hash table,this function does nothing.  hashtab.c:714 */
 static void	htab_remove_elt(htab_t htab,const void *element)
 {
 	htab_remove_elt_with_hash(htab,element,(*htab->hash_f) (element));
 }
 
 
-/*
- * This function deletes an element with the given value from hash table.  If
- * there is no matching element in the hash table,this function does nothing.
- */
-
+/* This function deletes an element with the given value from hash table.  If
+ * there is no matching element in the hash table,this function does nothing.*/
 static void	htab_remove_elt_with_hash(htab_t htab,const void *element,hashval_t hash)
 {
 	void          **slot;
@@ -35736,8 +34717,7 @@ static void	htab_remove_elt_with_hash(htab_t htab,const void *element,hashval_t 
 	htab->n_deleted++;
 }
 
-/*
- * Hash P as a null-terminated string.
+/* Hash P as a null-terminated string.
  * 
  * Copied from gcc/hashtable.c.  Zack had the following to say with respect to
  * applicability,though note that unlike hashtable.c,this hash table
@@ -35758,8 +34738,7 @@ static void	htab_remove_elt_with_hash(htab_t htab,const void *element,hashval_t 
  * I'll add that it thoroughly trounces the hash functions recommended for this
  * use at http://burtleburtle.net/bob/hash/index.html,both on speed and bucket
  * distribution.  I haven't tried it against the function they just started
- * using for Perl's hashes.
- */
+ * using for Perl's hashes. */
 
 static hashval_t htab_hash_string(const void *p)
 {
@@ -35903,15 +34882,13 @@ static void    *bfd_alloc(bfd * abfd,size_t size)
 	unsigned long	ul_size = (unsigned long)size;
 
 	if (size != ul_size
-	/*
-	 * Note - although objalloc_alloc takes an unsigned long as its
+	/* Note - although objalloc_alloc takes an unsigned long as its
 	 * argument,internally the size is treated as a signed long.  This can
 	 * lead to problems where,for example,a request to allocate -1 bytes
 	 * can result in just 1 byte being allocated,rather than ((unsigned
 	 * long) -1) bytes.  Also memory checkers will often complain about
 	 * attempts to allocate a negative amount of memory. So to stop these
-	 * problems we fail if the size is negative.
-	 */
+	 * problems we fail if the size is negative.  */
 	    || ((signed long)ul_size) < 0) {
 		bfd_set_error(bfd_error_no_memory);
 		return NULL;
@@ -36950,11 +35927,9 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 
 	case SHT_GNU_verneed:
 		this_hdr->sh_entsize = 0;
-		/*
-		 * objcopy or strip will copy over sh_info,but may not set
+		/* objcopy or strip will copy over sh_info,but may not set
 		 * cverrefs.  The linker will set cverrefs,but sh_info will be
-		 * zero.
-		 */
+		 * zero.  */
 		if (this_hdr->sh_info == 0)
 			this_hdr->sh_info = elf_tdata(abfd)->cverrefs;
 		else
@@ -36985,17 +35960,13 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 		this_hdr->sh_flags |= SHF_STRINGS;
 	if ((asect->flags & SEC_GROUP) == 0 && elf_group_name(asect) != NULL)
 		this_hdr->sh_flags |= SHF_GROUP;
-	/*
-	 * If the section has relocs,set up a section header for the
+	/* If the section has relocs,set up a section header for the
 	 * SHT_REL[A] section.  If two relocation sections are required for
 	 * this section,it is up to the processor-specific back-end to create
-	 * the other.
-	 */
+	 * the other.  */
 	if ((asect->flags & SEC_RELOC) != 0) {
-		/*
-		 * When doing a relocatable link,create both REL and RELA
-		 * sections if needed.
-		 */
+		/* * When doing a relocatable link,create both REL and RELA
+		 * sections if needed.  */
 		if (!_bfd_elf_init_reloc_shdr(abfd,
 					      (asect->use_rela_p
 					       ? &esd->rela : &esd->rel),
@@ -37009,17 +35980,13 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 	/* Check for processor-specific section types.  */
 	sh_type = this_hdr->sh_type;
 	if (sh_type == SHT_NOBITS && asect->size != 0) {
-		/*
-		 * Don't change the header type from NOBITS if we are being
-		 * called for objcopy --only-keep-debug.
-		 */
+		/* Don't change the header type from NOBITS if we are being
+		 * called for objcopy --only-keep-debug.  */
 		this_hdr->sh_type = sh_type;
 	}
 }
-/*
- * Don't output section symbols for sections that are not going to be output,
- * that are duplicates or there is no BFD section.
- */
+/* Don't output section symbols for sections that are not going to be output,
+ * that are duplicates or there is no BFD section.  */
 static bool	ignore_section_sym(bfd * abfd,asymbol * sym)
 {
 	elf_symbol_type *type_ptr;
@@ -37791,140 +36758,6 @@ static bool	assign_file_positions_except_relocs(bfd * abfd,
 	}
 	return true;
 }
-/*
- * Fill in the contents of a SHT_GROUP section.  Called from
- * compute_section_file_positions for gas,objcopy,and when ELF targets use
- * the generic linker,ld.  Called for ld -r from bfd_elf_final_link.
- */
-static void	elf_set_group_contents(asection * sec,void *failedptrarg)
-{
-	bfd            *abfd = stdoutput;
-	bool           *failedptr = (bool *) failedptrarg;
-	asection       *elt,*first;
-	unsigned char  *loc;
-	bool		gas;
-
-	/*
-	 * Ignore linker created group section.  See elfNN_ia64_object_p in
-	 * elfxx-ia64.c.
-	 */
-	if ((sec->flags & (SEC_GROUP|SEC_LINKER_CREATED)) != SEC_GROUP
-	    || sec->size == 0
-	    || *failedptr)
-		return;
-
-	if (elf_section_data(sec)->this_hdr.sh_info == 0) {
-		unsigned long	symindx = 0;
-
-		/*
-		 * elf_group_id will have been set up by objcopy and the
-		 * generic linker.
-		 */
-		if (elf_group_id(sec) != NULL)
-			symindx = elf_group_id(sec)->udata.i;
-
-		if (symindx == 0) {
-			/*
-			 * If called from the assembler,swap_out_syms will
-			 * have set up elf_section_syms. PR 25699: A corrupt
-			 * input file could contain bogus group info.
-			 */
-			if (sec->index >= elf_num_section_syms(abfd)
-			    || elf_section_syms(abfd)[sec->index] == NULL) {
-				*failedptr = true;
-				return;
-			}
-			symindx = elf_section_syms(abfd)[sec->index]->udata.i;
-		}
-		elf_section_data(sec)->this_hdr.sh_info = symindx;
-	}
-	/* The contents won't be allocated for "ld -r" or objcopy.  */
-	gas = true;
-	if (sec->contents == NULL) {
-		gas = false;
-		sec->contents = (unsigned char *)bfd_alloc(abfd,sec->size);
-
-		/* Arrange for the section to be written out.  */
-		elf_section_data(sec)->this_hdr.contents = sec->contents;
-		if (sec->contents == NULL) {
-			*failedptr = true;
-			return;
-		}
-	}
-	loc = sec->contents + sec->size;
-
-	/*
-	 * Get the pointer to the first section in the group that gas
-	 * squirreled away here.  objcopy arranges for this to be set to the
-	 * start of the input section group.
-	 */
-	first = elt = elf_next_in_group(sec);
-
-	/*
-	 * First element is a flag word.  Rest of section is elf section
-	 * indices for all the sections of the group.  Write them backwards
-	 * just to keep the group in the same order as given in .section
-	 * directives,not that it matters.
-	 */
-	while (elt != NULL) {
-		asection       *s;
-
-		s = elt;
-		if (!gas)
-			s = s->output_section;
-		if (s != NULL
-		    && !bfd_is_abs_section(s)) {
-			struct bfd_elf_section_data *elf_sec = elf_section_data(s);
-			struct bfd_elf_section_data *input_elf_sec = elf_section_data(elt);
-
-			if (elf_sec->rel.hdr != NULL
-			    && (gas
-				|| (input_elf_sec->rel.hdr != NULL
-				    && input_elf_sec->rel.hdr->sh_flags & SHF_GROUP) != 0)) {
-				elf_sec->rel.hdr->sh_flags |= SHF_GROUP;
-				loc -= 4;
-				if (loc == sec->contents)
-					break;
-				bfd_putl32(elf_sec->rel.idx,loc);
-			}
-			if (elf_sec->rela.hdr != NULL
-			    && (gas
-				|| (input_elf_sec->rela.hdr != NULL
-				    && input_elf_sec->rela.hdr->sh_flags & SHF_GROUP) != 0)) {
-				elf_sec->rela.hdr->sh_flags |= SHF_GROUP;
-				loc -= 4;
-				if (loc == sec->contents)
-					break;
-				bfd_putl32(elf_sec->rela.idx,loc);
-			}
-			loc -= 4;
-			if (loc == sec->contents)
-				break;
-			bfd_putl32(elf_sec->this_idx,loc);
-		}
-		elt = elf_next_in_group(elt);
-		if (elt == first)
-			break;
-	}
-
-	/*
-	 * We should always get here with loc == sec->contents + 4,but it is
-	 * possible to craft bogus SHT_GROUP sections that will cause segfaults
-	 * in objcopy without checking loc here and in the loop above.
-	 */
-	if (loc == sec->contents)
-		gas_assert(0);
-	else {
-		loc -= 4;
-		if (loc != sec->contents) {
-			gas_assert(0);
-			memset(sec->contents + 4,0,loc - sec->contents);
-			loc = sec->contents;
-		}
-	}
-
-	bfd_putl32(sec->flags & SEC_LINK_ONCE ? GRP_COMDAT : 0,loc);
-}
 static bool	strtab_emit(register bfd * abfd,struct elf_strtab_hash *tab)
 {
 	size_t		off = 1;
@@ -37962,7 +36795,6 @@ static bool	compute_section_file_positions(bfd * abfd,
 {
 	//const struct elf_backend_data *bed = get_elf_backend_data(abfd);
 	struct fake_section_arg fsargs;
-	bool		failed;
 	struct elf_strtab_hash *strtab = NULL;
 	Elf_Internal_Shdr *shstrtab_hdr;
 	bool		need_symtab;
@@ -37998,12 +36830,6 @@ static bool	compute_section_file_positions(bfd * abfd,
 
 		abfd->flags &= ~(EXEC_P|DYNAMIC);
 		if (!swap_out_syms(abfd,&strtab,0,link_info))
-			return false;
-	}
-	failed = false;
-	if (link_info == NULL) {
-		map_over_sections(elf_set_group_contents,&failed);
-		if (failed)
 			return false;
 	}
 	shstrtab_hdr = &elf_tdata(abfd)->shstrtab_hdr;
@@ -39142,20 +37968,16 @@ static void	elf_write_relocs(asection * sec,void *data)
 	if ((sec->flags & SEC_RELOC) == 0)
 		return;
 
-	/*
-	 * The linker backend writes the relocs out itself,and sets the
+	/* The linker backend writes the relocs out itself,and sets the
 	 * reloc_count field to zero to inhibit writing them here.  Also,
 	 * sometimes the SEC_RELOC flag gets set even when there aren't any
-	 * relocs.
-	 */
+	 * relocs.  */
 	if (sec->reloc_count == 0)
 		return;
 
-	/*
-	 * If we have opened an existing file for update,reloc_count may be
+	/* If we have opened an existing file for update,reloc_count may be
 	 * set even though we are not linking.  In that case we have nothing to
-	 * do.
-	 */
+	 * do.  */
 	if (sec->orelocation == NULL)
 		return;
 
@@ -39175,25 +37997,14 @@ static void	elf_write_relocs(asection * sec,void *data)
 		swap_out = bfd_elf64_swap_reloca_out;
 		extsize = sizeof(Elf64_External_Rela);
 	}
-#if 0
 	else
-		if (rela_hdr->sh_type == SHT_REL) {
-			swap_out = elf_swap_reloc_out;
-			extsize = sizeof(Elf_External_Rel);
-		}
-#endif
-		else
-			/*
-			 * Every relocation section should be either an
-			 * SHT_RELA or an SHT_REL section.
-			 */
-			abort();
+		/* Every relocation section should be either an
+		 * SHT_RELA or an SHT_REL section.  */
+		abort();
 
-	/*
-	 * The address of an ELF reloc is section relative for an object file,
+	/* The address of an ELF reloc is section relative for an object file,
 	 * and absolute for an executable file or shared library. The address
-	 * of a BFD reloc is always section relative.
-	 */
+	 * of a BFD reloc is always section relative.  */
 	addr_offset = 0;
 	if ((abfd->flags & (EXEC_P|DYNAMIC)) != 0)
 		addr_offset = sec->vma;
@@ -39226,32 +38037,10 @@ static void	elf_write_relocs(asection * sec,void *data)
 				last_sym_idx = n;
 			}
 
-#if 0
-		if ((*ptr->sym_ptr_ptr)->the_bfd != NULL
-		    && (*ptr->sym_ptr_ptr)->the_bfd->xvec != abfd->xvec
-		    && !_bfd_elf_validate_reloc(abfd,ptr)) {
-			*failedp = true;
-			return;
-		}
-#endif
-
 		if (ptr->howto == NULL) {
 			*failedp = true;
 			return;
 		}
-#if defined(BFD64) && ARCH_SIZE == 32
-		if (rela_hdr->sh_type == SHT_RELA
-		    && ptr->howto->bitsize > 32
-		    && ptr->addend - INT32_MIN > UINT32_MAX) {
-			_bfd_error_handler(("%pB: %pA+%" PRIx64 ": "
-				   "relocation addend %" PRIx64 " too large"),
-					   abfd,sec,(uint64_t) ptr->address,
-					   (uint64_t) ptr->addend);
-			*failedp = true;
-			bfd_set_error(bfd_error_bad_value);
-		}
-#endif
-
 		src_rela.r_offset = ptr->address + addr_offset;
 		src_rela.r_info = ELF64_R_INFO(n,ptr->howto->type);
 		src_rela.r_addend = ptr->addend;
@@ -39269,15 +38058,13 @@ static bool	elf_write_object_contents(bfd * abfd)
 	if (!abfd->output_has_begun
 	    && !compute_section_file_positions(abfd,NULL))
 		return false;
-	/*
-	 * Do not rewrite ELF data when the BFD has been opened for update.
+	/* Do not rewrite ELF data when the BFD has been opened for update.
 	 * abfd->output_has_begun was set to TRUE on opening,so creation of
 	 * new sections,and modification of existing section sizes was
 	 * restricted.  This means the ELF header,program headers and section
 	 * headers can't have changed.  If the contents of any sections has
 	 * been modified,then those changes have already been written to the
-	 * BFD.
-	 */
+	 * BFD.  */
 	else
 		if (abfd->direction == both_direction) {
 			gas_assert(abfd->output_has_begun);
@@ -39299,11 +38086,6 @@ static bool	elf_write_object_contents(bfd * abfd)
 		i_shdrp[count]->sh_name
 			= _bfd_elf_strtab_offset(elf_shstrtab(abfd),
 						 i_shdrp[count]->sh_name);
-#if 0
-		if (bed->elf_backend_section_processing)
-			if (!(*bed->elf_backend_section_processing) (abfd,i_shdrp[count]))
-				return false;
-#endif
 		if (i_shdrp[count]->contents) {
 			size_t		amt = i_shdrp[count]->sh_size;
 
@@ -39363,7 +38145,8 @@ static asection *
 	return NULL;
 }
 
-/* Special_function of RISCV_ADD and RISCV_SUB relocations.  */
+/* Special_function of RISCV_ADD and RISCV_SUB relocations. 
+ * elfxx-riscv.c:999 */
 static bfd_reloc_status_type riscv_elf_add_sub_reloc(bfd * abfd,
 				       		arelent *	reloc_entry,
 					    		asymbol *	symbol,
@@ -39396,10 +38179,7 @@ static bfd_reloc_status_type riscv_elf_add_sub_reloc(bfd * abfd,
 				     data + reloc_entry->address);
 
 	switch (howto->type) {
-	case R_RISCV_ADD8:
-	case R_RISCV_ADD16:
-	case R_RISCV_ADD32:
-	case R_RISCV_ADD64:
+	case R_RISCV_ADD8:case R_RISCV_ADD16:case R_RISCV_ADD32:case R_RISCV_ADD64:
 		relocation = old_value + relocation;
 		break;
 	case R_RISCV_SUB6:
@@ -39407,10 +38187,7 @@ static bfd_reloc_status_type riscv_elf_add_sub_reloc(bfd * abfd,
 			| (((old_value & howto->dst_mask) - relocation)
 			   & howto->dst_mask);
 		break;
-	case R_RISCV_SUB8:
-	case R_RISCV_SUB16:
-	case R_RISCV_SUB32:
-	case R_RISCV_SUB64:
+	case R_RISCV_SUB8:case R_RISCV_SUB16:case R_RISCV_SUB32:case R_RISCV_SUB64:
 		relocation = old_value - relocation;
 		break;
 	}
@@ -39418,10 +38195,8 @@ static bfd_reloc_status_type riscv_elf_add_sub_reloc(bfd * abfd,
 
 	return bfd_reloc_ok;
 }
-/*
- * Special handler for relocations which don't have to be relocated. This
- * function just simply return bfd_reloc_ok.
- */
+/* Special handler for relocations which don't have to be relocated. This
+ * function just simply return bfd_reloc_ok.  */
 static bfd_reloc_status_type riscv_elf_ignore_reloc(bfd * abfd ATTRIBUTE_UNUSED,
 				      		arelent *	reloc_entry,
 			  		asymbol *	symbol ATTRIBUTE_UNUSED,
@@ -39434,16 +38209,13 @@ static bfd_reloc_status_type riscv_elf_ignore_reloc(bfd * abfd ATTRIBUTE_UNUSED,
 		reloc_entry->address += input_section->output_offset;
 	return bfd_reloc_ok;
 }
-/*
- * ELF relocs are against symbols.  If we are producing relocatable output,and
+/* ELF relocs are against symbols.  If we are producing relocatable output,and
  * the reloc is against an external symbol,and nothing has given us any
  * additional addend,the resulting reloc will also be against the same symbol.
  * In such a case,we don't want to change anything about the way the reloc is
  * handled,since it will all be done at final link time.  Rather than put
  * special case code into bfd_perform_relocation,all the reloc types use this
- * howto function,or should call this function for relocatable output.
- */
-
+ * howto function,or should call this function for relocatable output.  */
 static bfd_reloc_status_type bfd_elf_generic_reloc(bfd * abfd ATTRIBUTE_UNUSED,
 				     		arelent *	reloc_entry,
 					  		asymbol *	symbol,
@@ -39459,15 +38231,13 @@ static bfd_reloc_status_type bfd_elf_generic_reloc(bfd * abfd ATTRIBUTE_UNUSED,
 		reloc_entry->address += input_section->output_offset;
 		return bfd_reloc_ok;
 	}
-	/*
-	 * In some cases the relocation should be treated as output section
+	/* In some cases the relocation should be treated as output section
 	 * relative,as when linking ELF DWARF into PE COFF.  Many ELF targets
 	 * lack section relative relocations and instead use ordinary absolute
 	 * relocations for references between DWARF sections.  That is arguably
 	 * a bug in those targets but it happens to work for the usual case of
 	 * linking to non-loaded ELF debug sections with VMAs forced to zero.
-	 * PE COFF on the other hand doesn't allow a section VMA of zero.
-	 */
+	 * PE COFF on the other hand doesn't allow a section VMA of zero.  */
 	if (output_bfd == NULL
 	    && !reloc_entry->howto->pc_relative
 	    && (symbol->section->flags & SEC_DEBUGGING) != 0
@@ -40428,36 +39198,21 @@ static		bool
 					enum		riscv_insn_class insn_class)
 {
 	switch (insn_class) {
-	case INSN_CLASS_I:
-		return riscv_subset_supports(rps,"i");
-	case INSN_CLASS_ZICBOM:
-		return riscv_subset_supports(rps,"zicbom");
-	case INSN_CLASS_ZICBOP:
-		return riscv_subset_supports(rps,"zicbop");
-	case INSN_CLASS_ZICBOZ:
-		return riscv_subset_supports(rps,"zicboz");
-	case INSN_CLASS_ZICSR:
-		return riscv_subset_supports(rps,"zicsr");
-	case INSN_CLASS_ZIFENCEI:
-		return riscv_subset_supports(rps,"zifencei");
-	case INSN_CLASS_ZIHINTPAUSE:
-		return riscv_subset_supports(rps,"zihintpause");
-	case INSN_CLASS_M:
-		return riscv_subset_supports(rps,"m");
-	case INSN_CLASS_ZMMUL:
-		return riscv_subset_supports(rps,"zmmul");
-	case INSN_CLASS_A:
-		return riscv_subset_supports(rps,"a");
-	case INSN_CLASS_ZAWRS:
-		return riscv_subset_supports(rps,"zawrs");
-	case INSN_CLASS_F:
-		return riscv_subset_supports(rps,"f");
-	case INSN_CLASS_D:
-		return riscv_subset_supports(rps,"d");
-	case INSN_CLASS_Q:
-		return riscv_subset_supports(rps,"q");
-	case INSN_CLASS_C:
-		return riscv_subset_supports(rps,"c");
+	case INSN_CLASS_I: return riscv_subset_supports(rps,"i");
+	case INSN_CLASS_ZICBOM: return riscv_subset_supports(rps,"zicbom");
+	case INSN_CLASS_ZICBOP: return riscv_subset_supports(rps,"zicbop");
+	case INSN_CLASS_ZICBOZ: return riscv_subset_supports(rps,"zicboz");
+	case INSN_CLASS_ZICSR: return riscv_subset_supports(rps,"zicsr");
+	case INSN_CLASS_ZIFENCEI: return riscv_subset_supports(rps,"zifencei");
+	case INSN_CLASS_ZIHINTPAUSE: return riscv_subset_supports(rps,"zihintpause");
+	case INSN_CLASS_M: return riscv_subset_supports(rps,"m");
+	case INSN_CLASS_ZMMUL: return riscv_subset_supports(rps,"zmmul");
+	case INSN_CLASS_A: return riscv_subset_supports(rps,"a");
+	case INSN_CLASS_ZAWRS: return riscv_subset_supports(rps,"zawrs");
+	case INSN_CLASS_F: return riscv_subset_supports(rps,"f");
+	case INSN_CLASS_D: return riscv_subset_supports(rps,"d");
+	case INSN_CLASS_Q: return riscv_subset_supports(rps,"q");
+	case INSN_CLASS_C: return riscv_subset_supports(rps,"c");
 	case INSN_CLASS_F_AND_C:
 		return (riscv_subset_supports(rps,"f")
 			&& riscv_subset_supports(rps,"c"));
@@ -40491,39 +39246,27 @@ static		bool
 			 && riscv_subset_supports(rps,"q"))
 			|| (riscv_subset_supports(rps,"zhinxmin")
 			    && riscv_subset_supports(rps,"zqinx")));
-	case INSN_CLASS_ZBA:
-		return riscv_subset_supports(rps,"zba");
-	case INSN_CLASS_ZBB:
-		return riscv_subset_supports(rps,"zbb");
-	case INSN_CLASS_ZBC:
-		return riscv_subset_supports(rps,"zbc");
-	case INSN_CLASS_ZBS:
-		return riscv_subset_supports(rps,"zbs");
-	case INSN_CLASS_ZBKB:
-		return riscv_subset_supports(rps,"zbkb");
-	case INSN_CLASS_ZBKC:
-		return riscv_subset_supports(rps,"zbkc");
-	case INSN_CLASS_ZBKX:
-		return riscv_subset_supports(rps,"zbkx");
+	case INSN_CLASS_ZBA: return riscv_subset_supports(rps,"zba");
+	case INSN_CLASS_ZBB: return riscv_subset_supports(rps,"zbb");
+	case INSN_CLASS_ZBC: return riscv_subset_supports(rps,"zbc");
+	case INSN_CLASS_ZBS: return riscv_subset_supports(rps,"zbs");
+	case INSN_CLASS_ZBKB: return riscv_subset_supports(rps,"zbkb");
+	case INSN_CLASS_ZBKC: return riscv_subset_supports(rps,"zbkc");
+	case INSN_CLASS_ZBKX: return riscv_subset_supports(rps,"zbkx");
 	case INSN_CLASS_ZBB_OR_ZBKB:
 		return (riscv_subset_supports(rps,"zbb")
 			|| riscv_subset_supports(rps,"zbkb"));
 	case INSN_CLASS_ZBC_OR_ZBKC:
 		return (riscv_subset_supports(rps,"zbc")
 			|| riscv_subset_supports(rps,"zbkc"));
-	case INSN_CLASS_ZKND:
-		return riscv_subset_supports(rps,"zknd");
-	case INSN_CLASS_ZKNE:
-		return riscv_subset_supports(rps,"zkne");
-	case INSN_CLASS_ZKNH:
-		return riscv_subset_supports(rps,"zknh");
+	case INSN_CLASS_ZKND: return riscv_subset_supports(rps,"zknd");
+	case INSN_CLASS_ZKNE: return riscv_subset_supports(rps,"zkne");
+	case INSN_CLASS_ZKNH: return riscv_subset_supports(rps,"zknh");
 	case INSN_CLASS_ZKND_OR_ZKNE:
 		return (riscv_subset_supports(rps,"zknd")
 			|| riscv_subset_supports(rps,"zkne"));
-	case INSN_CLASS_ZKSED:
-		return riscv_subset_supports(rps,"zksed");
-	case INSN_CLASS_ZKSH:
-		return riscv_subset_supports(rps,"zksh");
+	case INSN_CLASS_ZKSED: return riscv_subset_supports(rps,"zksed");
+	case INSN_CLASS_ZKSH: return riscv_subset_supports(rps,"zksh");
 	case INSN_CLASS_V:
 		return (riscv_subset_supports(rps,"v")
 			|| riscv_subset_supports(rps,"zve64x")
@@ -40533,39 +39276,23 @@ static		bool
 			|| riscv_subset_supports(rps,"zve64d")
 			|| riscv_subset_supports(rps,"zve64f")
 			|| riscv_subset_supports(rps,"zve32f"));
-	case INSN_CLASS_SVINVAL:
-		return riscv_subset_supports(rps,"svinval");
-	case INSN_CLASS_H:
-		return riscv_subset_supports(rps,"h");
-	case INSN_CLASS_XTHEADBA:
-		return riscv_subset_supports(rps,"xtheadba");
-	case INSN_CLASS_XTHEADBB:
-		return riscv_subset_supports(rps,"xtheadbb");
-	case INSN_CLASS_XTHEADBS:
-		return riscv_subset_supports(rps,"xtheadbs");
-	case INSN_CLASS_XTHEADCMO:
-		return riscv_subset_supports(rps,"xtheadcmo");
-	case INSN_CLASS_XTHEADCONDMOV:
-		return riscv_subset_supports(rps,"xtheadcondmov");
-	case INSN_CLASS_XTHEADFMEMIDX:
-		return riscv_subset_supports(rps,"xtheadfmemidx");
-	case INSN_CLASS_XTHEADFMV:
-		return riscv_subset_supports(rps,"xtheadfmv");
-	case INSN_CLASS_XTHEADINT:
-		return riscv_subset_supports(rps,"xtheadint");
-	case INSN_CLASS_XTHEADMAC:
-		return riscv_subset_supports(rps,"xtheadmac");
-	case INSN_CLASS_XTHEADMEMIDX:
-		return riscv_subset_supports(rps,"xtheadmemidx");
-	case INSN_CLASS_XTHEADMEMPAIR:
-		return riscv_subset_supports(rps,"xtheadmempair");
-	case INSN_CLASS_XTHEADSYNC:
-		return riscv_subset_supports(rps,"xtheadsync");
-	case INSN_CLASS_XVENTANACONDOPS:
-		return riscv_subset_supports(rps,"xventanacondops");
+	case INSN_CLASS_SVINVAL: return riscv_subset_supports(rps,"svinval");
+	case INSN_CLASS_H: return riscv_subset_supports(rps,"h");
+	case INSN_CLASS_XTHEADBA: return riscv_subset_supports(rps,"xtheadba");
+	case INSN_CLASS_XTHEADBB: return riscv_subset_supports(rps,"xtheadbb");
+	case INSN_CLASS_XTHEADBS: return riscv_subset_supports(rps,"xtheadbs");
+	case INSN_CLASS_XTHEADCMO: return riscv_subset_supports(rps,"xtheadcmo");
+	case INSN_CLASS_XTHEADCONDMOV: return riscv_subset_supports(rps,"xtheadcondmov");
+	case INSN_CLASS_XTHEADFMEMIDX: return riscv_subset_supports(rps,"xtheadfmemidx");
+	case INSN_CLASS_XTHEADFMV: return riscv_subset_supports(rps,"xtheadfmv");
+	case INSN_CLASS_XTHEADINT: return riscv_subset_supports(rps,"xtheadint");
+	case INSN_CLASS_XTHEADMAC: return riscv_subset_supports(rps,"xtheadmac");
+	case INSN_CLASS_XTHEADMEMIDX: return riscv_subset_supports(rps,"xtheadmemidx");
+	case INSN_CLASS_XTHEADMEMPAIR: return riscv_subset_supports(rps,"xtheadmempair");
+	case INSN_CLASS_XTHEADSYNC: return riscv_subset_supports(rps,"xtheadsync");
+	case INSN_CLASS_XVENTANACONDOPS: return riscv_subset_supports(rps,"xventanacondops");
 	default:
-		rps->error_handler
-			(("internal: unreachable INSN_CLASS_*"));
+		rps->error_handler("internal: unreachable INSN_CLASS_*");
 		return false;
 	}
 }
@@ -40869,16 +39596,13 @@ static void	bfd_rename_section(asection * sec,const char *newname)
 
 #define MAX_COMPRESSION_HEADER_SIZE 24
 
-/*
- * FUNCTION bfd_update_compression_header
- * 
+/* FUNCTION bfd_update_compression_header
+ * compress.c:153
  * SYNOPSIS void bfd_update_compression_header (bfd *abfd,bfd_byte *contents,
  * asection *sec);
  * 
  * DESCRIPTION Set the compression header at CONTENTS of SEC in ABFD and update
- * elf_section_flags for compression.
- */
-
+ * elf_section_flags for compression.  */
 static void	bfd_update_compression_header(bfd * abfd,bfd_byte * contents,
 					  		asection *	sec)
 {
@@ -40914,10 +39638,8 @@ static void	bfd_update_compression_header(bfd * abfd,bfd_byte * contents,
 		/* Fall through.  */
 
 	default:
-		/*
-		 * Write the zlib header.  It should be "ZLIB" followed by the
-		 * uncompressed section size,8 bytes in big-endian order.
-		 */
+		/* Write the zlib header.  It should be "ZLIB" followed by the
+		 * uncompressed section size,8 bytes in big-endian order.  */
 		memcpy(contents,"ZLIB",4);
 		bfd_putb64(sec->size,contents + 4);
 		/* No way to keep the original alignment,just use 1 always. */
@@ -40956,6 +39678,7 @@ static bool	bfd_default_scan(const bfd_arch_info_type * info ATTRIBUTE_UNUSED,
 	abort();
 	return false;
 }
+/* hash.c:687 */
 static void	bfd_hash_rename(struct bfd_hash_table *table,
 			    		const		char  *string,
 			    		struct	bfd_hash_entry *ent)
@@ -40967,8 +39690,7 @@ static void	bfd_hash_rename(struct bfd_hash_table *table,
 	for (pph = &table->table[_index]; *pph != NULL; pph = &(*pph)->next)
 		if (*pph == ent)
 			break;
-	if (*pph == NULL)
-		abort();
+	if (*pph == NULL) abort();
 
 	*pph = ent->next;
 	ent->string = string;

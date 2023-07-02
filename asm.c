@@ -20062,7 +20062,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		sec->orelocation = relocs;
 		sec->reloc_count = n;
 	}
-	else sec->flags &= ~SEC_RELOC
+	else sec->flags &= ~SEC_RELOC;
 #ifdef SET_SECTION_RELOCS
 	SET_SECTION_RELOCS(sec,relocs,n);
 #endif

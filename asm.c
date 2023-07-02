@@ -41,8 +41,7 @@ static int	dwarf_line;
 static int	finalize_syms = 0;
 /* This variable is set to be non-zero if the next string we see might be the
  * name of the source file in DWARF debugging information.  See the comment in
- * emit_expr for the format we look for.
- */
+ * emit_expr for the format we look for.  */
 static int	dwarf_file_string;
 
 /* ======================================================== Prototypes  */
@@ -805,16 +804,13 @@ static void	dump_statistics(void)
 #endif
 }
 
-/*
- * Here to attempt 1 pass over each input file. We scan argv[*] looking for
+/* Here to attempt 1 pass over each input file. We scan argv[*] looking for
  * filenames or exactly "" which is shorthand for stdin. Any argv that is NULL
  * is not a file-name. We set need_pass_2 TRUE if,after this,we still have
  * unresolved expressions of the form (unknown value)+-(unknown value).
  * 
  * Note the un*x semantics: there is only 1 logical input file,but it may be a
- * catenation of many 'physical' input files.
- */
-
+ * catenation of many 'physical' input files.  */
 static void	perform_an_assembly_pass(int argc,char **argv)
 {
 	int		saw_a_file = 0;
@@ -1047,16 +1043,12 @@ int		main       (int argc,char **argv)
 		gnustack->flags = SEC_READONLY|(flag_execstack ? SEC_CODE : 0);
 
 	}
-	/*
-	 * If we've been collecting dwarf2 .debug_line info,either for
-	 * assembly debugging or on behalf of the compiler,emit it now.
-	 */
+	/* If we've been collecting dwarf2 .debug_line info,either for
+	 * assembly debugging or on behalf of the compiler,emit it now. */
 	dwarf2_finish();
 
-	/*
-	 * If we constructed dwarf2 .eh_frame info,either via .cfi directives
-	 * from the user or by the backend,emit it now.
-	 */
+	/* If we constructed dwarf2 .eh_frame info,either via .cfi directives
+	 * from the user or by the backend,emit it now.  */
 	cfi_finish();
 
 	keep_it = 0;
@@ -1083,11 +1075,9 @@ int		main       (int argc,char **argv)
 			keep_it = 1;
 		else
 			if (flag_always_generate_output) {
-				/*
-				 * The -Z flag indicates that an object file
+				/* The -Z flag indicates that an object file
 				 * should be generated,regardless of warnings
-				 * and errors.
-				 */
+				 * and errors.  */
 				keep_it = 1;
 				fprintf(stderr,("%s,%s,generating bad object file\n"),
 					err_msg,warn_msg);
@@ -1097,15 +1087,13 @@ int		main       (int argc,char **argv)
 
 	input_scrub_end();
 
-	/*
-	 * Use xexit instead of return,because under VMS environments they may
+	/* Use xexit instead of return,because under VMS environments they may
 	 * not place the same interpretation on the value given.
 	 */
 	if (had_errors() != 0)
 		xexit(EXIT_FAILURE);
 
 	/* Only generate dependency file if assembler was successful.  */
-
 	xexit(EXIT_SUCCESS);
 }
 /* ==================================================**** atof-generic.c */
@@ -1115,8 +1103,7 @@ static void	flonum_print(const FLONUM_TYPE *);
 #endif
 
 #define ASSUME_DECIMAL_MARK_IS_DOT
-/*
- * ======================================================================*\ *
+/* ======================================================================*\ *
  * 
  * Given a string of decimal digits ,with optional decimal	* mark and
  * optional decimal exponent (place value) of the		* lowest_order
@@ -1194,10 +1181,7 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		digits_sign_char = '+';
 
 	switch (first_digit[0]) {
-	case 's':
-	case 'S':
-	case 'q':
-	case 'Q':
+	case 's': case 'S': case 'q': case 'Q':
 		if (!strncasecmp("nan",first_digit + 1,3)) {
 			address_of_generic_floating_point_number->sign =
 				digits_sign_char == '+' ? TOUPPER(first_digit[0])
@@ -1210,8 +1194,7 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		}
 		break;
 
-	case 'n':
-	case 'N':
+	case 'n': case 'N':
 		if (!strncasecmp("nan",first_digit,3)) {
 			address_of_generic_floating_point_number->sign =
 				digits_sign_char == '+' ? 0 : 'q';
@@ -1223,8 +1206,7 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		}
 		break;
 
-	case 'i':
-	case 'I':
+	case 'i': case 'I':
 		if (!strncasecmp("inf",first_digit,3)) {
 			address_of_generic_floating_point_number->sign =
 				digits_sign_char == '+' ? 'P' : 'N';
@@ -1264,24 +1246,19 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		}
 	}			/* For each digit before decimal mark.  */
 
-	/*
-	 * Ignore trailing 0's after the decimal point.  The original code here
+	/* Ignore trailing 0's after the decimal point.  The original code here
 	 * (ifdef'd out) does not do this,and numbers like
 	 * 4.29496729600000000000e+09	(2**31) come out inexact for some
-	 * reason related to length of the digit string.
-	 */
+	 * reason related to length of the digit string.  */
 
-	/*
-	 * The case number_of_digits_before_decimal = 0 is handled for deleting
+	/* The case number_of_digits_before_decimal = 0 is handled for deleting
 	 * zeros after decimal.  In this case the decimal mark and the first
-	 * zero digits after decimal mark are skipped.
-	 */
+	 * zero digits after decimal mark are skipped. */
 	seen_significant_digit = 0;
 	unsigned long	subtract_decimal_exponent = 0;
 
 	if (c && IS_DECIMAL_MARK(c)) {
-		unsigned	zeros = 0;	/* Length of current string of
-						 * zeros.  */
+		unsigned	zeros = 0;	/* Length of current string of zeros.  */
 
 		if (number_of_digits_before_decimal == 0)
 			/* Skip decimal mark.  */
@@ -1330,10 +1307,8 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			decimal_exponent = -decimal_exponent;
 		}
 	}
-	/*
-	 * Subtract_decimal_exponent != 0 when number_of_digits_before_decimal
-	 * = 0 and first digit after decimal is '0'.
-	 */
+	/* Subtract_decimal_exponent != 0 when number_of_digits_before_decimal
+	 * = 0 and first digit after decimal is '0'.  */
 	decimal_exponent += subtract_decimal_exponent;
 
 	*address_of_string_pointer = p;
@@ -1341,16 +1316,14 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 	number_of_digits_available =
 		number_of_digits_before_decimal + number_of_digits_after_decimal;
 	if (number_of_digits_available == 0) {
-		address_of_generic_floating_point_number->exponent = 0;	/* Not strictly
-									 * necessary */
+		address_of_generic_floating_point_number->exponent = 0;	/* Not strictly necessary */
 		address_of_generic_floating_point_number->leader
 			= -1 + address_of_generic_floating_point_number->low;
 		address_of_generic_floating_point_number->sign = digits_sign_char;
 		/* We have just concocted (+/-)0.0E0 */
 
 	} else {
-		int		count;	/* Number of useful digits left to
-					 * scan.  */
+		int		count;	/* Number of useful digits left to scan.  */
 
 		LITTLENUM_TYPE *temporary_binary_low = NULL;
 		LITTLENUM_TYPE *power_binary_low = NULL;
@@ -1400,15 +1373,13 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			   / LITTLENUM_NUMBER_OF_BITS)
 			+ 2;
 
-		/*
-		 * Compute (digits) part. In "12.34E56" this is the "1234"
+		/* Compute (digits) part. In "12.34E56" this is the "1234"
 		 * part. Arithmetic is exact here. If no digits are supplied
 		 * then this part is a 0 valued binary integer.  Allocate room
 		 * to build up the binary number as littlenums.  We want this
 		 * memory to disappear when we leave this function.  Assume no
 		 * alignment problems => (room for n objects) == n * (room for
-		 * 1 object).
-		 */
+		 * 1 object). */
 
 		size_of_digits_in_littlenums = more_than_enough_littlenums_for_digits;
 		size_of_digits_in_chars = size_of_digits_in_littlenums
@@ -1421,21 +1392,16 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 
 		/* Digits_binary_low[] is allocated and zeroed.  */
 
-		/*
-		 * Parse the decimal digits as if * digits_low was in the units
+		/* Parse the decimal digits as if * digits_low was in the units
 		 * position. Emit a binary number into digits_binary_low[].
 		 * 
 		 * Use a large-precision version of: (((1st-digit) * 10 +
-		 * 2nd-digit) * 10 + 3rd-digit ...) * 10 + last-digit
-		 */
-
+		 * 2nd-digit) * 10 + 3rd-digit ...) * 10 + last-digit */
 		for (p = first_digit,count = number_of_digits_to_use; count; p++,--count) {
 			c = *p;
 			if (ISDIGIT(c)) {
-				/*
-				 * Multiply by 10. Assume can never overflow.
-				 * Add this digit to digits_binary_low[].
-				 */
+				/* Multiply by 10. Assume can never overflow.
+				 * Add this digit to digits_binary_low[].  */
 
 				long		carry;
 				LITTLENUM_TYPE *littlenum_pointer;
@@ -1470,10 +1436,8 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			}
 		}
 
-		/*
-		 * Digits_binary_low[] properly encodes the value of the
-		 * digits. Forget about any high-order littlenums that are 0.
-		 */
+		/* Digits_binary_low[] properly encodes the value of the
+		 * digits. Forget about any high-order littlenums that are 0.  */
 		while (digits_binary_low[size_of_digits_in_littlenums - 1] == 0
 		       && size_of_digits_in_littlenums >= 2)
 			size_of_digits_in_littlenums--;
@@ -1482,25 +1446,21 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		digits_flonum.high = digits_binary_low + size_of_digits_in_littlenums - 1;
 		digits_flonum.leader = digits_flonum.high;
 		digits_flonum.exponent = 0;
-		/*
-		 * The value of digits_flonum . sign should not be important.
+		/* The value of digits_flonum . sign should not be important.
 		 * We have already decided the output's sign. We trust that the
 		 * sign won't influence the other parts of the number! So we
 		 * give it a value for these reasons: (1) courtesy to humans
 		 * reading/debugging these numbers so they don't get excited
 		 * about strange values (2) in future there may be more meaning
 		 * attached to sign,and what was harmless noise may become
-		 * disruptive,ill-conditioned (or worse) input.
-		 */
+		 * disruptive,ill-conditioned (or worse) input.  */
 		digits_flonum.sign = '+';
 
 		{
-			/*
-			 * Compute the mantissa (& exponent) of the power of
+			/* Compute the mantissa (& exponent) of the power of
 			 * 10. If successful,then multiply the power of 10 by
 			 * the digits giving return_binary_mantissa and
-			 * return_binary_exponent.
-			 */
+			 * return_binary_exponent.  */
 
 			int		decimal_exponent_is_negative;
 			/* This refers to the "-56" in "12.34E-56".  */
@@ -1511,19 +1471,15 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			unsigned	size_of_power_in_chars;
 
 			size_of_power_in_littlenums = precision;
-			/*
-			 * Precision has a built-in fudge factor so we get a
-			 * few guard bits.
-			 */
+			/* Precision has a built-in fudge factor so we get a
+			 * few guard bits.  */
 
 			decimal_exponent_is_negative = (long)decimal_exponent < 0;
 			if (decimal_exponent_is_negative) {
 				decimal_exponent = -decimal_exponent;
 			}
-			/*
-			 * From now on: the decimal exponent is > 0. Its sign
-			 * is separate.
-			 */
+			/* From now on: the decimal exponent is > 0. Its sign
+			 * is separate.  */
 
 			size_of_power_in_chars = size_of_power_in_littlenums
 				* sizeof(LITTLENUM_TYPE) + 2;
@@ -1540,16 +1496,11 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			power_of_10_flonum.sign = '+';
 			temporary_flonum.low = temporary_binary_low;
 			temporary_flonum.high = temporary_binary_low + size_of_power_in_littlenums - 1;
-			/*
-			 * (power) == 1. Space for temporary_flonum allocated.
-			 */
+			/* (power) == 1. Space for temporary_flonum allocated.  */
 
-			/*
-			 * ...
-			 * 
+			/* ... 
 			 * WHILE	more bits DO	find next bit (with place
-			 * value) multiply into power mantissa OD
-			 */
+			 * value) multiply into power mantissa OD */
 			{
 				int		place_number_limit;
 				/* Any 10^(2^n) whose "n" exceeds this */
@@ -1571,27 +1522,13 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 				     decimal_exponent >>= 1,place_number++) {
 					if (decimal_exponent & 1) {
 						if (place_number > place_number_limit) {
-							/*
-							 * The decimal exponent
-							 * has a magnitude so
-							 * great that our
-							 * tables can't help us
-							 * fragment it.
-							 * Although this
-							 * routine is in error
-							 * because it can't
-							 * imagine a number
-							 * that big,signal an
-							 * error as if it is
-							 * the user's fault for
-							 * presenting such a
-							 * big number.
-							 */
+						/* The decimal exponent has a magnitude so
+						 * great that our tables can't help us fragment it.
+						 * Although this routine is in error because it can't
+						 * imagine a number* that big,signal an* error as if it is
+						 * the user's fault for presenting such a big number.  */
 							return_value = ERROR_EXPONENT_OVERFLOW;
-							/*
-							 * quit out of loop
-							 * gracefully
-							 */
+							/* quit out of loop gracefully */
 							decimal_exponent = 0;
 						} else {
 #ifdef TRACE
@@ -1634,13 +1571,11 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 			}
 		}
 
-		/*
-		 * power_of_10_flonum is power of ten in binary (mantissa) ,
+		/* power_of_10_flonum is power of ten in binary (mantissa) ,
 		 * (exponent). It may be the number 1,in which case we don't
 		 * NEED to multiply.
 		 * 
-		 * Multiply (decimal digits) by power_of_10_flonum.
-		 */
+		 * Multiply (decimal digits) by power_of_10_flonum.  */
 
 		flonum_multip(&power_of_10_flonum,&digits_flonum,address_of_generic_floating_point_number);
 		/* Assert sign of the number we made is '+'.  */
@@ -1654,8 +1589,7 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 }
 
 #ifdef TRACE
-static void	flonum_print(f)
-	const FLONUM_TYPE *f;
+static void	flonum_print(const FLONUM_TYPE *f)
 {
 	LITTLENUM_TYPE *lp;
 	char		littlenum_format[10];
@@ -1672,42 +1606,14 @@ static void	flonum_print(f)
 	fflush(stdout);
 }
 #endif
-
 /* end of atof_generic.c */
 /* ==================================================** compress-debug.c */
 /* compress-debug.c - compress debug sections */
 #include <zlib.h>
-#if HAVE_ZSTD
-#include <zstd.h>
-#endif
-/* compress-debug.h - Header file for compressed debug sections. */
-#ifndef COMPRESS_DEBUG_H
-#define COMPRESS_DEBUG_H
 struct z_stream_s;
-
 /* Initialize the compression engine.  */
-static void    *compress_init(bool);
-
-/*
- * Stream the contents of a frag to the compression engine.  Output from the
- * engine goes into the current frag on the obstack.
- */
-static int	compress_data(bool,void *,const char **,int *,char **,int *);
-
-/* Finish the compression and consume the remaining compressed output.  */
-static int	compress_finish(bool,void *,char **,int *,int *);
-
-#endif				/* COMPRESS_DEBUG_H */
-
-/* Initialize the compression engine.  */
-
-static void    *compress_init(bool use_zstd)
+static void    *compress_init(bool use_zstd ATTRIBUTE_UNUSED)
 {
-	if (use_zstd) {
-#if HAVE_ZSTD
-		return ZSTD_createCCtx();
-#endif
-	}
 	static struct z_stream_s strm;
 	memset(&strm,0,sizeof(strm));
 	deflateInit(&strm,Z_DEFAULT_COMPRESSION);
@@ -1718,23 +1624,10 @@ static void    *compress_init(bool use_zstd)
  * Stream the contents of a frag to the compression engine.  Output from the
  * engine goes into the current frag on the obstack.
  */
-static int	compress_data(bool use_zstd,void *ctx,const char **next_in,int *avail_in,
+static int	compress_data(bool use_zstd ATTRIBUTE_UNUSED,
+                    void *ctx,const char **next_in,int *avail_in,
 			 		char        **next_out,int *avail_out)
 {				/* compress-debug.c:71 */
-	if (use_zstd) {
-#if HAVE_ZSTD
-		ZSTD_outBuffer	ob = {*next_out,*avail_out,0};
-		ZSTD_inBuffer	ib = {*next_in,*avail_in,0};
-		size_t		ret = ZSTD_compressStream2(ctx,&ob,&ib,ZSTD_e_continue);
-		*next_in += ib.pos;
-		*avail_in -= ib.pos;
-		*next_out += ob.pos;
-		*avail_out -= ob.pos;
-		if (ZSTD_isError(ret))
-			return -1;
-		return (int)ob.pos;
-#endif
-	}
 	struct z_stream_s *strm = ctx;
 
 	strm->next_in = (Bytef *) (*next_in);
@@ -1755,28 +1648,12 @@ static int	compress_data(bool use_zstd,void *ctx,const char **next_in,int *avail
 	return out_size;
 }
 
-/*
- * Finish the compression and consume the remaining compressed output. Returns
- * -1 for error,0 when done,1 when more output buffer is needed.
- */
-static int	compress_finish(bool use_zstd,void *ctx,char **next_out,
+/* Finish the compression and consume the remaining compressed output. Returns
+ * -1 for error,0 when done,1 when more output buffer is needed.  */
+static int	compress_finish(bool use_zstd ATTRIBUTE_UNUSED,
+                                void *ctx,char **next_out,
 			   		int          *avail_out,int *out_size)
 {
-	if (use_zstd) {
-#if HAVE_ZSTD
-		ZSTD_outBuffer	ob = {*next_out,*avail_out,0};
-		ZSTD_inBuffer	ib = {0,0,0};
-		size_t		ret = ZSTD_compressStream2(ctx,&ob,&ib,ZSTD_e_end);
-		*out_size = ob.pos;
-		*next_out += ob.pos;
-		*avail_out -= ob.pos;
-		if (ZSTD_isError(ret))
-			return -1;
-		if (ret == 0)
-			ZSTD_freeCCtx(ctx);
-		return ret ? 1 : 0;
-#endif
-	}
 	int		x;
 	struct z_stream_s *strm = ctx;
 
@@ -1798,14 +1675,7 @@ static int	compress_finish(bool use_zstd,void *ctx,char **next_out,
 		return -1;
 	return 1;
 }
-/* ============================================================** cond.c */
-/* cond.c - conditional assembly pseudo-ops,and .include */
-
-/*
- * This is allocated to grow and shrink as .ifdef/.endif pairs are scanned.
- */
 /* =======================================================** dw2gencfi.c */
-/* dw2gencfi.c - Support for generating Dwarf2 CFI information. */
 /* dw2gencfi.h - Support for generating Dwarf2 CFI information. */
 #ifndef DW2GENCFI_H
 #define DW2GENCFI_H
@@ -1844,14 +1714,8 @@ struct symbol;
 #define TARGET_MULTIPLE_EH_FRAME_SECTIONS 0
 #endif
 
-#define MULTIPLE_FRAME_SECTIONS (SUPPORT_COMPACT_EH \
-				 || TARGET_MULTIPLE_EH_FRAME_SECTIONS)
-
 struct cfi_insn_data {
 	struct cfi_insn_data *next;
-#if MULTIPLE_FRAME_SECTIONS
-	segT		cur_seg;
-#endif
 	int		insn;
 	union {
 		struct {
@@ -1883,8 +1747,7 @@ struct cfi_insn_data {
 	}		u;
 };
 
-/*
- * An enumeration describing the Compact EH header format.  The least
+/* An enumeration describing the Compact EH header format.  The least
  * significant bit is used to distinguish the entries.
  * 
  * Inline Compact:			Function offset [0] Four chars of unwind data.
@@ -1896,13 +1759,8 @@ struct cfi_insn_data {
  * discovered by encountering a .fde_data entry. Failure to find a .fde_data
  * entry will cause an EH_COMPACT_LEGACY header to be generated.
  */
-
-enum {
-	EH_COMPACT_UNKNOWN,
-	EH_COMPACT_LEGACY,
-	EH_COMPACT_INLINE,
-	EH_COMPACT_OUTLINE,
-	EH_COMPACT_OUTLINE_DONE,
+enum { EH_COMPACT_UNKNOWN, EH_COMPACT_LEGACY, EH_COMPACT_INLINE,
+	EH_COMPACT_OUTLINE, EH_COMPACT_OUTLINE_DONE,
 	/* Outline if .cfi_inline_lsda used,otherwise legacy FDE.  */
 	EH_COMPACT_HAS_LSDA
 };
@@ -1923,9 +1781,6 @@ struct frch_cfi_data {
 
 struct fde_entry {
 	struct fde_entry *next;
-#if MULTIPLE_FRAME_SECTIONS
-	segT		cur_seg;
-#endif
 	symbolS        *start_address;
 	symbolS        *end_address;
 	struct cfi_insn_data *data;
@@ -1937,9 +1792,6 @@ struct fde_entry {
 	expressionS	lsda;
 	unsigned	return_column;
 	unsigned	signal_frame;
-#if MULTIPLE_FRAME_SECTIONS
-	int		handled;
-#endif
 	int		eh_header_type;
 	/* Compact unwinding opcodes,not including the PR byte or LSDA.  */
 	int		eh_data_size;
@@ -1948,7 +1800,7 @@ struct fde_entry {
 	symbolS        *eh_loc;
 	int		sections;
 #ifdef tc_fde_entry_extras
-			tc_fde_entry_extras
+	tc_fde_entry_extras
 #endif
 };
 
@@ -2038,17 +1890,10 @@ static void	output_sframe(segT sframe_seg);
 #define DWARF2_ADDR_SIZE(x) (x->arch_info->bits_per_address / 8)
 #endif
 
-#if MULTIPLE_FRAME_SECTIONS
-#define CUR_SEG(structp) structp->cur_seg
-#define SET_CUR_SEG(structp,seg) structp->cur_seg = seg
-#define HANDLED(structp) structp->handled
-#define SET_HANDLED(structp,val) structp->handled = val
-#else
 #define CUR_SEG(structp) NULL
 #define SET_CUR_SEG(structp,seg) (void) (0 && seg)
 #define HANDLED(structp) 0
 #define SET_HANDLED(structp,val) (void) (0 && val)
-#endif
 
 #ifndef tc_cfi_reloc_for_encoding
 #define tc_cfi_reloc_for_encoding(e) BFD_RELOC_NONE
@@ -2075,7 +1920,6 @@ static bool	compact_eh;
 static htab_t	dwcfi_hash;
 
 /* Emit a single byte into the current segment.  */
-
 static inline void out_one(int byte)
 {
 	FRAG_APPEND_1_CHAR(byte);
@@ -2097,9 +1941,7 @@ static void	out_uleb128(addressT value)
 {
 	output_leb128(frag_more(sizeof_leb128(value,0)),value,0);
 }
-/*
- * Write VAL in uleb128 format to P,returning a pointer to the following byte.
- */
+/* Write VAL in uleb128 format to P,returning a pointer to the following byte. */
 static bfd_byte *write_uleb128(bfd_byte * p,unsigned int val)
 {
 	bfd_byte	c;
@@ -2114,7 +1956,6 @@ static bfd_byte *write_uleb128(bfd_byte * p,unsigned int val)
 	return p;
 }
 /* Emit an unsigned "little-endian base 128" number.  */
-
 static void	out_sleb128(offsetT value)
 {
 	output_leb128(frag_more(sizeof_leb128(value,1)),value,1);
@@ -2125,23 +1966,17 @@ static unsigned	encoding_size(unsigned char encoding)
 	if (encoding == DW_EH_PE_omit)
 		return 0;
 	switch (encoding & 0x7) {
-	case 0:
-		return 8;
-	case DW_EH_PE_udata2:
-		return 2;
-	case DW_EH_PE_udata4:
-		return 4;
-	case DW_EH_PE_udata8:
-		return 8;
+	case 0: return 8;
+	case DW_EH_PE_udata2: return 2;
+	case DW_EH_PE_udata4: return 4;
+	case DW_EH_PE_udata8: return 8;
 	default:
 		abort();
 	}
 }
 
-/*
- * Emit expression EXP in ENCODING.  If EMIT_ENCODING is true,first emit a
- * byte containing ENCODING.
- */
+/* Emit expression EXP in ENCODING.  If EMIT_ENCODING is true,first emit a
+ * byte containing ENCODING. */
 static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 {
 	unsigned	size = encoding_size(encoding);
@@ -2177,13 +2012,9 @@ static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 			emit_expr(exp,size);
 }
 
-/*
- * Build based on segment the derived .debug_... segment name containing origin
- * segment's postfix name part.
- */
-
-static char    *
-		get_debugseg_name(segT seg,const char *base_name)
+/* Build based on segment the derived .debug_... segment name containing origin
+ * segment's postfix name part.  */
+static char    *get_debugseg_name(segT seg,const char *base_name)
 {
 	const char     *name;
 	const char     *dollar;
@@ -2219,7 +2050,6 @@ static char    *
 }
 
 /* Allocate a dwcfi_seg_list structure.  */
-
 static struct dwcfi_seg_list *alloc_debugseg_item(segT seg,int subseg,char *name)
 {
 	struct dwcfi_seg_list *r;
@@ -2247,9 +2077,7 @@ static segT	is_now_linkonce_segment(void)
 	return NULL;
 }
 
-/*
- * Generate debug... segment with same linkonce properties of based segment.
- */
+/* Generate debug... segment with same linkonce properties of based segment. */
 static segT	make_debug_seg(segT cseg,char *name,int sflags)
 {
 	segT		save_seg = now_seg;
@@ -2287,17 +2115,12 @@ static struct dwcfi_seg_list *dwcfi_hash_find(char *name)
 /* The default number of entries to use when creating a hash table.  */
 #define DEFAULT_SIZE 4051
 
-/*
- * The following function returns a nearest prime number which is greater than
+/* The following function returns a nearest prime number which is greater than
  * N,and near a power of two.  Copied from libiberty. Returns zero for
- * ridiculously large N to signify an error.
- */
+ * ridiculously large N to signify an error.  */
 static uint32_t	higher_prime_number(uint32_t n)
 {
-	/*
-	 * These are primes that are near,but slightly smaller than,a power
-	 * of two.
-	 */
+	/* These are primes that are near,but slightly smaller than,a power of two. */
 	static const uint32_t primes[] = {
 		31,61,127,251,509U,1021,2039,4093,8191,16381,
 		32749,65521,131071U,262139,524287,1048573U,2097143U,
@@ -2401,9 +2224,7 @@ static inline unsigned long bfd_hash_hash(const char *string,unsigned int *lenp)
 	return hash;
 }
 static struct bfd_hash_entry *bfd_hash_lookup(struct bfd_hash_table *table,
-				      		const		char  *string,
-					    		bool		create ,
-					      		bool		copy)
+			      		const char *string, bool create , bool copy)
 {
 	unsigned long	hash;
 	struct bfd_hash_entry *hashp;
@@ -2463,9 +2284,7 @@ static struct dwcfi_seg_list *dwcfi_hash_find_or_make(segT cseg,const char *base
 /* ??? Share this with dwarf2cfg.c.  */
 #ifndef TC_DWARF2_EMIT_OFFSET
 #define TC_DWARF2_EMIT_OFFSET  generic_dwarf2_emit_offset
-
 /* Create an offset to .dwarf2_*.  */
-
 static void	generic_dwarf2_emit_offset(symbolS * symbol,unsigned size)
 {
 	expressionS	exp;
@@ -2484,9 +2303,6 @@ struct cfi_escape_data {
 
 struct cie_entry {
 	struct cie_entry *next;
-#if MULTIPLE_FRAME_SECTIONS
-	segT		cur_seg;
-#endif
 	symbolS        *start_address;
 	unsigned	return_column;
 	unsigned	signal_frame;
@@ -2494,14 +2310,10 @@ struct cie_entry {
 	unsigned char	per_encoding;
 	unsigned char	lsda_encoding;
 	expressionS	personality;
-#ifdef tc_cie_entry_extras
-			tc_cie_entry_extras
-#endif
 	struct cfi_insn_data *first,*last;
 };
 
 /* List of FDE entries.  */
-
 struct fde_entry *all_fde_data;
 static struct fde_entry **last_fde_data = &all_fde_data;
 
@@ -2524,23 +2336,14 @@ static struct fde_entry *alloc_fde_entry(void)
 	fde->per_encoding = DW_EH_PE_omit;
 	fde->lsda_encoding = DW_EH_PE_omit;
 	fde->eh_header_type = EH_COMPACT_UNKNOWN;
-#ifdef tc_fde_entry_init_extra
-	tc_fde_entry_init_extra(fde)
-#endif
-
-		return fde;
+	return fde;
 }
 
-/*
- * The following functions are available for a backend to construct its own
- * unwind information,usually from legacy unwind directives.
- */
-
-/*
+/* The following functions are available for a backend to construct its own
+ * unwind information,usually from legacy unwind directives.  
+ *
  * Construct a new INSN structure and add it to the end of the insn list for
- * the currently active FDE.
- */
-
+ * the currently active FDE.  */
 static bool	cfi_sections_set = false;
 static int	cfi_sections = CFI_EMIT_eh_frame;
 static int	all_cfi_sections = 0;
@@ -2558,7 +2361,7 @@ static struct cfi_insn_data *alloc_cfi_insn_data(void)
 }
 
 /* Construct a new FDE structure that begins at LABEL.  */
-void		cfi_new_fde(symbolS * label)
+static void	cfi_new_fde(symbolS * label)
 {
 	struct fde_entry *fde = alloc_fde_entry();
 	fde->start_address = label;
@@ -2566,8 +2369,7 @@ void		cfi_new_fde(symbolS * label)
 }
 
 /* End the currently open FDE.  */
-
-void		cfi_end_fde(symbolS * label)
+static void		cfi_end_fde(symbolS * label)
 {
 	frchain_now->frch_cfi_data->cur_fde_data->end_address = label;
 	free(frchain_now->frch_cfi_data);
@@ -2575,13 +2377,12 @@ void		cfi_end_fde(symbolS * label)
 }
 
 /* Set the return column for the current FDE.  */
-
-void		cfi_set_return_column(unsigned regno)
+static void	cfi_set_return_column(unsigned regno)
 {
 	frchain_now->frch_cfi_data->cur_fde_data->return_column = regno;
 }
 
-void		cfi_set_sections(void)
+static void	cfi_set_sections(void)
 {
 	frchain_now->frch_cfi_data->cur_fde_data->sections = all_cfi_sections;
 	cfi_sections_set = true;
@@ -2749,7 +2550,6 @@ static void	cfi_add_CFA_restore_state(void)
 
 
 /* Parse CFI assembler directives.  */
-
 static void	dot_cfi(int);
 static void	dot_cfi_escape(int);
 static void	dot_cfi_sections(int);
@@ -2805,10 +2605,8 @@ static void	cfi_parse_separator(void)
 		as_bad(("missing separator"));
 }
 
-#ifndef tc_parse_to_dw2regnum
 static void	tc_parse_to_dw2regnum(expressionS * exp)
 {
-#ifdef tc_regname_to_dw2regnum
 	SKIP_WHITESPACE();
 	if (is_name_beginner(*input_line_pointer)
 	    || (*input_line_pointer == '%'
@@ -2821,11 +2619,8 @@ static void	tc_parse_to_dw2regnum(expressionS * exp)
 		exp->X_add_number = tc_regname_to_dw2regnum(name);
 
 		restore_line_pointer(c);
-	} else
-#endif
-		expression_and_evaluate(exp);
+	} else expression_and_evaluate(exp);
 }
-#endif
 
 static unsigned	cfi_parse_reg(void)
 {
@@ -2834,11 +2629,9 @@ static unsigned	cfi_parse_reg(void)
 
 	tc_parse_to_dw2regnum(&exp);
 	switch (exp.X_op) {
-	case O_register:
-	case O_constant:
+	case O_register: case O_constant:
 		regno = exp.X_add_number;
 		break;
-
 	default:
 		regno = -1;
 		break;
@@ -2851,8 +2644,7 @@ static unsigned	cfi_parse_reg(void)
 	return regno;
 }
 
-static		offsetT
-		cfi_parse_const(void)
+static		offsetT cfi_parse_const(void)
 {
 	return get_absolute_expression();
 }
@@ -3279,7 +3071,7 @@ static void	dot_cfi_sections(int ignored ATTRIBUTE_UNUSED)
 	    && (sections & (CFI_EMIT_eh_frame|CFI_EMIT_eh_frame_compact))
 	  && ((cfi_sections & (CFI_EMIT_eh_frame|CFI_EMIT_eh_frame_compact))
 	      != (sections & (CFI_EMIT_eh_frame|CFI_EMIT_eh_frame_compact))))
-		as_bad(("inconsistent uses of .cfi_sections"));
+		as_bad("inconsistent uses of .cfi_sections");
 	cfi_sections = sections;
 }
 
@@ -3288,7 +3080,7 @@ static void	dot_cfi_startproc(int ignored ATTRIBUTE_UNUSED)
 	int		simple = 0;
 
 	if (frchain_now->frch_cfi_data != NULL) {
-		as_bad(("previous CFI entry not closed (missing .cfi_endproc)"));
+		as_bad("previous CFI entry not closed (missing .cfi_endproc)");
 		ignore_rest_of_line();
 		return;
 	}
@@ -3330,7 +3122,6 @@ static void	dot_cfi_endproc(int ignored ATTRIBUTE_UNUSED)
 	last_fde = frchain_now->frch_cfi_data->cur_fde_data;
 
 	cfi_end_fde(symbol_temp_new_now());
-
 	demand_empty_rest_of_line();
 
 	cfi_sections_set = true;
@@ -3375,173 +3166,6 @@ static		segT
 	return cseg;
 }
 
-#if SUPPORT_COMPACT_EH
-static void	dot_cfi_personality_id(int ignored ATTRIBUTE_UNUSED)
-{
-	struct fde_entry *fde;
-
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
-	fde = frchain_now->frch_cfi_data->cur_fde_data;
-	fde->personality_id = cfi_parse_const();
-	demand_empty_rest_of_line();
-
-	if (fde->personality_id == 0 || fde->personality_id > 3) {
-		as_bad(("wrong argument to .cfi_personality_id"));
-		return;
-	}
-}
-
-static void	dot_cfi_fde_data(int ignored ATTRIBUTE_UNUSED)
-{
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad((".cfi_fde_data without corresponding .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
-	last_fde = frchain_now->frch_cfi_data->cur_fde_data;
-
-	cfi_sections_set = true;
-	if ((cfi_sections & CFI_EMIT_target) != 0
-	    || (cfi_sections & CFI_EMIT_eh_frame_compact) != 0) {
-		struct cfi_escape_data *head,**tail,*e;
-		int		num_ops = 0;
-
-		tail = &head;
-		if (!is_it_end_of_statement()) {
-			num_ops = 0;
-			do {
-				e = XNEW(struct cfi_escape_data);
-				do_parse_cons_expression(&e->exp,1);
-				*tail = e;
-				tail = &e->next;
-				num_ops++;
-			}
-			while (*input_line_pointer++ == ',');
-			--input_line_pointer;
-		}
-		*tail = NULL;
-
-		if (last_fde->lsda_encoding != DW_EH_PE_omit)
-			last_fde->eh_header_type = EH_COMPACT_HAS_LSDA;
-		else
-			if (num_ops <= 3 && last_fde->per_encoding == DW_EH_PE_omit)
-				last_fde->eh_header_type = EH_COMPACT_INLINE;
-			else
-				last_fde->eh_header_type = EH_COMPACT_OUTLINE;
-
-		if (last_fde->eh_header_type == EH_COMPACT_INLINE)
-			num_ops = 3;
-
-		last_fde->eh_data_size = num_ops;
-		last_fde->eh_data = XNEWVEC(uint8_t,num_ops);
-		num_ops = 0;
-		while (head) {
-			e = head;
-			head = e->next;
-			last_fde->eh_data[num_ops++] = e->exp.X_add_number;
-			free(e);
-		}
-		if (last_fde->eh_header_type == EH_COMPACT_INLINE)
-			while (num_ops < 3)
-				last_fde->eh_data[num_ops++] = tc_compact_eh_opcode_stop;
-	}
-	demand_empty_rest_of_line();
-}
-
-/*
- * Function to emit the compact unwinding opcodes stored in the fde's eh_data
- * field.  The end of the opcode data will be padded to the value in align.
- */
-
-static void	output_compact_unwind_data(struct fde_entry *fde,int align)
-{
-	int		data_size = fde->eh_data_size + 2;
-	int		align_padding;
-	int		amask;
-	char           *p;
-
-	fde->eh_loc = symbol_temp_new_now();
-
-	p = frag_more(1);
-	if (fde->personality_id != 0)
-		*p = fde->personality_id;
-	else
-		if (fde->per_encoding != DW_EH_PE_omit) {
-			*p = 0;
-			emit_expr_encoded(&fde->personality,fde->per_encoding,false);
-			data_size += encoding_size(fde->per_encoding);
-		} else
-			*p = 1;
-
-	amask = (1 << align) - 1;
-	align_padding = ((data_size + amask) & ~amask) - data_size;
-
-	p = frag_more(fde->eh_data_size + 1 + align_padding);
-	memcpy(p,fde->eh_data,fde->eh_data_size);
-	p += fde->eh_data_size;
-
-	while (align_padding-- > 0)
-		*(p++) = tc_compact_eh_opcode_pad;
-
-	*(p++) = tc_compact_eh_opcode_stop;
-	fde->eh_header_type = EH_COMPACT_OUTLINE_DONE;
-}
-
-/* Handle the .cfi_inline_lsda directive.  */
-static void	dot_cfi_inline_lsda(int ignored ATTRIBUTE_UNUSED)
-{
-	segT		ccseg;
-	int		align;
-	long		max_alignment = 28;
-
-	if (!last_fde) {
-		as_bad(("unexpected .cfi_inline_lsda"));
-		ignore_rest_of_line();
-		return;
-	}
-	if ((last_fde->sections & CFI_EMIT_eh_frame_compact) == 0) {
-		as_bad((".cfi_inline_lsda not valid for this frame"));
-		ignore_rest_of_line();
-		return;
-	}
-	if (last_fde->eh_header_type != EH_COMPACT_UNKNOWN
-	    && last_fde->eh_header_type != EH_COMPACT_HAS_LSDA) {
-		as_bad((".cfi_inline_lsda seen for frame without .cfi_lsda"));
-		ignore_rest_of_line();
-		return;
-	}
-	align = get_absolute_expression();
-	if (align > max_alignment) {
-		align = max_alignment;
-		as_bad(("Alignment too large: %d. assumed."),align);
-	} else
-		if (align < 0) {
-			as_warn(("Alignment negative: 0 assumed."));
-			align = 0;
-		}
-	demand_empty_rest_of_line();
-	ccseg = CUR_SEG(last_fde);
-
-	/* Open .gnu_extab section.  */
-	get_cfi_seg(ccseg,".gnu_extab",
-		    (SEC_ALLOC|SEC_LOAD|SEC_DATA
-		    |DWARF2_EH_FRAME_READ_ONLY),
-		    1);
-
-	frag_align(align,0,0);
-	record_alignment(now_seg,align);
-	if (last_fde->eh_header_type == EH_COMPACT_HAS_LSDA)
-		output_compact_unwind_data(last_fde,align);
-
-	last_fde = NULL;
-
-	return;
-}
-#else				/* !SUPPORT_COMPACT_EH */
 static void	dot_cfi_inline_lsda(int ignored ATTRIBUTE_UNUSED)
 {
 	as_bad((".cfi_inline_lsda is not supported for this target"));
@@ -3559,7 +3183,6 @@ static void	dot_cfi_personality_id(int ignored ATTRIBUTE_UNUSED)
 	as_bad((".cfi_personality_id is not supported for this target"));
 	ignore_rest_of_line();
 }
-#endif
 
 static void	output_cfi_insn(struct cfi_insn_data *insn)
 {
@@ -20301,6 +19924,7 @@ static fragS   *get_frag_for_reloc(fragS * last_frag,
 	return NULL;
 }
 
+/* gas/write.c:1229 */
 static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 {
 	segment_info_type *seginfo = seg_info(sec);
@@ -20438,6 +20062,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		sec->orelocation = relocs;
 		sec->reloc_count = n;
 	}
+	else sec->flags &= ~SEC_RELOC
 #ifdef SET_SECTION_RELOCS
 	SET_SECTION_RELOCS(sec,relocs,n);
 #endif
@@ -21227,7 +20852,6 @@ static void	maybe_generate_build_notes(void)
 #endif				/* OBJ_ELF */
 
 /* Write the object file.  */
-
 static void	write_object_file(void)
 {
 	struct relax_seg_info rsi;

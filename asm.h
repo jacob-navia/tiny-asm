@@ -2957,6 +2957,10 @@ static char *xstrerror(int);
 static void *xrealloc(void *,size_t);
 static char *getpwd(void);
 static void xexit(int status) ATTRIBUTE_NORETURN;
+static void	cfi_finish(void);
+static void	map_over_sections(void (*operation) (asection *,void *),void *user_storage);
+static int	obj_elf_vendor_attribute(int vendor);
+static bool	set_section_size(asection *,size_t val);
 #define _hex_array_size 256
 #define _hex_bad	99
 #define LIBIBERTY_H
@@ -3655,21 +3659,6 @@ static bool literal_prefix_dollar_hex;
 #define GNU_PROPERTY_LOUSER  0xe0000000
 /* Application-specific semantics, hi */
 #define GNU_PROPERTY_HIUSER  0xffffffff
-
-/* GNU_PROPERTY_X86_ISA_1_BASELINE: CMOV, CX8 (cmpxchg8b), FPU (fld),
-   MMX, OSFXSR (fxsave), SCE (syscall), SSE and SSE2.  */
-#define GNU_PROPERTY_X86_ISA_1_BASELINE		(1U << 0)
-/* GNU_PROPERTY_X86_ISA_1_V2: GNU_PROPERTY_X86_ISA_1_BASELINE,
-   CMPXCHG16B (cmpxchg16b), LAHF-SAHF (lahf), POPCNT (popcnt), SSE3,
-   SSSE3, SSE4.1 and SSE4.2.  */
-#define GNU_PROPERTY_X86_ISA_1_V2		(1U << 1)
-/* GNU_PROPERTY_X86_ISA_1_V3: GNU_PROPERTY_X86_ISA_1_V2, AVX, AVX2, BMI1,
-   BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE.  */
-#define GNU_PROPERTY_X86_ISA_1_V3		(1U << 2)
-/* GNU_PROPERTY_X86_ISA_1_V4: GNU_PROPERTY_X86_ISA_1_V3, AVX512F,
-   AVX512BW, AVX512CD, AVX512DQ and AVX512VL.  */
-#define GNU_PROPERTY_X86_ISA_1_V4		(1U << 3)
-
 /* Values used in GNU .note.ABI-tag notes (NT_GNU_ABI_TAG).  */
 #define GNU_ABI_TAG_LINUX	0
 #define GNU_ABI_TAG_HURD	1
@@ -4403,42 +4392,6 @@ typedef struct {
 struct elf_strtab_hash;
 struct got_entry;
 struct plt_entry;
-
-union gotplt_union
-  {
-    bfd_signed_vma refcount;
-    bfd_vma offset;
-    struct got_entry *glist;
-    struct plt_entry *plist;
-  };
-
-struct elf_link_virtual_table_entry
-  {
-    /* Virtual table entry use information.  This array is nominally of size
-       size/sizeof(target_void_pointer), though we have to be able to assume
-       and track a size while the symbol is still undefined.  It is indexed
-       via offset/sizeof(target_void_pointer).  */
-    size_t size;
-    bool *used;
-
-    /* Virtual table derivation info.  */
-    struct elf_link_hash_entry *parent;
-  };
-
-/* ELF symbol version.  */
-enum elf_symbol_version
-  {
-    unknown = 0,
-    unversioned,
-    versioned,
-    versioned_hidden
-  };
-
-/* Will references to this symbol always reference the symbol
-   in this object?  */
-#define SYMBOL_REFERENCES_LOCAL(INFO, H) \
-  _bfd_elf_symbol_refs_local_p (H, INFO, 0)
-
 /* Will _calls_ to this symbol always call the version in this object?  */
 #define SYMBOL_CALLS_LOCAL(INFO, H) \
   _bfd_elf_symbol_refs_local_p (H, INFO, 1)
@@ -4670,40 +4623,6 @@ struct bfd_elf_special_section {
 };
 
 enum action_discarded { COMPLAIN = 1, PRETEND = 2 };
-
-typedef asection * (*elf_gc_mark_hook_fn)
-  (asection *, struct bfd_link_info *, Elf_Internal_Rela *,
-   struct elf_link_hash_entry *, Elf_Internal_Sym *);
-
-enum elf_property_kind {
-    /* A new property.  */
-    property_unknown = 0,
-    /* A property ignored by backend.  */
-    property_ignored,
-    /* A corrupt property reported by backend.  */
-    property_corrupt,
-    /* A property should be removed due to property merge.  */
-    property_remove,
-    /* A property which is a number.  */
-    property_number
- };
-
-typedef struct elf_property {
-  unsigned int pr_type;
-  unsigned int pr_datasz;
-  union
-    {
-      /* For property_number, this is a number.  */
-      bfd_vma number;
-      /* Add a new one if elf_property_kind is updated.  */
-    } u;
-  enum elf_property_kind pr_kind;
-} elf_property;
-
-typedef struct elf_property_list {
-  struct elf_property_list *next;
-  struct elf_property property;
-} elf_property_list;
 
 /* Information about reloc sections associated with a bfd_elf_section_data
    structure.  */
@@ -5040,7 +4959,7 @@ struct elf_obj_tdata
 
   /* List of GNU properties.  Will be updated by setup_gnu_properties
      after all input GNU properties are merged for output.  */
-  elf_property_list *properties;
+  void */*elf_property_list*/ *properties;
 
   obj_attribute known_obj_attributes[2][NUM_KNOWN_OBJ_ATTRIBUTES];
   obj_attribute_list *other_obj_attributes[2];

@@ -1,5 +1,8 @@
-/* asm.c: a tiny assembler for riscv machines. This is a digest of the gas assembler
- * for the same machine. The full copyright notice is in asm.h, the companion
+/* ------------------------------------------------------------------------
+ * asm.c: a tiny assembler for riscv machines. 
+ * -------------------------------------------------------------------------
+ * This is a digest of the gas assembler (a part of the binutils distribution)
+ * for the riscv machine. The full copyright notice is in asm.h, the companion
  * file for this one. I have reformatted the code, and added references to where I 
  * got each function. Some names are changed.
  * All the indirections existing in gas have been eliminated. When you see text
@@ -7,7 +10,7 @@
  * "foo" with argument "arg" and not a #defined symbol that points to a vtable that
  * renames it to some function elsewhere.
  * #ifdefs have been eliminated as far as I could do that, to simplify the code
- * and making  easier to read.
+ * and making it  easier to read.
  * All linker code that was getting pulled in by the vtables is gone. This is an 
  * assembler, not a linker.
  * The code has been reformatted to minimize the vertical length. There are already
@@ -43,17 +46,6 @@ static int	finalize_syms = 0;
  * name of the source file in DWARF debugging information.  See the comment in
  * emit_expr for the format we look for.  */
 static int	dwarf_file_string;
-
-/* ======================================================== Prototypes  */
-/*
- * cfi_finish() is called at the end of file. It will complain if the last CFI
- * wasn't properly closed by .cfi_endproc.
- */
-static void	cfi_finish(void);
-static void	map_over_sections(void (*operation) (asection *,void *),void *user_storage);
-void           *xmemdup(const void *input,size_t copy_size,size_t alloc_size);
-static int	obj_elf_vendor_attribute(int vendor);
-static bool	set_section_size(asection *,size_t val);
 /* ============================================================**** as.c */
 /*
  * We build a list of defsyms as we read the options,and then define them
@@ -3943,15 +3935,6 @@ static void	cfi_finish(void)
 #define DL_BODY		2
 
 /*
- * If linker relaxation might change offsets in the code,the DWARF special
- * opcodes and variable-length operands cannot be used.  If this macro is
- * nonzero,use the DW_LNS_fixed_advance_pc opcode instead.
- */
-#ifndef DWARF2_USE_FIXED_ADVANCE_PC
-#define DWARF2_USE_FIXED_ADVANCE_PC	linkrelax
-#endif
-
-/*
  * First special line opcode - leave room for the standard opcodes. Note: If
  * you want to change this,you'll have to update the "standard_opcode_lengths"
  * table that is emitted below in out_debug_line().
@@ -5480,12 +5463,7 @@ static void	relax_inc_line_addr(int line_delta,symbolS * to_sym,symbolS * from_s
 
 	/* The maximum size of the frag is the line delta with a maximum sized
 	 * address delta.  */
-	if (DWARF2_USE_FIXED_ADVANCE_PC)
-		max_chars = size_fixed_inc_line_addr(line_delta,
-						-DWARF2_LINE_MIN_INSN_LENGTH);
-	else
-		max_chars = size_inc_line_addr(line_delta,-DWARF2_LINE_MIN_INSN_LENGTH);
-
+	max_chars = size_fixed_inc_line_addr(line_delta,-DWARF2_LINE_MIN_INSN_LENGTH);
 	frag_var(rs_dwarf2dbg,max_chars,max_chars,1,
 		 make_expr_symbol(&exp),line_delta,NULL);
 }
@@ -5499,10 +5477,7 @@ static int	dwarf2dbg_estimate_size_before_relax(fragS * frag)
 	int		size;
 
 	addr_delta = resolve_symbol_value(frag->fr_symbol);
-	if (DWARF2_USE_FIXED_ADVANCE_PC)
-		size = size_fixed_inc_line_addr(frag->fr_offset,addr_delta);
-	else
-		size = size_inc_line_addr(frag->fr_offset,addr_delta);
+	size = size_fixed_inc_line_addr(frag->fr_offset,addr_delta);
 
 	frag->fr_subtype = size;
 
@@ -5529,25 +5504,22 @@ static void	dwarf2dbg_convert_frag(fragS * frag)
 {
 	offsetT		addr_diff;
 
-	if (DWARF2_USE_FIXED_ADVANCE_PC) {
-		/*
-		 * If linker relaxation is enabled then the distance between
-		 * the two symbols in the frag->fr_symbol expression might
-		 * change.  Hence we cannot rely upon the value computed by
-		 * resolve_symbol_value. Instead we leave the expression
-		 * unfinalized and allow emit_fixed_inc_line_addr to create a
-		 * fixup (which later becomes a relocation) that will allow the
-		 * linker to correctly compute the actual address difference.
-		 * We have to use a fixed line advance for this as we cannot
-		 * (easily) relocate leb128 encoded values.
-		 */
-		int		saved_finalize_syms = finalize_syms;
+	{ //DWARF2_use_fixed_ADVANCE_PC is 1
+	/* If linker relaxation is enabled then the distance between
+	 * the two symbols in the frag->fr_symbol expression might
+	 * change.  Hence we cannot rely upon the value computed by
+	 * resolve_symbol_value. Instead we leave the expression
+	 * unfinalized and allow emit_fixed_inc_line_addr to create a
+	 * fixup (which later becomes a relocation) that will allow the
+	 * linker to correctly compute the actual address difference.
+	 * We have to use a fixed line advance for this as we cannot
+	 * (easily) relocate leb128 encoded values.  */
+	int		saved_finalize_syms = finalize_syms;
 
-		finalize_syms = 0;
-		addr_diff = resolve_symbol_value(frag->fr_symbol);
-		finalize_syms = saved_finalize_syms;
-	} else
-		addr_diff = resolve_symbol_value(frag->fr_symbol);
+	finalize_syms = 0;
+	addr_diff = resolve_symbol_value(frag->fr_symbol);
+	finalize_syms = saved_finalize_syms;
+	}
 
 	/*
 	 * fr_var carries the max_chars that we created the fragment with.
@@ -5556,13 +5528,9 @@ static void	dwarf2dbg_convert_frag(fragS * frag)
 	 */
 	gas_assert(frag->fr_var >= (int)frag->fr_subtype);
 
-	if (DWARF2_USE_FIXED_ADVANCE_PC)
-		emit_fixed_inc_line_addr(frag->fr_offset,addr_diff,frag,
+	emit_fixed_inc_line_addr(frag->fr_offset,addr_diff,frag,
 					 frag->fr_literal + frag->fr_fix,
 					 frag->fr_subtype);
-	else
-		emit_inc_line_addr(frag->fr_offset,addr_diff,
-			   frag->fr_literal + frag->fr_fix,frag->fr_subtype);
 
 	frag->fr_fix += frag->fr_subtype;
 	frag->fr_type = rs_fill;
@@ -5670,10 +5638,7 @@ static void	process_entries(segT seg,struct line_entry *e)
 			out_set_addr(lab);
 			out_inc_line_addr(line_delta,0);
 		} else
-			if (frag == last_frag && !DWARF2_USE_FIXED_ADVANCE_PC)
-				out_inc_line_addr(line_delta,frag_ofs - last_frag_ofs);
-			else
-				relax_inc_line_addr(line_delta,lab,last_lab);
+			relax_inc_line_addr(line_delta,lab,last_lab);
 
 		line = e->loc.line;
 		last_lab = lab;
@@ -5686,12 +5651,8 @@ static void	process_entries(segT seg,struct line_entry *e)
 	/* Emit a DW_LNE_end_sequence for the end of the section.  */
 	frag = last_frag_for_seg(seg);
 	frag_ofs = get_frag_fix(frag,seg);
-	if (frag == last_frag && !DWARF2_USE_FIXED_ADVANCE_PC)
-		out_inc_line_addr(INT_MAX,frag_ofs - last_frag_ofs);
-	else {
-		lab = symbol_temp_new(seg,frag,frag_ofs);
-		relax_inc_line_addr(INT_MAX,lab,last_lab);
-	}
+	lab = symbol_temp_new(seg,frag,frag_ofs);
+	relax_inc_line_addr(INT_MAX,lab,last_lab);
 }
 
 /* Switch to LINE_STR_SEG and output the given STR.  Return the symbol pointing
@@ -20611,10 +20572,8 @@ static bfd_vma	obj_attr_size(unsigned int tag,obj_attribute * attr)
 		size += strlen((char *)attr->s) + 1;
 	return size;
 }
-/*
- * Write attribute ATTR to butter P,and return a pointer to the following
- * byte.
- */
+/* Write attribute ATTR to butter P,and return a pointer to the following
+ * byte.  */
 static bfd_byte *write_obj_attribute(bfd_byte * p,unsigned tag,obj_attribute * attr)
 {
 	/* Suppress default entries.  */
@@ -20633,10 +20592,8 @@ static bfd_byte *write_obj_attribute(bfd_byte * p,unsigned tag,obj_attribute * a
 	}
 	return p;
 }
-/*
- * Write the contents of the object attributes section (length SIZE) for VENDOR
- * to CONTENTS.
- */
+/* Write the contents of the object attributes section (length SIZE) for VENDOR
+ * to CONTENTS.  */
 static void	vendor_set_obj_attr_contents(bfd * abfd,bfd_byte * contents,
 				     		bfd_vma	size ,int vendor)
 {
@@ -20659,8 +20616,6 @@ static void	vendor_set_obj_attr_contents(bfd * abfd,bfd_byte * contents,
 	attr = elf_known_obj_attributes(abfd)[vendor];
 	for (i = LEAST_KNOWN_OBJ_ATTRIBUTE; i < NUM_KNOWN_OBJ_ATTRIBUTES; i++) {
 		unsigned int	tag = i;
-		//if (get_elf_backend_data(abfd)->obj_attrs_order)
-			//tag = get_elf_backend_data(abfd)->obj_attrs_order(i);
 		p = write_obj_attribute(p,tag,&attr[tag]);
 	}
 
@@ -20701,11 +20656,9 @@ static void	create_obj_attrs_section(void)
 	if (size == 0)
 		return;
 
-	//name = get_elf_backend_data(stdoutput)->obj_attrs_section;
-	name = ".riscv.attributes";
+	name=".riscv.attributes";//get_elf_backend_data(stdoutput)->obj_attrs_section
 	s = subseg_new(name,0);
-	elf_section_type(s) = 0x70000003;
-	//SHT_RISCV_ATTRIBUTES;
+	elf_section_type(s) = 0x70000003; //SHT_RISCV_ATTRIBUTES;
 	//=get_elf_backend_data(stdoutput)->obj_attrs_section_type;
 	s->flags = SEC_READONLY|SEC_DATA;
 	frag_now_fix();
@@ -20731,10 +20684,8 @@ static void	create_note_reloc(segT sec,
 
 	reloc = XNEW(struct reloc_list);
 
-	/*
-	 * We create a .b type reloc as resolve_reloc_expr_symbols() has
-	 * already been called.
-	 */
+	/* We create a .b type reloc as resolve_reloc_expr_symbols() has
+	 * already been called.  */
 	reloc->u.b.sec = sec;
 	reloc->u.b.s = symbol_get_bfdsym(sym);
 	reloc->u.b.r.sym_ptr_ptr = &reloc->u.b.s;
@@ -20743,7 +20694,7 @@ static void	create_note_reloc(segT sec,
 	reloc->u.b.r.howto = riscv_reloc_type_lookup(stdoutput,reloc_type);
 
 	if (reloc->u.b.r.howto == NULL) {
-		as_bad(("unable to create reloc for build note"));
+		as_bad("unable to create reloc for build note");
 		return;
 	}
 	reloc->file = N_("<gnu build note>");
@@ -20794,10 +20745,8 @@ static void	maybe_generate_build_notes(void)
 		if ((bsym = symbol_get_bfdsym(sym)) != NULL
 		    && bsym->flags & BSF_SECTION_SYM
 		    && bsym->section != NULL
-		/*
-		 * Skip linkonce sections - we cannot use these section symbols
-		 * as they may disappear.
-		 */
+		/* Skip linkonce sections - we cannot use these section symbols
+		 * as they may disappear.  */
 		    && (bsym->section->flags & (SEC_CODE|SEC_LINK_ONCE)) == SEC_CODE
 		/* Not all linkonce sections are flagged...  */
 		    && !startswith(S_GET_NAME(sym),".gnu.linkonce")) {
@@ -20892,18 +20841,14 @@ static void	write_object_file(void)
 			break;
 	}
 
-	/*
-	 * Note - Most ports will use the default value of
+	/* Note - Most ports will use the default value of
 	 * TC_FINALIZE_SYMS_BEFORE_SIZE_SEG,which 1.  This will force local
 	 * symbols to be resolved,removing their frag information. Some ports
 	 * however,will not have finished relaxing all of their frags and will
 	 * still need the local symbol frag information.  These ports can set
-	 * TC_FINALIZE_SYMS_BEFORE_SIZE_SEG to 0.
-	 */
+	 * TC_FINALIZE_SYMS_BEFORE_SIZE_SEG to 0.  */
 	finalize_syms = TC_FINALIZE_SYMS_BEFORE_SIZE_SEG;
-
 	map_over_sections(size_seg,(char *)0);
-
 	/* Relaxation has completed.  Freeze all syms.  */
 	finalize_syms = 1;
 
@@ -20914,10 +20859,8 @@ static void	write_object_file(void)
 		create_obj_attrs_section();
 #endif
 
-	/*
-	 * Resolve symbol values.  This needs to be done before processing the
-	 * relocations.
-	 */
+	/* Resolve symbol values.  This needs to be done before processing the
+	 * relocations.  */
 	if (symbol_rootP) {
 		symbolS        *symp;
 
@@ -21113,10 +21056,8 @@ static void	write_object_file(void)
 	map_over_sections(write_contents,(char *)0);
 }
 
-/*
- * Relax_align. Advance location counter to next address that has 'alignment'
- * lowest order bits all 0s,return size of adjustment made.
- */
+/* Relax_align. Advance location counter to next address that has 'alignment'
+ * lowest order bits all 0s,return size of adjustment made.  */
 static relax_addressT relax_align(relax_addressT address,	/* Address now.  */
 	  		int		alignment /* Alignment (binary).  */ )
 {
@@ -21128,17 +21069,14 @@ static relax_addressT relax_align(relax_addressT address,	/* Address now.  */
 	return (new_address - address);
 }
 
-/*
- * Now we have a segment,not a crowd of sub-segments,we can make fr_address
+/* Now we have a segment,not a crowd of sub-segments,we can make fr_address
  * values.
  * 
  * Relax the frags.
  * 
  * After this,all frags in this segment have addresses that are correct within
  * the segment. Since segments live in different file addresses,these frag
- * addresses may not be the same as final object-file addresses.
- */
-
+ * addresses may not be the same as final object-file addresses.  */
 static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 {
 	unsigned long	frag_count;
@@ -21647,15 +21585,6 @@ static void	print_fixup(fixS * fixp)
 }
 #endif
 /* ====================================================================== app.c */
-/*
- * This is the Assembler Pre-Processor Modified by Allen Wirfs-Brock,
- * Instantiations Inc 2/90. App,the assembler pre-processor.  This
- * pre-processor strips out excess spaces,turns single-quoted characters into
- * a decimal constant,and turns the # in # <number> <filename> <garbage> into
- * a .linefile.  This needs better error-handling.
- */
-
-
 static char	lex [256];
 static const char symbol_chars[] =
 "$._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -21829,10 +21758,7 @@ static bool	scan_for_multibyte_characters(const unsigned char *start,
 /*
  * RISC-V-specific support for 64-bit ELF. This file handles RISC-V ELF
  * targets.
- */
-
-/* RISC-V ELF specific backend routines. */
-
+ * RISC-V ELF specific backend routines. */
 enum riscv_spec_class {
 	/* ISA spec.  */
 	ISA_SPEC_CLASS_NONE = 0,ISA_SPEC_CLASS_2P2,ISA_SPEC_CLASS_20190608,
@@ -21883,8 +21809,6 @@ static void	riscv_get_priv_spec_class_from_numbers(unsigned int,
 			      		unsigned	int ,unsigned int,
 			     		enum		riscv_spec_class *);
 
-//static bool	riscv_elf_is_mapping_symbols(const char *);
-
 #define RISCV_UNKNOWN_VERSION -1
 
 struct riscv_elf_params {
@@ -21898,27 +21822,23 @@ static reloc_howto_type *
 static reloc_howto_type *riscv_reloc_type_lookup(bfd *,bfd_reloc_code_real_type);
 
 /* The information of architecture attribute.  */
-struct riscv_subset_t {
+typedef struct riscv_subset_t {
 	const char     *name;
 	int		major_version;
 	int		minor_version;
 	struct riscv_subset_t *next;
-};
-
-typedef struct riscv_subset_t riscv_subset_t;
+} riscv_subset_t;
 
 typedef struct {
 	riscv_subset_t *head;
 	riscv_subset_t *tail;
 	const char     *arch_str;
-}		riscv_subset_list_t;
+}	riscv_subset_list_t;
 
 
 static void	riscv_release_subset_list(riscv_subset_list_t *);
-
 static void	riscv_add_subset(riscv_subset_list_t *,
 			     		const		char  *,int,int);
-
 static bool	riscv_lookup_subset(const riscv_subset_list_t *,
 		  		const		char  *,riscv_subset_t **);
 
@@ -21929,18 +21849,13 @@ typedef struct {
 	unsigned       *xlen;
 	enum riscv_spec_class *isa_spec;
 	bool		check_unknown_prefixed_ext;
-}		riscv_parse_subset_t;
-/*
- * Add/Remove an extension to/from the subset list.  This is used for the
- * .option rvc or norvc,and .option arch directives.
- */
-
+}	riscv_parse_subset_t;
+/* Add/Remove an extension to/from the subset list.  This is used for the
+ * .option rvc or norvc,and .option arch directives.  */
 static bool	riscv_parse_subset(riscv_parse_subset_t * rps,const char *arch);
-/*
- * Parsing extension version. Return Value: Points to the end of version
+/* Parsing extension version. Return Value: Points to the end of version
  * Arguments: `p`: Curent parsing position. `major_version`: Parsed major
- * version. `minor_version`: Parsed minor version.
- */
+ * version. `minor_version`: Parsed minor version.  */
 static const char *riscv_parsing_subset_version(const char *p,
 	      		int          *major_version,int *minor_version)
 {
@@ -21957,7 +21872,6 @@ static const char *riscv_parsing_subset_version(const char *p,
 			/* Might be beginning of `p` extension.  */
 			if (!ISDIGIT(np))
 				break;
-
 			*major_version = version;
 			major_p = false;
 			version = 0;
@@ -21967,12 +21881,10 @@ static const char *riscv_parsing_subset_version(const char *p,
 			else
 				break;
 	}
-
 	if (major_p)
 		*major_version = version;
 	else
 		*minor_version = version;
-
 	/* We can not find any version in string.  */
 	if (*major_version == 0 && *minor_version == 0) {
 		*major_version = RISCV_UNKNOWN_VERSION;
@@ -21984,18 +21896,13 @@ static const char *riscv_parsing_subset_version(const char *p,
 static int	riscv_ext_order[26] = {0};
 /* ISA extension prefixed name class.  Must define them in parsing order.  */
 enum riscv_prefix_ext_class {
-	RV_ISA_CLASS_Z = 1,
-	RV_ISA_CLASS_S,
-	RV_ISA_CLASS_ZXM,
-	RV_ISA_CLASS_X,
-	RV_ISA_CLASS_SINGLE
+	RV_ISA_CLASS_Z = 1, RV_ISA_CLASS_S, RV_ISA_CLASS_ZXM,
+	RV_ISA_CLASS_X, RV_ISA_CLASS_SINGLE
 };
-/*
- * Record the strings of the prefixed extensions,and their corresponding
+/* Record the strings of the prefixed extensions,and their corresponding
  * classes.  The more letters of the prefix string,the more forward it must be
  * defined.  Otherwise,the riscv_get_prefix_class will map it to the wrong
- * classes.
- */
+ * classes.  */
 struct riscv_parse_prefix_config {
 	/* Class of the extension. */
 	enum riscv_prefix_ext_class class;
@@ -22151,10 +22058,8 @@ static struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
 	{"xventanacondops",ISA_SPEC_CLASS_DRAFT,1,0,0},
 	{NULL,0,0,0,0}
 };
-/*
- * Get the prefixed name class for the extensions,the class also means the
- * order of the prefixed extensions.
- */
+/* Get the prefixed name class for the extensions,the class also means the
+ * order of the prefixed extensions.  */
 static enum riscv_prefix_ext_class riscv_get_prefix_class(const char *arch)
 {
 	int		i = 0;
@@ -22256,10 +22161,8 @@ static void	riscv_get_default_ext_version(enum riscv_spec_class *default_isa_spe
 		i++;
 	}
 }
-/*
- * Add the extension to the subset list.  Search the list first,and then find
- * the right place to add.
- */
+/* Add the extension to the subset list.  Search the list first,and then find
+ * the right place to add.  */
 static void	riscv_add_subset(riscv_subset_list_t * subset_list,
 	       		const		char  *subset,int major,int minor)
 {
@@ -22285,11 +22188,9 @@ static void	riscv_add_subset(riscv_subset_list_t * subset_list,
 	if (new->next == NULL)
 		subset_list->tail = new;
 }
-/*
- * Find the default versions for the extension before adding them to the subset
+/* Find the default versions for the extension before adding them to the subset
  * list,if their versions are RISCV_UNKNOWN_VERSION. Afterwards,report errors
- * if we can not find their default versions.
- */
+ * if we can not find their default versions.  */
 static void	riscv_parse_add_subset(riscv_parse_subset_t * rps,
 				   		const		char  *subset,
 				   		int		major   ,
@@ -22597,16 +22498,11 @@ static void	riscv_release_subset_list(riscv_subset_list_t * subset_list)
 		subset_list->arch_str = NULL;
 	}
 }
-static void	riscv_add_subset(riscv_subset_list_t *,
-			     		const		char  *,int,int);
-
+static void	riscv_add_subset(riscv_subset_list_t *, const char *,int,int);
 static const struct riscv_supported_ext *riscv_all_supported_ext[] = {
-	riscv_supported_std_ext,
-	riscv_supported_std_z_ext,
-	riscv_supported_std_s_ext,
-	riscv_supported_std_zxm_ext,
-	riscv_supported_vendor_x_ext,
-	NULL
+	riscv_supported_std_ext, riscv_supported_std_z_ext,
+	riscv_supported_std_s_ext, riscv_supported_std_zxm_ext,
+	riscv_supported_vendor_x_ext, NULL
 };
 static void	riscv_set_default_arch(riscv_parse_subset_t * rps)
 {
@@ -22625,19 +22521,15 @@ static void	riscv_set_default_arch(riscv_parse_subset_t * rps)
 		}
 	}
 }
-/*
- * Parsing function for both standard and prefixed extensions. Return Value:
+/* Parsing function for both standard and prefixed extensions. Return Value:
  * Points to the end of extensions. Arguments: `rps`: Hooks and status for
- * parsing extensions. `arch`: Full ISA string. `p`: Curent parsing position.
- */
+ * parsing extensions. `arch`: Full ISA string. `p`: Curent parsing position. */
 static const char *riscv_parse_extensions(riscv_parse_subset_t * rps,
 		     		const		char  *arch,const char *p)
 {
 	/* First letter must start with i,e or g.  */
 	if (*p != 'e' && *p != 'i' && *p != 'g') {
-		rps->error_handler
-		(("%s: first ISA extension must be `e',`i' or `g'"),
-		 arch);
+		rps->error_handler("%s: first ISA extension must be `e',`i' or `g'",arch);
 		return NULL;
 	}
 	while (*p != '\0') {
@@ -22684,15 +22576,11 @@ static const char *riscv_parse_extensions(riscv_parse_subset_t * rps,
 			}
 			q++;
 
-			/*
-			 * Check if the end of extension is 'p' or not.  If
-			 * yes,then the second letter from the end cannot be
-			 * number.
-			 */
+			/* Check if the end of extension is 'p' or not.  If yes,then the 
+			 * second letter from the end cannot be * number.  */
 			if (*(q - 1) == 'p' && ISDIGIT(*(q - 2))) {
 				*q = '\0';
-				rps->error_handler
-					(("%s: invalid prefixed ISA extension `%s' ends with <number>p"),
+				rps->error_handler("%s: invalid prefixed ISA extension `%s' ends with <number>p",
 					 arch,subset);
 				free(subset);
 				return NULL;
@@ -22733,8 +22621,7 @@ static const char *riscv_parse_extensions(riscv_parse_subset_t * rps,
 
 		if (class != RV_ISA_CLASS_SINGLE
 		    && *p != '\0' && *p != '_') {
-			rps->error_handler
-				(("%s: prefixed ISA extension must separate with _"),
+			rps->error_handler("%s: prefixed ISA extension must separate with _",
 				 arch);
 			return NULL;
 		}
@@ -22742,20 +22629,16 @@ static const char *riscv_parse_extensions(riscv_parse_subset_t * rps,
 
 	return p;
 }
-/*
- * Function for parsing ISA string. Return Value: Return TRUE on success.
+/* Function for parsing ISA string. Return Value: Return TRUE on success.
  * Arguments: `rps`: Hooks and status for parsing extensions. `arch`: Full ISA
- * string.
- */
+ * string.  */
 static bool	riscv_parse_subset(riscv_parse_subset_t * rps,
 			       		const		char  *arch)
 {
 	const char     *p;
 
-	/*
-	 * Init the riscv_ext_order array to compare the order of extensions
-	 * quickly.
-	 */
+	/* Init the riscv_ext_order array to compare the order of extensions
+	 * quickly.  */
 	riscv_init_ext_order();
 
 	if (arch == NULL) {
@@ -22779,19 +22662,14 @@ static bool	riscv_parse_subset(riscv_parse_subset_t * rps,
 			*rps->xlen = 64;
 			p += 4;
 		} else {
-			/*
-			 * ISA string shouldn't be NULL or empty here.  For
-			 * linker,it might be empty when we failed to merge
-			 * the ISA string in the riscv_merge_attributes.  For
-			 * assembler,we might give an empty string by
-			 * .attribute arch,"" or -march=. However,We have
-			 * already issued the correct error message in another
-			 * side,so do not issue this error when the ISA string
-			 * is empty.
-			 */
+			/* ISA string shouldn't be NULL or empty here.  For linker,it might
+			 * be empty when we failed to merge * the ISA string in the 
+			 * riscv_merge_attributes.  For assembler,we might give an empty 
+			 * string by .attribute arch,"" or -march=. However,We have
+			 * already issued the correct error message in another side,so do 
+			 * not issue this error when the ISA string is empty.  */
 			if (strlen(arch))
-				rps->error_handler(
-						   ("%s: ISA string must begin with rv32 or rv64"),
+				rps->error_handler("%s: ISA string must begin with rv32 or rv64",
 						   arch);
 			return false;
 		}
@@ -22800,9 +22678,7 @@ static bool	riscv_parse_subset(riscv_parse_subset_t * rps,
 	if (riscv_parse_extensions(rps,arch,p) == NULL)
 		return false;
 
-	/*
-	 * Finally add implicit extensions according to the current extensions.
-	 */
+	/* Finally add implicit extensions according to the current extensions. */
 	riscv_parse_add_implicit_subsets(rps);
 
 	/* Check the conflicts.  */
@@ -22810,17 +22686,13 @@ static bool	riscv_parse_subset(riscv_parse_subset_t * rps,
 }
 static void	riscv_release_subset_list(riscv_subset_list_t *);
 static char    *riscv_arch_str(unsigned,const riscv_subset_list_t *);
-static const bfd_arch_info_type *
-		riscv_compatible(const bfd_arch_info_type * a,const bfd_arch_info_type * b)
+static const bfd_arch_info_type * riscv_compatible(const bfd_arch_info_type * a,
+			const bfd_arch_info_type * b)
 {
 	if (a->arch != b->arch)
 		return NULL;
 
-	/*
-	 * Machine compatibility is checked in
-	 * _bfd_riscv_elf_merge_private_bfd_data.
-	 */
-
+	/* Machine compatibility is checked in _bfd_riscv_elf_merge_private_bfd_data. */
 	return a;
 }
 
@@ -22944,14 +22816,12 @@ static size_t	riscv_estimate_digit(unsigned num)
 	return digit;
 }
 
-/*
- * Similar to the strcmp.  It returns an integer less than,equal to,or
+/* Similar to the strcmp.  It returns an integer less than,equal to,or
  * greater than zero if `subset2` is found,respectively,to be less than,to
  * match,or be greater than `subset1`.
  * 
  * The order values,Zero: Preserved keywords. Positive number: Standard
- * extensions. Negative number: Prefixed keywords.
- */
+ * extensions. Negative number: Prefixed keywords. */
 
 /* Canonical order for single letter extensions.  */
 static const char riscv_ext_canonical_order[] = "eigmafdqlcbkjtpvnh";
@@ -23045,44 +22915,27 @@ static bool	riscv_subset_supports(riscv_parse_subset_t * rps,
 
 static bool	riscv_multi_subset_supports(riscv_parse_subset_t *,enum riscv_insn_class);
 
-/*
- * Each instuction is belonged to an instruction class INSN_CLASS_*. Call
- * riscv_subset_supports_ext to determine the missing extension.
- */
+/* Each instuction belongs to an instruction class INSN_CLASS_*. Call
+ * riscv_subset_supports_ext to determine the missing extension.  */
 static const char *riscv_multi_subset_supports_ext(riscv_parse_subset_t * rps,
 		     		enum		riscv_insn_class insn_class)
 {
 	switch (insn_class) {
-	case INSN_CLASS_I:
-		return "i";
-	case INSN_CLASS_ZICBOM:
-		return "zicbom";
-	case INSN_CLASS_ZICBOP:
-		return "zicbop";
-	case INSN_CLASS_ZICBOZ:
-		return "zicboz";
-	case INSN_CLASS_ZICSR:
-		return "zicsr";
-	case INSN_CLASS_ZIFENCEI:
-		return "zifencei";
-	case INSN_CLASS_ZIHINTPAUSE:
-		return "zihintpause";
-	case INSN_CLASS_M:
-		return "m";
-	case INSN_CLASS_ZMMUL:
-		return _("m' or `zmmul");
-	case INSN_CLASS_A:
-		return "a";
-	case INSN_CLASS_ZAWRS:
-		return "zawrs";
-	case INSN_CLASS_F:
-		return "f";
-	case INSN_CLASS_D:
-		return "d";
-	case INSN_CLASS_Q:
-		return "q";
-	case INSN_CLASS_C:
-		return "c";
+	case INSN_CLASS_I: return "i";
+	case INSN_CLASS_ZICBOM: return "zicbom";
+	case INSN_CLASS_ZICBOP: return "zicbop";
+	case INSN_CLASS_ZICBOZ: return "zicboz";
+	case INSN_CLASS_ZICSR: return "zicsr";
+	case INSN_CLASS_ZIFENCEI: return "zifencei";
+	case INSN_CLASS_ZIHINTPAUSE: return "zihintpause";
+	case INSN_CLASS_M: return "m";
+	case INSN_CLASS_ZMMUL: return _("m' or `zmmul");
+	case INSN_CLASS_A: return "a";
+	case INSN_CLASS_ZAWRS: return "zawrs";
+	case INSN_CLASS_F: return "f";
+	case INSN_CLASS_D: return "d";
+	case INSN_CLASS_Q: return "q";
+	case INSN_CLASS_C: return "c";
 	case INSN_CLASS_F_AND_C:
 		if (!riscv_subset_supports(rps,"f")
 		    && !riscv_subset_supports(rps,"c"))
@@ -23101,18 +22954,12 @@ static const char *riscv_multi_subset_supports_ext(riscv_parse_subset_t * rps,
 				return "d";
 			else
 				return "c";
-	case INSN_CLASS_F_INX:
-		return ("f' or `zfinx");
-	case INSN_CLASS_D_INX:
-		return ("d' or `zdinx");
-	case INSN_CLASS_Q_INX:
-		return ("q' or `zqinx");
-	case INSN_CLASS_ZFH_INX:
-		return ("zfh' or `zhinx");
-	case INSN_CLASS_ZFHMIN:
-		return "zfhmin";
-	case INSN_CLASS_ZFHMIN_INX:
-		return ("zfhmin' or `zhinxmin");
+	case INSN_CLASS_F_INX: return ("f' or `zfinx");
+	case INSN_CLASS_D_INX: return ("d' or `zdinx");
+	case INSN_CLASS_Q_INX: return ("q' or `zqinx");
+	case INSN_CLASS_ZFH_INX: return ("zfh' or `zhinx");
+	case INSN_CLASS_ZFHMIN: return "zfhmin";
+	case INSN_CLASS_ZFHMIN_INX: return ("zfhmin' or `zhinxmin");
 	case INSN_CLASS_ZFHMIN_AND_D_INX:
 		if (riscv_subset_supports(rps,"zfhmin"))
 			return "d";
@@ -23141,68 +22988,37 @@ static const char *riscv_multi_subset_supports_ext(riscv_parse_subset_t * rps,
 						return "zhinxmin";
 					else
 						return ("zfhmin' and `q',or `zhinxmin' and `zqinx");
-	case INSN_CLASS_ZBA:
-		return "zba";
-	case INSN_CLASS_ZBB:
-		return "zbb";
-	case INSN_CLASS_ZBC:
-		return "zbc";
-	case INSN_CLASS_ZBS:
-		return "zbs";
-	case INSN_CLASS_ZBKB:
-		return "zbkb";
-	case INSN_CLASS_ZBKC:
-		return "zbkc";
-	case INSN_CLASS_ZBKX:
-		return "zbkx";
-	case INSN_CLASS_ZBB_OR_ZBKB:
-		return ("zbb' or `zbkb");
-	case INSN_CLASS_ZBC_OR_ZBKC:
-		return ("zbc' or `zbkc");
-	case INSN_CLASS_ZKND:
-		return "zknd";
-	case INSN_CLASS_ZKNE:
-		return "zkne";
-	case INSN_CLASS_ZKNH:
-		return "zknh";
-	case INSN_CLASS_ZKND_OR_ZKNE:
-		return ("zknd' or `zkne");
-	case INSN_CLASS_ZKSED:
-		return "zksed";
-	case INSN_CLASS_ZKSH:
-		return "zksh";
-	case INSN_CLASS_V:
-		return ("v' or `zve64x' or `zve32x");
-	case INSN_CLASS_ZVEF:
-		return ("v' or `zve64d' or `zve64f' or `zve32f");
-	case INSN_CLASS_SVINVAL:
-		return "svinval";
-	case INSN_CLASS_H:
-		return ("h");
-	case INSN_CLASS_XTHEADBA:
-		return "xtheadba";
-	case INSN_CLASS_XTHEADBB:
-		return "xtheadbb";
-	case INSN_CLASS_XTHEADBS:
-		return "xtheadbs";
-	case INSN_CLASS_XTHEADCMO:
-		return "xtheadcmo";
-	case INSN_CLASS_XTHEADCONDMOV:
-		return "xtheadcondmov";
-	case INSN_CLASS_XTHEADFMEMIDX:
-		return "xtheadfmemidx";
-	case INSN_CLASS_XTHEADFMV:
-		return "xtheadfmv";
-	case INSN_CLASS_XTHEADINT:
-		return "xtheadint";
-	case INSN_CLASS_XTHEADMAC:
-		return "xtheadmac";
-	case INSN_CLASS_XTHEADMEMIDX:
-		return "xtheadmemidx";
-	case INSN_CLASS_XTHEADMEMPAIR:
-		return "xtheadmempair";
-	case INSN_CLASS_XTHEADSYNC:
-		return "xtheadsync";
+	case INSN_CLASS_ZBA: return "zba";
+	case INSN_CLASS_ZBB: return "zbb";
+	case INSN_CLASS_ZBC: return "zbc";
+	case INSN_CLASS_ZBS: return "zbs";
+	case INSN_CLASS_ZBKB: return "zbkb";
+	case INSN_CLASS_ZBKC: return "zbkc";
+	case INSN_CLASS_ZBKX: return "zbkx";
+	case INSN_CLASS_ZBB_OR_ZBKB: return ("zbb' or `zbkb");
+	case INSN_CLASS_ZBC_OR_ZBKC: return ("zbc' or `zbkc");
+	case INSN_CLASS_ZKND: return "zknd";
+	case INSN_CLASS_ZKNE: return "zkne";
+	case INSN_CLASS_ZKNH: return "zknh";
+	case INSN_CLASS_ZKND_OR_ZKNE: return ("zknd' or `zkne");
+	case INSN_CLASS_ZKSED: return "zksed";
+	case INSN_CLASS_ZKSH: return "zksh";
+	case INSN_CLASS_V: return ("v' or `zve64x' or `zve32x");
+	case INSN_CLASS_ZVEF: return ("v' or `zve64d' or `zve64f' or `zve32f");
+	case INSN_CLASS_SVINVAL: return "svinval";
+	case INSN_CLASS_H: return ("h");
+	case INSN_CLASS_XTHEADBA: return "xtheadba";
+	case INSN_CLASS_XTHEADBB: return "xtheadbb";
+	case INSN_CLASS_XTHEADBS: return "xtheadbs";
+	case INSN_CLASS_XTHEADCMO: return "xtheadcmo";
+	case INSN_CLASS_XTHEADCONDMOV: return "xtheadcondmov";
+	case INSN_CLASS_XTHEADFMEMIDX: return "xtheadfmemidx";
+	case INSN_CLASS_XTHEADFMV: return "xtheadfmv";
+	case INSN_CLASS_XTHEADINT: return "xtheadint";
+	case INSN_CLASS_XTHEADMAC: return "xtheadmac";
+	case INSN_CLASS_XTHEADMEMIDX: return "xtheadmemidx";
+	case INSN_CLASS_XTHEADMEMPAIR: return "xtheadmempair";
+	case INSN_CLASS_XTHEADSYNC: return "xtheadsync";
 	default:
 		rps->error_handler
 			(("internal: unreachable INSN_CLASS_*"));
@@ -23211,10 +23027,6 @@ static const char *riscv_multi_subset_supports_ext(riscv_parse_subset_t * rps,
 }
 //---------------------------------------------include "elf/riscv.h"
 /* RISC-V ELF support for BFD. */
-/*
- * This file holds definitions specific to the RISCV ELF ABI.  Note that most
- * of this is not actually implemented by BFD.
- */
 #ifndef _ELF_RISCV_H
 #define _ELF_RISCV_H
 /* Generic relocation support for BFD. */
@@ -23343,40 +23155,8 @@ struct _bfd_riscv_elf_obj_tdata {
 	char           *local_got_tls_type;
 };
 
-/*
- * Relocate a RISC-V ELF section.
- * 
- * The RELOCATE_SECTION function is called by the new ELF backend linker to handle
- * the relocations for a section.
- * 
- * The relocs are always passed as Rela structures.
- * 
- * This function is responsible for adjusting the section contents as necessary,
- * and (if generating a relocatable output file) adjusting the reloc addend as
- * necessary.
- * 
- * This function does not have to worry about setting the reloc address or the
- * reloc symbol index.
- * 
- * LOCAL_SYMS is a pointer to the swapped in local symbols.
- * 
- * LOCAL_SECTIONS is an array giving the section in the input file corresponding
- * to the st_shndx field of each local symbol.
- * 
- * The global hash table entry for the global symbols can be found via
- * elf_sym_hashes (input_bfd).
- * 
- * When generating relocatable output,this function must handle
- * STB_LOCAL/STT_SECTION symbols specially.  The output symbol is going to be
- * the section symbol corresponding to the output section,which means that the
- * addend must be adjusted accordingly.
- */
-
-
-/*
- * A second format for recording PC-relative hi relocations.  This stores the
- * information required to relax them to GP-relative addresses.
- */
+/* A second format for recording PC-relative hi relocations.  This stores the
+ * information required to relax them to GP-relative addresses. */
 #define TARGET_LITTLE_SYM			riscv_elf64_vec
 #define TARGET_LITTLE_NAME			"elf64-littleriscv"
 #define TARGET_BIG_SYM				riscv_elf64_be_vec
@@ -23480,9 +23260,6 @@ struct riscv_ip_error {
 	const char     *missing_ext;
 };
 
-/* Let riscv_after_parse_args set the default value according to xlen.  */
-#define DEFAULT_RISCV_ARCH_WITH_EXT NULL
-
 /* Need to sync the version with RISC-V compiler.  */
 #ifndef DEFAULT_RISCV_ISA_SPEC
 #define DEFAULT_RISCV_ISA_SPEC "20191213"
@@ -23492,7 +23269,7 @@ struct riscv_ip_error {
 #define DEFAULT_RISCV_PRIV_SPEC "1.11"
 #endif
 
-static const char *default_arch_with_ext = DEFAULT_RISCV_ARCH_WITH_EXT;
+static const char *default_arch_with_ext = NULL;
 static enum riscv_spec_class default_isa_spec = ISA_SPEC_CLASS_NONE;
 static enum riscv_spec_class default_priv_spec = PRIV_SPEC_CLASS_NONE;
 
@@ -23747,11 +23524,8 @@ static void	riscv_set_abi(unsigned new_xlen,enum float_abi new_float_abi,bool rv
 	rve_abi = rve;
 }
 
-/*
- * If the -mabi option isn't set,then set the abi according to the ISA string.
- * Otherwise,check if there is any conflict.
- */
-
+/* If the -mabi option isn't set,then set the abi according to the ISA string.
+ * Otherwise,check if there is any conflict.  */
 static void	riscv_set_abi_by_arch(void)
 {
 	if (!explicit_mabi) {

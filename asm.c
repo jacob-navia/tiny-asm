@@ -7212,7 +7212,6 @@ static void	eh_begin(void)
  * gives smaller files to re-compile.) Here,"operand"s are of expressions,not
  * instructions.  */
 #define min(a,b)       ((a) < (b) ? (a) : (b))
-static bool	literal_prefix_dollar_hex = false;
 static void	clean_up_expression(expressionS * expressionP);
 /*
  * We keep a mapping of expression symbols to file positions,so that we can
@@ -7935,17 +7934,8 @@ kkk
 									c);
 		}
 		break;
-
-	case '$':
-		if (literal_prefix_dollar_hex) {
-			/* $L is the start of a local label,not a hex * constant.  */
-			if (*input_line_pointer == 'L')
-				goto isname;
-			integer_constant(16,expressionP);
-		} else {
-			goto isname;
-		}
-		break;
+	/* The dollar case goes into the default case since "literal_prefix_dollar_hex"
+		is false and never changed  */
 
 	case '.':
 		if (!is_part_of_name(*input_line_pointer)) {
@@ -8004,9 +7994,6 @@ eol:
 
 
 	default:
-#if defined(md_need_index_operator) || defined(TC_M68K)
-de_fault:
-#endif
 		if (is_name_beginner(c) || c == '"') {	/* Here if did not begin
 							 * with a digit.  */
 			/* Identifier begins here. This is kludged for speed,
@@ -8014,41 +8001,6 @@ de_fault:
 	isname:
 			--input_line_pointer;
 			c = get_symbol_name(&name);
-
-#ifdef md_operator
-			{
-				op = md_operator(name,1,&c);
-				switch (op) {
-				case O_uminus:
-					restore_line_pointer(c);
-					c = '-';
-					goto unary;
-				case O_bit_not:
-					restore_line_pointer(c);
-					c = '~';
-					goto unary;
-				case O_logical_not:
-					restore_line_pointer(c);
-					c = '!';
-					goto unary;
-				case O_illegal:
-					as_bad(("invalid use of operator \"%s\""),name);
-					break;
-				default:
-					break;
-				}
-
-				if (op != O_absent && op != O_illegal) {
-					restore_line_pointer(c);
-					expr(9,expressionP,mode);
-					expressionP->X_add_symbol = make_expr_symbol(expressionP);
-					expressionP->X_op_symbol = NULL;
-					expressionP->X_add_number = 0;
-					expressionP->X_op = op;
-					break;
-				}
-			}
-#endif
 
 			/* This is a hook for the backend to parse certain
 			 * names specially in certain contexts.  If a name
@@ -8127,15 +8079,12 @@ de_fault:
 
 /* Internal.  Simplify a struct expression for use by expr ().  */
 
-/*
- * In:	address of an expressionS. The X_op field of the expressionS may only
+/* In:	address of an expressionS. The X_op field of the expressionS may only
  * take certain values. Elsewise we waste time special-case testing. Sigh.
  * Ditto SEG_ABSENT.
  * 
  * Out:	expressionS may have been modified: Unused fields zeroed to help expr
- * ().
- */
-
+ * ().  */
 static void	clean_up_expression(expressionS * expressionP)
 {
 	switch (expressionP->X_op) {
@@ -9085,7 +9034,8 @@ static char	get_symbol_name(char **ilp_return)
 	if (is_name_beginner(c = *input_line_pointer++)
 	    || (input_from_string && c == FAKE_LABEL_CHAR)) {
 		while (is_part_of_name(c = *input_line_pointer++)
-		       || (input_from_string && c == FAKE_LABEL_CHAR));
+		       || (input_from_string && c == FAKE_LABEL_CHAR))
+				;
 		if (is_name_ender(c))
 			c = *input_line_pointer++;
 	} else
@@ -11380,7 +11330,7 @@ static segT	get_known_segmented_expression(expressionS * expP);
 static void	pobegin(void);
 static void	poend(void);
 static void	generate_file_debug(void);
-static char    *_find_end_of_line(char *,int,int,int);
+static char *_find_end_of_line(char *,int,int,int);
 
 static void	read_begin(void)
 {
@@ -11583,18 +11533,107 @@ static void	pop_insert(const pseudo_typeS * table)
 				as_fatal("error constructing %s pseudo-op table",
 					 pop_table_name);
 		}
+		//else printf("%s\n",pop->poc_name);
 	}
 }
 
-#ifndef md_pop_insert
-#define md_pop_insert()		pop_insert(md_pseudo_table)
-#endif
+static void	obj_elf_attach_to_group(int);
+static void	obj_elf_lcomm(int);
+static void	obj_elf_local(int);
+static void	obj_elf_ident(int);
+static void	obj_elf_line(int);
+static void	obj_elf_size(int);
+static void	obj_elf_type(int);
+static void	obj_elf_weak(int);
+static void	obj_elf_visibility(int);
+static void	obj_elf_symver(int);
+static void	obj_elf_subsection(int);
+static void	obj_elf_popsection(int);
+static void	obj_elf_gnu_attribute(int);
+static void	obj_elf_tls_common(int);
+static void	obj_elf_struct(int);
+static const pseudo_typeS elf_pseudo_table[] = {
+	{"attach_to_group",obj_elf_attach_to_group,0},
+	{"comm",obj_elf_common,0},
+	{"common",obj_elf_common,1},
+	{"ident",obj_elf_ident,0},
+	{"lcomm",obj_elf_lcomm,0},
+	{"local",obj_elf_local,0},
+	{"previous",obj_elf_previous,0},
+	{"section",obj_elf_section,0},
+	{"section.s",obj_elf_section,0},
+	{"sect",obj_elf_section,0},
+	{"sect.s",obj_elf_section,0},
+	{"pushsection",obj_elf_section,1},
+	{"popsection",obj_elf_popsection,0},
+	{"size",obj_elf_size,0},
+	{"type",obj_elf_type,0},
+	{"version",obj_elf_version,0},
+	{"weak",obj_elf_weak,0},
 
-#ifndef obj_pop_insert
-#define obj_pop_insert()	pop_insert(obj_pseudo_table)
-#endif
+	/* These define symbol visibility.  */
+	{"internal",obj_elf_visibility,STV_INTERNAL},
+	{"hidden",obj_elf_visibility,STV_HIDDEN},
+	{"protected",obj_elf_visibility,STV_PROTECTED},
 
+	/* These are used for stabs-in-elf configurations.  */
+	{"line",obj_elf_line,0},
 
+	/* This is a GNU extension to handle symbol versions.  */
+	{"symver",obj_elf_symver,0},
+
+	/* A GNU extension to change subsection only.  */
+	{"subsection",obj_elf_subsection,0},
+
+	/* These are GNU extensions to aid in garbage collecting C++ vtables.  */
+	{"vtable_inherit",obj_elf_vtable_inherit,0},
+	{"vtable_entry",obj_elf_vtable_entry,0},
+
+	/* A GNU extension for object attributes.  */
+	{"gnu_attribute",obj_elf_gnu_attribute,0},
+
+	/* These are used for dwarf2.  */
+	{"file",dwarf2_directive_file,0},
+	{"loc",dwarf2_directive_loc,0},
+	{"loc_mark_labels",dwarf2_directive_loc_mark_labels,0},
+
+	/* We need to trap the section changing calls to handle .previous.  */
+	{"data",obj_elf_data,0},
+	{"offset",obj_elf_struct,0},
+	{"struct",obj_elf_struct,0},
+	{"text",obj_elf_text,0},
+	{"bss",obj_elf_bss,0},
+
+	{"tls_common",obj_elf_tls_common,0},
+
+	/* End sentinel.  */
+	{NULL,NULL,0},
+};
+static void	s_riscv_option(int x ATTRIBUTE_UNUSED);
+static void	s_dtprel(int bytes);
+static void	s_bss(int ignore ATTRIBUTE_UNUSED);
+static void	s_riscv_leb128(int sign);
+static void	s_riscv_insn(int x ATTRIBUTE_UNUSED);
+static void	s_riscv_attribute(int ignored ATTRIBUTE_UNUSED);
+static void	s_variant_cc(int ignored ATTRIBUTE_UNUSED);
+static const pseudo_typeS riscv_pseudo_table[] =
+{
+	{"option",s_riscv_option,0},
+	{"half",cons,2},
+	{"word",cons,4},
+	{"dword",cons,8},
+	{"dtprelword",s_dtprel,4},
+	{"dtpreldword",s_dtprel,8},
+	{"bss",s_bss,0},
+	{"uleb128",s_riscv_leb128,0},
+	{"sleb128",s_riscv_leb128,1},
+	{"insn",s_riscv_insn,0},
+	{"attribute",s_riscv_attribute,0},
+	{"variant_cc",s_variant_cc,0},
+	{"float16",float_cons,'h'},
+
+	{NULL,NULL,0},
+};
 static void	pobegin(void)
 {
 	po_hash = str_htab_create();
@@ -11602,12 +11641,12 @@ static void	pobegin(void)
 	/* Do the target-specific pseudo ops.  */
 	pop_table_name = "md";
 	pop_override_ok = 0;
-	md_pop_insert();
+	pop_insert(riscv_pseudo_table);
 
 	/* Now object specific.  Skip any that were in the target table.  */
 	pop_table_name = "obj";
 	pop_override_ok = 1;
-	obj_pop_insert();
+	pop_insert(elf_pseudo_table);
 
 	/* Now portable ones.  Skip any that we've seen already.  */
 	pop_table_name = "standard";
@@ -11740,7 +11779,7 @@ static void	read_a_source_file(const char *name)
 				 * points to the beginning of the symbol. [In
 				 * case of pseudo-op,s->'.'.]
 				 * Input_line_pointer->'\0' where NUL_CHAR was.  */
-				if (TC_START_LABEL(s,nul_char,next_char)) {
+				if (next_char == ':') {
 
 					colon(s);	/* User-defined label.  */
 					restore_line_pointer(nul_char);
@@ -11806,17 +11845,9 @@ static void	read_a_source_file(const char *name)
 								*input_line_pointer = '\0';
 
 								generate_lineno_debug();
-
-
 								assemble_one(s);/* Assemble 1 * instruction.  */
 
-								/* PR 19630: The backend may have set ilp to NULL
-								 * if it encountered a catastrophic failure.  */
-								if (input_line_pointer == NULL)
-									as_fatal("unable to continue with assembly.");
-
 								*input_line_pointer++ = nul_char;
-
 								/* We resume loop AFTER the end-of-line from this
 								 * instruction.  */
 							}
@@ -12031,17 +12062,14 @@ static char    *read_symbol_name(void)
 		}
 		*name = 0;
 
-		/*
-		 * Since quoted symbol names can contain non-ASCII characters,
+		/* Since quoted symbol names can contain non-ASCII characters,
 		 * check the string and warn if it cannot be recognised by the
 		 * current character set.
-		 */
-		/*
+		 *
 		 * PR 29447: mbstowcs ignores the third (length) parameter when
 		 * the first (destination) parameter is NULL.  For clarity sake
 		 * therefore we pass 0 rather than 'len' as the third
-		 * parameter.
-		 */
+		 * parameter.  */
 		if (mbstowcs(NULL,name,0) == (size_t) - 1)
 			as_warn(("symbol name not recognised in the current locale"));
 	} else
@@ -14517,8 +14545,7 @@ static void	stringer(int bits_appendzero)
 
 /* FIXME-SOMEDAY: I had trouble here on characters with the high bits set.
  * We'll probably also have trouble with multibyte chars,wide chars,etc.
- * Also be careful about returning values bigger than 1 byte.  xoxorich.
- */
+ * Also be careful about returning values bigger than 1 byte.  xoxorich.  */
 static unsigned int next_char_of_string(void)
 {
 	unsigned int	c;
@@ -14541,31 +14568,21 @@ static unsigned int next_char_of_string(void)
 		break;
 
 	case '\\':
-		if (!TC_STRING_ESCAPES)
-			break;
 		switch (c = *input_line_pointer++ & CHAR_MASK) {
 		case 'b': c = '\b'; break;
-
 		case 'f': c = '\f'; break;
-
 		case 'n': c = '\n'; break;
-
 		case 'r': c = '\r'; break;
-
 		case 't': c = '\t'; break;
-
 		case 'v': c = '\013'; break;
-
 		case '\\': case '"': break;	/* As itself.  */
-
 		case '0': case '1': case '2': case '3': case '4': case '5':
 		case '6': case '7': case '8': case '9':
 			{
-				unsigned	number;
-				int		i;
+				unsigned	number = 0;
+				int		i = 0;
 
-				for (i = 0,number = 0;
-				     ISDIGIT(c) && i < 3;
+				for (; ISDIGIT(c) && i < 3;
 				     c = *input_line_pointer++,i++) {
 					number = number * 8 + c - '0';
 				}
@@ -14574,12 +14591,10 @@ static unsigned int next_char_of_string(void)
 			}
 			--input_line_pointer;
 			break;
-
 		case 'x': case 'X':
 			{
-				unsigned	number;
+				unsigned	number = 0;
 
-				number = 0;
 				c = *input_line_pointer++;
 				while (ISXDIGIT(c)) {
 					if (ISDIGIT(c))
@@ -14670,11 +14685,8 @@ static char	get_absolute_expression_and_terminator(long *val_pointer)
 	return (*input_line_pointer++);
 }
 
-/*
- * Like demand_copy_string,but return NULL if the string contains any '\0's.
- * Give a warning if that happens.
- */
-
+/* Like demand_copy_string,but return NULL if the string contains any '\0's.
+ * Give a warning if that happens. */
 static char    *demand_copy_C_string(int *len_pointer)
 {
 	char           *s;
@@ -14711,10 +14723,8 @@ static char    *demand_copy_string(int *lenP)
 			obstack_1grow(&notes,c);
 			len++;
 		}
-		/*
-		 * JF this next line is so demand_copy_C_string will return a
-		 * null terminated string.
-		 */
+		/* JF this next line is so demand_copy_C_string will return a
+		 * null terminated string.  */
 		obstack_1grow(&notes,'\0');
 		retval = (char *)obstack_finish(&notes);
 	} else {
@@ -14747,7 +14757,6 @@ static void	equals(char *sym_name,int reassign)
 		input_line_pointer++;
 
 	assign_symbol(sym_name,reassign >= 0 ? !reassign : reassign);
-
 }
 
 /* Open FILENAME,first trying the unadorned file name,then if that fails and
@@ -14955,8 +14964,7 @@ static void	s_ignore(int arg ATTRIBUTE_UNUSED)
 #define TC_SINGLE_QUOTE_STRINGS 1
 #endif
 
-static char    *
-		_find_end_of_line(char *s,int mri_string,int insn ATTRIBUTE_UNUSED,
+static char * _find_end_of_line(char *s,int mri_string,int insn ATTRIBUTE_UNUSED,
 		    		int		in_macro)
 {
 	char		inquote = '\0';
@@ -27826,11 +27834,10 @@ static int	riscv_convert_symbolic_attribute(const char *name)
 /* Parse a .attribute directive.  */
 static void	s_riscv_attribute(int ignored ATTRIBUTE_UNUSED)
 {
-	as_fatal(("could not set architecture and machine"));
+	as_fatal("could not set architecture and machine");
 }
 
 /* Mark symbol that it follows a variant CC convention.  */
-
 static void	s_variant_cc(int ignored ATTRIBUTE_UNUSED)
 {
 	char           *name;
@@ -27882,32 +27889,6 @@ void		riscv_elf_copy_symbol_attributes(symbolS * dest,symbolS * src)
 	}
 }
 
-/* RISC-V pseudo-ops table.  */
-static const pseudo_typeS riscv_pseudo_table[] =
-{
-	{"option",s_riscv_option,0},
-	{"half",cons,2},
-	{"word",cons,4},
-	{"dword",cons,8},
-	{"dtprelword",s_dtprel,4},
-	{"dtpreldword",s_dtprel,8},
-	{"bss",s_bss,0},
-	{"uleb128",s_riscv_leb128,0},
-	{"sleb128",s_riscv_leb128,1},
-	{"insn",s_riscv_insn,0},
-	{"attribute",s_riscv_attribute,0},
-	{"variant_cc",s_variant_cc,0},
-	{"float16",float_cons,'h'},
-
-	{NULL,NULL,0},
-};
-
-void		riscv_pop_insert(void)
-{
-	extern void	pop_insert(const pseudo_typeS *);
-
-	pop_insert(riscv_pseudo_table);
-}
 /* ============================================================**** riscv-opc.c */
 /* RISC-V opcode list */
 
@@ -29999,87 +29980,20 @@ static const struct riscv_opcode riscv_insn_types[] = {
 };
 /* ============================================================**** obj-elf.c */
 /* ELF object file format */
-static void	obj_elf_line(int);
 static void	obj_elf_size(int);
 static void	obj_elf_type(int);
-static void	obj_elf_ident(int);
 static void	obj_elf_weak(int);
-static void	obj_elf_local(int);
 static void	obj_elf_visibility(int);
 static void	obj_elf_symver(int);
 static void	obj_elf_subsection(int);
 static void	obj_elf_popsection(int);
 static void	obj_elf_gnu_attribute(int);
 static void	obj_elf_tls_common(int);
-static void	obj_elf_lcomm(int);
 static void	obj_elf_struct(int);
-static void	obj_elf_attach_to_group(int);
 
-static const pseudo_typeS elf_pseudo_table[] = {
-	{"attach_to_group",obj_elf_attach_to_group,0},
-	{"comm",obj_elf_common,0},
-	{"common",obj_elf_common,1},
-	{"ident",obj_elf_ident,0},
-	{"lcomm",obj_elf_lcomm,0},
-	{"local",obj_elf_local,0},
-	{"previous",obj_elf_previous,0},
-	{"section",obj_elf_section,0},
-	{"section.s",obj_elf_section,0},
-	{"sect",obj_elf_section,0},
-	{"sect.s",obj_elf_section,0},
-	{"pushsection",obj_elf_section,1},
-	{"popsection",obj_elf_popsection,0},
-	{"size",obj_elf_size,0},
-	{"type",obj_elf_type,0},
-	{"version",obj_elf_version,0},
-	{"weak",obj_elf_weak,0},
-
-	/* These define symbol visibility.  */
-	{"internal",obj_elf_visibility,STV_INTERNAL},
-	{"hidden",obj_elf_visibility,STV_HIDDEN},
-	{"protected",obj_elf_visibility,STV_PROTECTED},
-
-	/* These are used for stabs-in-elf configurations.  */
-	{"line",obj_elf_line,0},
-
-	/* This is a GNU extension to handle symbol versions.  */
-	{"symver",obj_elf_symver,0},
-
-	/* A GNU extension to change subsection only.  */
-	{"subsection",obj_elf_subsection,0},
-
-	/* These are GNU extensions to aid in garbage collecting C++ vtables.  */
-	{"vtable_inherit",obj_elf_vtable_inherit,0},
-	{"vtable_entry",obj_elf_vtable_entry,0},
-
-	/* A GNU extension for object attributes.  */
-	{"gnu_attribute",obj_elf_gnu_attribute,0},
-
-	/* These are used for dwarf2.  */
-	{"file",dwarf2_directive_file,0},
-	{"loc",dwarf2_directive_loc,0},
-	{"loc_mark_labels",dwarf2_directive_loc_mark_labels,0},
-
-	/* We need to trap the section changing calls to handle .previous.  */
-	{"data",obj_elf_data,0},
-	{"offset",obj_elf_struct,0},
-	{"struct",obj_elf_struct,0},
-	{"text",obj_elf_text,0},
-	{"bss",obj_elf_bss,0},
-
-	{"tls_common",obj_elf_tls_common,0},
-
-	/* End sentinel.  */
-	{NULL,NULL,0},
-};
 
 #undef NO_RELOC
 static asection *elf_com_section_ptr;
-
-static void	elf_pop_insert(void)
-{
-	pop_insert(elf_pseudo_table);
-}
 
 static int	elf_s_get_other(symbolS * sym)
 {

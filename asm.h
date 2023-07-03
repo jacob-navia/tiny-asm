@@ -2985,8 +2985,6 @@ static void current_location (expressionS *);
 static uint32_t generic_bignum_to_int32 (void);
 static int resolve_expression (expressionS *);
 
-static bool literal_prefix_dollar_hex;
-
 /* This one starts the chain of target dependent headers.  */
 
 /* ELF object file format. */
@@ -6309,9 +6307,6 @@ static void riscv_pre_output_hook (void);
 #define TC_FORCE_RELOCATION_LOCAL(FIX) 1
 #define DIFF_EXPR_OK 1
 
-static void riscv_pop_insert (void);
-#define md_pop_insert()		riscv_pop_insert ()
-
 #define TARGET_USE_CFIPOP 1
 
 #define tc_cfi_frame_initial_instructions riscv_cfi_frame_initial_instructions
@@ -6654,11 +6649,6 @@ static  void elf_frob_symbol (symbolS *, int *);
 static void elf_fixup_removed_symbol (symbolS **);
 #ifndef obj_fixup_removed_symbol
 #define obj_fixup_removed_symbol(sympp) elf_fixup_removed_symbol (sympp)
-#endif
-
-static void elf_pop_insert (void);
-#ifndef obj_pop_insert
-#define obj_pop_insert()	elf_pop_insert()
 #endif
 
 #ifndef OBJ_MAYBE_ELF
@@ -7506,10 +7496,6 @@ static const char EXP_CHARS[];
 
 #ifdef H_TICK_HEX
 static int enable_h_tick_hex;
-#endif
-
-#ifndef TC_STRING_ESCAPES
-#define TC_STRING_ESCAPES 1
 #endif
 
 #if defined OBJ_ELF || defined OBJ_MAYBE_ELF

@@ -775,27 +775,6 @@ static void    *zmalloc(size_t siz)
 	return calloc(1,siz);
 }
 
-static void	dump_statistics(void)
-{
-	long		run_time = get_run_time() - start_time;
-
-	fprintf(stderr,("%s: total time in assembly: %ld.%06ld\n"),
-		myname,run_time / 1000000,run_time % 1000000);
-
-	subsegs_print_statistics(stderr);
-	write_print_statistics(stderr);
-	symbol_print_statistics(stderr);
-	read_print_statistics(stderr);
-
-#ifdef tc_print_statistics
-	tc_print_statistics(stderr);
-#endif
-
-#ifdef obj_print_statistics
-	obj_print_statistics(stderr);
-#endif
-}
-
 /* Here to attempt 1 pass over each input file. We scan argv[*] looking for
  * filenames or exactly "" which is shorthand for stdin. Any argv that is NULL
  * is not a file-name. We set need_pass_2 TRUE if,after this,we still have
@@ -924,13 +903,14 @@ static void	gas_init(void)
 	output_file_create(out_file_name);
 	gas_assert(stdoutput != 0);
 
+#if 0
 	/*
 	 * Must be called before output_file_close.  xexit calls the xatexit
 	 * list in reverse order.
 	 */
 	if (flag_print_statistics)
 		xatexit(dump_statistics);
-
+#endif
 	dot_symbol_init();
 
 #ifdef tc_init_after_args
@@ -1601,7 +1581,6 @@ static void	flonum_print(const FLONUM_TYPE *f)
 /* end of atof_generic.c */
 /* ==================================================** compress-debug.c */
 /* compress-debug.c - compress debug sections */
-#include <zlib.h>
 struct z_stream_s;
 /* Initialize the compression engine.  */
 static void    *compress_init(bool use_zstd ATTRIBUTE_UNUSED)
@@ -1910,6 +1889,7 @@ static bool	compact_eh;
 #endif
 
 static htab_t	dwcfi_hash;
+static htab_t	sy_hash;
 
 /* Emit a single byte into the current segment.  */
 static inline void out_one(int byte)
@@ -6883,11 +6863,8 @@ static int	get_cie_info(struct cie_info *info)
 			if (augmentation[0] != 'z')
 				return 0;
 
-	/*
-	 * We're now at the code alignment factor,which is a ULEB128.  If it
-	 * isn't a single byte,forget it.
-	 */
-
+	/* We're now at the code alignment factor,which is a ULEB128.  If it
+	 * isn't a single byte,forget it.  */
 	code_alignment = f->fr_literal[offset] & 0xff;
 	if ((code_alignment & 0x80) != 0)
 		code_alignment = 0;
@@ -7433,9 +7410,6 @@ static void	integer_constant(int radix,expressionS * expressionP)
 	short int	digit;	/* Value of next digit in current radix.  */
 	short int	maxdig = 0;	/* Highest permitted digit value.  */
 	int		too_many_digits = 0;	/* If we see >= this number of.  */
-	char           *name;	/* Points to name of symbol.  */
-	symbolS        *symbolP;/* Points to symbol.  */
-
 	int		small;	/* True if fits in 32 bits.  */
 
 	/* May be bignum,or may fit in 32 bits.  */
@@ -7661,59 +7635,10 @@ static void	integer_constant(int radix,expressionS * expressionP)
 		 * checking for strict canonical form.  Syntax sux!
 		 */
 
-		if (LOCAL_LABELS_FB && c == 'b') {
-			/*
-			 * Backward ref to local label. Because it is backward,
-			 * expect it to be defined.
-			 */
-			/* Construct a local label.  */
-			name = fb_label_name(number,0);
-
-			/* Seen before,or symbol is defined: OK.  */
-			symbolP = symbol_find(name);
-			if ((symbolP != NULL) && (S_IS_DEFINED(symbolP))) {
-				expressionP->X_op = O_symbol;
-				expressionP->X_add_symbol = symbolP;
-			} else {
-				/* Either not seen or not defined.  */
-				/*
-				 * @@ Should print out the original string
-				 * instead of the parsed number.
-				 */
-				as_bad(("backward ref to unknown label \"%d:\""),
-				       (int)number);
-				expressionP->X_op = O_constant;
-			}
-
-			expressionP->X_add_number = 0;
-		}
-		 /* case 'b' */ 
-		else
-			if (LOCAL_LABELS_FB && c == 'f') {
-				/*
-				 * Forward reference.  Expect symbol to be
-				 * undefined or unknown.  undefined: seen it
-				 * before.  unknown: never seen it before.
-				 * 
-				 * Construct a local label name,then an undefined
-				 * symbol. Don't create a xseg frag for it:
-				 * caller may do that. Just return it as never
-				 * seen before.
-				 */
-				name = fb_label_name(number,1);
-				symbolP = symbol_find_or_make(name);
-				/* We have no need to check symbol properties.  */
-				expressionP->X_op = O_symbol;
-				expressionP->X_add_symbol = symbolP;
-				expressionP->X_add_number = 0;
-			}
 		 /* case 'f' */ 
-			else {
-				expressionP->X_op = O_constant;
-				expressionP->X_add_number = number;
-				input_line_pointer--;	/* Restore following
-							 * character.  */
-			}	/* Really just a number.  */
+		expressionP->X_op = O_constant;
+		expressionP->X_add_number = number;
+		input_line_pointer--;	/* Restore following character.  */
 	} else {
 		/* Not a small number.  */
 		expressionP->X_op = O_big;
@@ -7793,6 +7718,7 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 		break;
 
 #ifdef LITERAL_PREFIXPERCENT_BIN
+kkk
 	case '%':
 		integer_constant(2,expressionP);
 		break;
@@ -7803,12 +7729,7 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 
 		c = *input_line_pointer;
 		switch (c) {
-		case 'o':
-		case 'O':
-		case 'q':
-		case 'Q':
-		case '8':
-		case '9':
+		case 'o': case 'O': case 'q': case 'Q': case '8': case '9':
 			/* Fall through.  */
 		default:
 	default_case:
@@ -7824,24 +7745,12 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 
 			break;
 
-		case 'x':
-		case 'X':
+		case 'x': case 'X':
 			input_line_pointer++;
 			integer_constant(16,expressionP);
 			break;
 
-		case 'b':
-			if (LOCAL_LABELS_FB
-			    && input_line_pointer[1] != '0'
-			    && input_line_pointer[1] != '1') {
-				/* Parse this as a back reference to label 0.  */
-				input_line_pointer--;
-				integer_constant(10,expressionP);
-				break;
-			}
-			/* Otherwise,parse this as a binary number.  */
-			/* Fall through.  */
-		case 'B':
+		case 'b': case 'B':
 			if (input_line_pointer[1] == '0'
 			    || input_line_pointer[1] == '1') {
 				input_line_pointer++;
@@ -7850,59 +7759,13 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 			}
 			goto default_case;
 
-		case '0':
-		case '1':
-		case '2':
-		case '3':
-		case '4':
-		case '5':
-		case '6':
-		case '7':
+		case '0': case '1': case '2': case '3': case '4': case '5':
+		case '6': case '7':
 			integer_constant(8, expressionP);
 			break;
 
-		case 'f':
-			if (LOCAL_LABELS_FB) {
-				int		is_label = 1;
-
-				/* If it says "0f" and it could possibly be a
-				 * floating point number,make it one.
-				 * Otherwise,make it a local label,and try to
-				 * deal with parsing the rest later.  */
-				if (!is_end_of_line[(unsigned char)input_line_pointer[1]]
-				    && strchr(FLT_CHARS,'f') != NULL) {
-					char           *cp = input_line_pointer + 1;
-
-					atof_generic(&cp,".",EXP_CHARS,
-					      &generic_floating_point_number);
-
-					/*
-					 * Was nothing parsed,or does it look
-					 * like an expression?
-					 */
-					is_label = (cp == input_line_pointer + 1
-					      || (cp == input_line_pointer + 2
-					  && (cp[-1] == '-' || cp[-1] == '+'))
-						    || *cp == 'f'
-						    || *cp == 'b');
-				}
-				if (is_label) {
-					input_line_pointer--;
-					integer_constant(10,expressionP);
-					break;
-				}
-			}
-			/* Fall through.  */
-
-		case 'd':
-		case 'D':
-			/* Fall through.  */
-		case 'F':
-		case 'r':
-		case 'e':
-		case 'E':
-		case 'g':
-		case 'G':
+		case 'f': case 'd': case 'D': case 'F': case 'r': case 'e':
+		case 'E': case 'g': case 'G':
 			input_line_pointer++;
 			floating_constant(expressionP);
 			expressionP->X_add_number = -TOLOWER(c);
@@ -10183,15 +10046,6 @@ static void ** htab_insert(htab_t htab,void *element,int replace)
 	return NULL;
 }
 
-/* Print statistics about a hash table.  */
-static void htab_print_statistics(FILE * f,const char *name,htab_t table)
-{
-	fprintf(f,"%s hash statistics:\n",name);
-	fprintf(f,"\t%u searches\n",table->searches);
-	fprintf(f,"\t%u collisions\n",table->collisions);
-	fprintf(f,"\t%lu elements\n",(unsigned long)htab_elements(table));
-	fprintf(f,"\t%lu table size\n",(unsigned long)htab_size(table));
-}
 /* =======================================================* input-file.c */
 /* input_file.c - Deal with Input Files - */
 /*
@@ -11379,7 +11233,7 @@ static void	output_file_close(void)
 #endif
 	expr_end();
 	read_end();
-	symbol_end();
+	htab_delete(sy_hash);
 	subsegs_end(obs);
 
 	if (!res)
@@ -11405,9 +11259,6 @@ static void	output_file_close(void)
  * Routines that read assembler source text to build spaghetti in memory.
  * Another group of these functions is in the expr.c module.
  */
-
-#include "wchar.h"
-
 
 #ifndef TC_START_LABEL
 #define TC_START_LABEL(STR,NUL_CHAR,NEXT_CHAR) (NEXT_CHAR == ':')
@@ -11621,9 +11472,6 @@ static const pseudo_typeS potable[] = {
 	{"ds.w",s_space,2},
 	{"ds.x",s_space,'x'},
 	{"debug",s_ignore,0},
-#ifdef S_SET_DESC
-	{"desc",s_desc,0},
-#endif
 	/* dim  */
 	{"double",float_cons,'d'},
 	/* dsect  */
@@ -11746,9 +11594,6 @@ static void	pop_insert(const pseudo_typeS * table)
 #define obj_pop_insert()	pop_insert(obj_pseudo_table)
 #endif
 
-#ifndef cfi_pop_insert
-#define cfi_pop_insert()	pop_insert(cfi_pseudo_table)
-#endif
 
 static void	pobegin(void)
 {
@@ -11770,7 +11615,7 @@ static void	pobegin(void)
 
 	/* Now CFI ones.  */
 	pop_table_name = "cfi";
-	cfi_pop_insert();
+	pop_insert(cfi_pseudo_table);
 }
 
 static void	poend(void)
@@ -11779,7 +11624,6 @@ static void	poend(void)
 }
 
 #define assemble_one(line) md_assemble(line)
-
 static bool	in_bss(void)
 {
 	uint32_t	flags = now_seg->flags;
@@ -11787,16 +11631,13 @@ static bool	in_bss(void)
 	return (flags & SEC_ALLOC) && !(flags & (SEC_LOAD|SEC_HAS_CONTENTS));
 }
 
-/*
- * Guts of .align directive: N is the power of two to which to align.  A value
+/* Guts of .align directive: N is the power of two to which to align.  A value
  * of zero is accepted but ignored: the default alignment of the section will
  * be at least this. FILL may be NULL,or it may point to the bytes of the fill
  * pattern. LEN is the length of whatever FILL points to,if anything.  If LEN
  * is zero but FILL is not NULL then LEN is treated as if it were one. MAX is
  * the maximum number of characters to skip when doing the alignment,or 0 if
- * there is no maximum.
- */
-
+ * there is no maximum.  */
 static void	do_align(unsigned int n,char *fill,unsigned int len,unsigned int max)
 {
 	if (now_seg == absolute_section || in_bss()) {
@@ -11848,107 +11689,44 @@ static void	read_a_source_file(const char *name)
 	char		nul_char;
 	char		next_char;
 	char           *s;	/* String of symbol,'\0' appended.  */
-	long		temp;
 	const pseudo_typeS *pop;
 
-#ifdef WARN_COMMENTS
-	found_comment = 0;
-#endif
 
 	buffer = input_scrub_new_file(name);
-
-
-	/*
-	 * Generate debugging information before we've read anything in to
+	/* Generate debugging information before we've read anything in to
 	 * denote this file as the "main" source file and not a subordinate one
-	 * (e.g. N_SO vs N_SOL in stabs).
-	 */
+	 * (e.g. N_SO vs N_SOL in stabs).  */
 	generate_file_debug();
 
-	while ((buffer_limit = input_scrub_next_buffer(&input_line_pointer)) != 0) {	/* We have another line
-											 * to parse.  */
+	while ((buffer_limit = input_scrub_next_buffer(&input_line_pointer)) != 0) {	
+		/* We have another line to parse.  */
 		while (input_line_pointer < buffer_limit) {
 			bool		was_new_line;
 			/* We have more of this buffer to parse.  */
 
-			/*
-			 * We now have input_line_pointer->1st char of next
+			/* We now have input_line_pointer->1st char of next
 			 * line. If input_line_pointer [-1] == '\n' then we
-			 * just scanned another line: so bump line counters.
-			 */
+			 * just scanned another line: so bump line counters.  */
 			was_new_line = is_end_of_line[(unsigned char)input_line_pointer[-1]];
 			if (was_new_line) {
 				symbol_set_value_now(&dot_symbol);
-#ifdef md_start_line_hook
-				md_start_line_hook();
-#endif
 				if (input_line_pointer[-1] == '\n')
 					bump_line_counters();
 			}
-			if (was_new_line) {
-				if (LABELS_WITHOUT_COLONS) {
-					next_char = *input_line_pointer;
-					/*
-					 * Text at the start of a line must be
-					 * a label,we run down and stick a
-					 * colon in.
-					 */
-					if (is_name_beginner(next_char) || next_char == '"') {
-						char           *line_start;
-						int		mri_line_macro;
-
-						nul_char = get_symbol_name(&line_start);
-						next_char = (nul_char == '"' ? input_line_pointer[1] : nul_char);
-
-						/*
-						 * In MRI mode,the EQU and
-						 * MACRO pseudoops must be
-						 * handled specially.
-						 */
-						mri_line_macro = 0;
-
-						/*
-						 * In MRI mode,we need to
-						 * handle the MACRO pseudo-op
-						 * specially: we don't want to
-						 * put the symbol in the symbol
-						 * table.
-						 */
-						if (!mri_line_macro
-#ifdef TC_START_LABEL_WITHOUT_COLON
-						    && TC_START_LABEL_WITHOUT_COLON(nul_char,next_char)
-#endif
-							)
-							colon(line_start);
-						else
-							symbol_create(line_start,
-							     absolute_section,
-							&zero_address_frag,0);
-
-						next_char = restore_line_pointer(nul_char);
-						if (next_char == ':')
-							input_line_pointer++;
-					}
-				}
-			}
-			/*
-			 * We are at the beginning of a line,or similar place.
+			/* We are at the beginning of a line,or similar place.
 			 * We expect a well-formed assembler statement. A
 			 * "symbol-name:" is a statement.
 			 * 
 			 * Depending on what compiler is used,the order of these
 			 * tests may vary to catch most common case 1st. Each
 			 * test is independent of all other tests at the (top)
-			 * level.
-			 */
+			 * level.  */
 			do
 				nul_char = next_char = *input_line_pointer++;
 			while (next_char == '\t' || next_char == ' ' || next_char == '\f');
 
-			/*
-			 * C is the 1st significant character.
-			 * Input_line_pointer points after that character.
-			 */
+			/* C is the 1st significant character.
+			 * Input_line_pointer points after that character.  */
 			if (is_name_beginner(next_char) || next_char == '"') {
 				char           *rest;
 
@@ -11957,13 +11735,11 @@ static void	read_a_source_file(const char *name)
 				next_char = (nul_char == '"' ? input_line_pointer[1] : nul_char);
 				rest = input_line_pointer + (nul_char == '"' ? 2 : 1);
 
-				/*
-				 * NEXT_CHAR is character after symbol. The end
+				/* NEXT_CHAR is character after symbol. The end
 				 * of symbol in the input line is now '\0'. S
 				 * points to the beginning of the symbol. [In
 				 * case of pseudo-op,s->'.'.]
-				 * Input_line_pointer->'\0' where NUL_CHAR was.
-				 */
+				 * Input_line_pointer->'\0' where NUL_CHAR was.  */
 				if (TC_START_LABEL(s,nul_char,next_char)) {
 
 					colon(s);	/* User-defined label.  */
@@ -11981,46 +11757,21 @@ static void	read_a_source_file(const char *name)
 					} else
 						if ((next_char == '='
 						     || ((next_char == ' ' || next_char == '\t')
-							 && *rest == '='))
-#ifdef TC_EQUAL_IN_INSN
-						    && !TC_EQUAL_IN_INSN(next_char,s)
-#endif
-							) {
+							 && *rest == '='))) {
 							equals(s,1);
 							demand_empty_rest_of_line();
 						} else {
 							if (*s == '.') {
-								/*
-								 * PSEUDO - OP.
-								 * WARNING:
-								 * next_char
-								 * may be
-								 * end-of-line.
-								 * We lookup
-								 * the
-								 * pseudo-op
-								 * table with
-								 * s+1 because
-								 * we already
-								 * know that
-								 * the
-								 * pseudo-op
-								 * begins with
-								 * a '.'.
-								 */
-
+							/* PSEUDO - OP. WARNING:
+							 * next_char may be end-of-line. We lookup the
+							 * pseudo-op table with s+1 because we already
+							 * know that the pseudo-op begins with a '.'  */
 								pop = str_hash_find(po_hash,s + 1);
 								if (pop && !pop->poc_handler)
 									pop = NULL;
 
-
-								/*
-								 * Print the
-								 * error msg
-								 * now,while
-								 * we still
-								 * can.
-								 */
+								/* Print the error msg now,while we still
+								 * can.  */
 								if (pop == NULL) {
 									char           *end = input_line_pointer;
 
@@ -12033,58 +11784,22 @@ static void	read_a_source_file(const char *name)
 									*input_line_pointer++ = nul_char;
 									continue;
 								}
-								/*
-								 * Put it back
-								 * for error
-								 * messages
-								 * etc.
-								 */
+								/* Put it back for error messages etc.  */
 								next_char = restore_line_pointer(nul_char);
-								/*
-								 * The
-								 * following
-								 * skip of
-								 * whitespace
-								 * is
-								 * compulsory.
-								 * A well
-								 * shaped space
-								 * is sometimes
-								 * all that
-								 * separates
-								 * keyword from
-								 * operands.
-								 */
+								/* The following skip of whitespace is compulsory.
+								 * A well shaped space is sometimes all that
+								 * separates keyword from operands.  */
 								if (next_char == ' ' || next_char == '\t')
 									input_line_pointer++;
 
-								/*
-								 * Input_line
-								 * is restored.
-								 * Input_line_po
-								 * inter->1st
-								 * non-blank
-								 * char after
-								 * pseudo-operat
-								 * ion.
-								 */
+								/* Input_line is restored. Input_line_pointer->1st
+								 * non-blank char after pseudo-operation.  */
 								(*pop->poc_handler) (pop->poc_val);
 
 							} else {
-								/*
-								 * WARNING:
-								 * next_char
-								 * may be
-								 * end-of-line.
-								 */
-								/*
-								 * Also:
-								 * input_line_po
-								 * inter->`\0`
-								 * where
-								 * nul_char
-								 * was.
-								 */
+								/* WARNING: next_char may be end-of-line. */
+								/* Also: input_line_pointer->`\0` where
+								 * nul_char was.  */
 								(void)restore_line_pointer(nul_char);
 								input_line_pointer = _find_end_of_line(input_line_pointer,0,1,0);
 								next_char = nul_char = *input_line_pointer;
@@ -12093,33 +11808,17 @@ static void	read_a_source_file(const char *name)
 								generate_lineno_debug();
 
 
-								assemble_one(s);	/* Assemble 1
-											 * instruction.  */
+								assemble_one(s);/* Assemble 1 * instruction.  */
 
-								/*
-								 * PR 19630:
-								 * The backend
-								 * may have set
-								 * ilp to NULL
-								 * if it
-								 * encountered
-								 * a
-								 * catastrophic
-								 * failure.
-								 */
+								/* PR 19630: The backend may have set ilp to NULL
+								 * if it encountered a catastrophic failure.  */
 								if (input_line_pointer == NULL)
 									as_fatal("unable to continue with assembly.");
 
 								*input_line_pointer++ = nul_char;
 
-								/*
-								 * We resume
-								 * loop AFTER
-								 * the
-								 * end-of-line
-								 * from this
-								 * instruction.
-								 */
+								/* We resume loop AFTER the end-of-line from this
+								 * instruction.  */
 							}
 						}
 				continue;
@@ -12128,45 +11827,6 @@ static void	read_a_source_file(const char *name)
 			if (is_end_of_line[(unsigned char)next_char])
 				continue;
 
-			if (LOCAL_LABELS_FB && ISDIGIT(next_char)) {
-				/* local label  ("4:")  */
-				char           *backup = input_line_pointer;
-
-
-				temp = next_char - '0';
-
-				if (nul_char == '"')
-					++input_line_pointer;
-
-				/* Read the whole number.  */
-				while (ISDIGIT(*input_line_pointer)) {
-					const long	digit = *input_line_pointer - '0';
-					if (temp > (INT_MAX - digit) / 10) {
-						as_bad("local label too large near %s",backup);
-						temp = -1;
-						break;
-					}
-					temp = temp * 10 + digit;
-					++input_line_pointer;
-				}
-
-				/* Overflow: stop processing the label.  */
-				if (temp == -1) {
-					ignore_rest_of_line();
-					continue;
-				}
-				if (LOCAL_LABELS_FB
-				    && *input_line_pointer++ == ':') {
-					fb_label_instance_inc(temp);
-					colon(fb_label_name(temp,0));
-					continue;
-				}
-				input_line_pointer = backup;
-			}
-#ifdef tc_unrecognized_line
-			if (tc_unrecognized_line(next_char))
-				continue;
-#endif
 			input_line_pointer--;
 			/* Report unknown char as error.  */
 			demand_empty_rest_of_line();
@@ -12175,22 +11835,12 @@ static void	read_a_source_file(const char *name)
 
 	symbol_set_value_now(&dot_symbol);
 
-
 	/* Close the input file.  */
 	input_scrub_close();
-#ifdef WARN_COMMENTS
-	{
-		if (warn_comment && found_comment)
-			as_warn_where(found_comment_file,found_comment,
-				      "first comment found here");
-	}
-#endif
 }
 
-/*
- * Convert O_constant expression EXP into the equivalent O_big representation.
- * Take the sign of the number from SIGN rather than X_add_number.
- */
+/* Convert O_constant expression EXP into the equivalent O_big representation.
+ * Take the sign of the number from SIGN rather than X_add_number.  */
 static void	convert_to_bignum(expressionS * exp,int sign)
 {
 	valueT		value;
@@ -12201,10 +11851,8 @@ static void	convert_to_bignum(expressionS * exp,int sign)
 		generic_bignum[i] = value & LITTLENUM_MASK;
 		value >>= LITTLENUM_NUMBER_OF_BITS;
 	}
-	/*
-	 * Add a sequence of sign bits if the top bit of X_add_number is not
-	 * the sign of the original value.
-	 */
+	/* Add a sequence of sign bits if the top bit of X_add_number is not
+	 * the sign of the original value.  */
 	if ((exp->X_add_number < 0) == !sign)
 		generic_bignum[i++] = sign ? LITTLENUM_MASK : 0;
 	exp->X_op = O_big;
@@ -15302,11 +14950,6 @@ static void	s_ignore(int arg ATTRIBUTE_UNUSED)
 	ignore_rest_of_line();
 }
 
-static void	read_print_statistics(FILE * file)
-{
-	htab_print_statistics(file,"pseudo-op table",po_hash);
-}
-
 /* Find the end of a line,considering quotation and escaping of quotes.  */
 #if !defined(TC_SINGLE_QUOTE_STRINGS) && defined(SINGLE_QUOTE_STRINGS)
 #define TC_SINGLE_QUOTE_STRINGS 1
@@ -16290,40 +15933,6 @@ static int	seg_not_empty_p(segT sec ATTRIBUTE_UNUSED)
 	return 0;
 }
 
-static void	subsegs_print_statistics(FILE * file)
-{
-	frchainS       *frchp;
-	asection       *s;
-
-	/* PR 20897 - check to see if the output bfd was actually created.  */
-	if (stdoutput == NULL)
-		return;
-
-	fprintf(file,"frag chains:\n");
-	for (s = stdoutput->sections; s; s = s->next) {
-		segment_info_type *seginfo;
-
-		/* Skip gas-internal sections.  */
-		if (segment_name(s)[0] == '*')
-			continue;
-
-		seginfo = seg_info(s);
-		if (!seginfo)
-			continue;
-
-		for (frchp = seginfo->frchainP; frchp; frchp = frchp->frch_next) {
-			int		count = 0;
-			fragS          *fragp;
-
-			for (fragp = frchp->frch_root; fragp; fragp = fragp->fr_next)
-				count++;
-
-			fprintf(file,"\n");
-			fprintf(file,"\t%p %-10s\t%10d frags\n",(void *)frchp,
-				segment_name(s),count);
-		}
-	}
-}
 /* end of subsegs.c */
 /* =======================================================**** symbols.c */
 typedef struct symbol symbolS;
@@ -16385,7 +15994,6 @@ static void    *symbol_entry_find(htab_t table,const char *name)
 /*
  * This is non-zero if symbols are case sensitive,which is the default.
  */
-static htab_t	sy_hash;
 /* Below are commented in "symbols.h".  */
 static symbolS *symbol_rootP;
 static symbolS *symbol_lastP;
@@ -17657,113 +17265,13 @@ static int	snapshot_symbol(symbolS ** symbolPP,valueT * valueP,segT * segP,fragS
 #define FB_LABEL_SPECIAL (10)
 
 typedef unsigned int fb_ent;
-static fb_ent	fb_low_counter[FB_LABEL_SPECIAL];
-static fb_ent  *fb_labels;
-static fb_ent  *fb_label_instances;
-static size_t	fb_label_count;
-static size_t	fb_label_max;
 
 /* This must be more than FB_LABEL_SPECIAL.  */
 #define FB_LABEL_BUMP_BY (FB_LABEL_SPECIAL + 6)
 
-static void	fb_label_init(void)
-{
-	memset((void *)fb_low_counter,'\0',sizeof(fb_low_counter));
-}
-
-/* Add one to the instance number of this fb label.  */
-static void	fb_label_instance_inc(unsigned int label)
-{
-	fb_ent         *i;
-
-	if (label < FB_LABEL_SPECIAL) {
-		++fb_low_counter[label];
-		return;
-	}
-	if (fb_labels != NULL) {
-		for (i = fb_labels + FB_LABEL_SPECIAL;
-		     i < fb_labels + fb_label_count; ++i) {
-			if (*i == label) {
-				++fb_label_instances[i - fb_labels];
-				return;
-			}	/* if we find it  */
-		}		/* for each existing label  */
-	}
-	/* If we get to here,we don't have label listed yet.  */
-
-	if (fb_labels == NULL) {
-		fb_labels = XNEWVEC(fb_ent,FB_LABEL_BUMP_BY);
-		fb_label_instances = XNEWVEC(fb_ent,FB_LABEL_BUMP_BY);
-		fb_label_max = FB_LABEL_BUMP_BY;
-		fb_label_count = FB_LABEL_SPECIAL;
-
-	} else
-		if (fb_label_count == fb_label_max) {
-			fb_label_max += FB_LABEL_BUMP_BY;
-			fb_labels = XRESIZEVEC(fb_ent,fb_labels,fb_label_max);
-			fb_label_instances = XRESIZEVEC(fb_ent,fb_label_instances,
-							fb_label_max);
-		}		/* if we needed to grow  */
-	fb_labels[fb_label_count] = label;
-	fb_label_instances[fb_label_count] = 1;
-	++fb_label_count;
-}
-
-static unsigned int fb_label_instance(unsigned int label)
-{
-	fb_ent         *i;
-
-	if (label < FB_LABEL_SPECIAL)
-		return (fb_low_counter[label]);
-
-	if (fb_labels != NULL) {
-		for (i = fb_labels + FB_LABEL_SPECIAL;
-		     i < fb_labels + fb_label_count; ++i) {
-			if (*i == label)
-				return (fb_label_instances[i - fb_labels]);
-		}
-	}
-	/* We didn't find the label,so this must be a reference to the first
-	 * instance.  */
-	return 0;
-}
-
-/* Caller must copy returned name: we re-use the area for the next name.
- * 
- * The mth occurrence of label n: is turned into the symbol "Ln^Bm" where n is the
- * label number and m is the instance number. "L" makes it a label discarded
- * unless debugging and "^B"('\2') ensures no ordinary symbol SHOULD get the
- * same name as a local label symbol. The first "4:" is "L4^B1" - the m numbers
- * begin at 1.
- * 
- * dollar labels get the same treatment,except that ^A is used in place of ^B.
- * 
- * AUGEND is 0 for nb,1 for n:,nf.  */
-static char    *fb_label_name(unsigned int n,unsigned int augend)
-{
-	/* Returned to caller,then copied.  Used for created names ("4f").  */
-	static char	symbol_name_build[24];
-	char           *p = symbol_name_build;
-
-#ifdef TC_MMIX
-	know(augend <= 2 /* See mmix_fb_label.  */ );
-#else
-	know(augend <= 1);
-#endif
-
-#ifdef LOCAL_LABEL_PREFIX
-	*p++ = LOCAL_LABEL_PREFIX;
-#endif
-	sprintf(p,"L%u%c%u",
-		n,LOCAL_LABEL_CHAR,fb_label_instance(n) + augend);
-	return symbol_name_build;
-}
-
-/*
- * Decode name that may have been generated by foo_label_name() above. If the
+/* Decode name that may have been generated by foo_label_name() above. If the
  * name wasn't generated by foo_label_name(),then return it unaltered.  This
- * is used for error messages.
- */
+ * is used for error messages.  */
 static char    *decode_local_label_name(char *s)
 {
 	char           *p;
@@ -18448,13 +17956,6 @@ static void	symbol_begin(void)
 	abs_symbol.x->value.X_op = O_constant;
 	abs_symbol.frag = &zero_address_frag;
 
-	if (LOCAL_LABELS_FB)
-		fb_label_init();
-}
-
-static void	symbol_end(void)
-{
-	htab_delete(sy_hash);
 }
 
 static void	dot_symbol_init(void)
@@ -18467,166 +17968,6 @@ static void	dot_symbol_init(void)
 	dot_symbol.bsym->name = ".";
 	dot_symbol.x = &dot_symbol_x;
 	dot_symbol.x->value.X_op = O_constant;
-}
-
-static int	indent_level;
-
-/* Maximum indent level. Available for modification inside a gdb session.  */
-static int	max_indent_level = 8;
-
-static void	print_symbol_value_1(FILE * file,symbolS * sym)
-{
-	const char     *name = S_GET_NAME(sym);
-	if (!name || !name[0])
-		name = "(unnamed)";
-	fprintf(file,"sym %p %s",sym,name);
-
-	if (sym->flags.local_symbol) {
-		struct local_symbol *locsym = (struct local_symbol *)sym;
-
-		if (locsym->frag != &zero_address_frag
-		    && locsym->frag != NULL)
-			fprintf(file," frag %p",locsym->frag);
-		if (locsym->flags.resolved)
-			fprintf(file," resolved");
-		fprintf(file," local");
-	} else {
-		if (sym->frag != &zero_address_frag)
-			fprintf(file," frag %p",sym->frag);
-		if (sym->flags.written)
-			fprintf(file," written");
-		if (sym->flags.resolved)
-			fprintf(file," resolved");
-		else
-			if (sym->flags.resolving)
-				fprintf(file," resolving");
-		if (sym->flags.used_in_reloc)
-			fprintf(file," used-in-reloc");
-		if (sym->flags.used)
-			fprintf(file," used");
-		if (S_IS_LOCAL(sym))
-			fprintf(file," local");
-		if (S_IS_EXTERNAL(sym))
-			fprintf(file," extern");
-		if (S_IS_WEAK(sym))
-			fprintf(file," weak");
-		if (S_IS_DEBUG(sym))
-			fprintf(file," debug");
-		if (S_IS_DEFINED(sym))
-			fprintf(file," defined");
-	}
-	if (S_IS_WEAKREFR(sym))
-		fprintf(file," weakrefr");
-	if (S_IS_WEAKREFD(sym))
-		fprintf(file," weakrefd");
-	fprintf(file," %s",segment_name(S_GET_SEGMENT(sym)));
-	if (symbol_resolved_p(sym)) {
-		segT		s = S_GET_SEGMENT(sym);
-
-		if (s != undefined_section
-		    && s != expr_section)
-			fprintf(file," %lx",(unsigned long)S_GET_VALUE(sym));
-	} else
-		if (indent_level < max_indent_level
-		    && S_GET_SEGMENT(sym) != undefined_section) {
-			indent_level++;
-			fprintf(file,"\n%*s<",indent_level * 4,"");
-			if (sym->flags.local_symbol)
-				fprintf(file,"constant %lx",
-					(unsigned long)((struct local_symbol *)sym)->value);
-			else
-				print_expr_1(file,&sym->x->value);
-			fprintf(file,">");
-			indent_level--;
-		}
-	fflush(file);
-}
-
-static void	print_binary(FILE * file,const char *name,expressionS * exp)
-{
-	indent_level++;
-	fprintf(file,"%s\n%*s<",name,indent_level * 4,"");
-	print_symbol_value_1(file,exp->X_add_symbol);
-	fprintf(file,">\n%*s<",indent_level * 4,"");
-	print_symbol_value_1(file,exp->X_op_symbol);
-	fprintf(file,">");
-	indent_level--;
-}
-
-static void	print_expr_1(FILE * file,expressionS * exp)
-{
-	fprintf(file,"expr %p ",exp);
-	switch (exp->X_op) {
-	case O_illegal: fprintf(file,"illegal"); break;
-	case O_absent: fprintf(file,"absent"); break;
-	case O_constant: fprintf(file,"constant %" PRIx64,(uint64_t)exp->X_add_number);
-		break;
-	case O_symbol:
-		indent_level++;
-		fprintf(file,"symbol\n%*s<",indent_level * 4,"");
-		print_symbol_value_1(file,exp->X_add_symbol);
-		fprintf(file,">");
-maybe_print_addnum:
-		if (exp->X_add_number)
-			fprintf(file,"\n%*s%" PRIx64,indent_level * 4,"",
-				(uint64_t) exp->X_add_number);
-		indent_level--;
-		break;
-	case O_register:
-		fprintf(file,"register #%d",(int)exp->X_add_number);
-		break;
-	case O_big: fprintf(file,"big"); break;
-	case O_uminus:
-		fprintf(file,"uminus -<");
-		indent_level++;
-		print_symbol_value_1(file,exp->X_add_symbol);
-		fprintf(file,">");
-		goto maybe_print_addnum;
-	case O_bit_not: fprintf(file,"bit_not"); break;
-	case O_multiply: print_binary(file,"multiply",exp); break;
-	case O_divide: print_binary(file,"divide",exp); break;
-	case O_modulus: print_binary(file,"modulus",exp); break;
-	case O_left_shift: print_binary(file,"lshift",exp); break;
-	case O_right_shift: print_binary(file,"rshift",exp); break;
-	case O_bit_inclusive_or: print_binary(file,"bit_ior",exp); break;
-	case O_bit_exclusive_or: print_binary(file,"bit_xor",exp); break;
-	case O_bit_and: print_binary(file,"bit_and",exp); break;
-	case O_eq: print_binary(file,"eq",exp); break;
-	case O_ne: print_binary(file,"ne",exp); break;
-	case O_lt: print_binary(file,"lt",exp); break;
-	case O_le: print_binary(file,"le",exp); break;
-	case O_ge: print_binary(file,"ge",exp); break;
-	case O_gt: print_binary(file,"gt",exp); break;
-	case O_logical_and: print_binary(file,"logical_and",exp); break;
-	case O_logical_or: print_binary(file,"logical_or",exp); break;
-	case O_add:
-		indent_level++;
-		fprintf(file,"add\n%*s<",indent_level * 4,"");
-		print_symbol_value_1(file,exp->X_add_symbol);
-		fprintf(file,">\n%*s<",indent_level * 4,"");
-		print_symbol_value_1(file,exp->X_op_symbol);
-		fprintf(file,">");
-		goto maybe_print_addnum;
-	case O_subtract:
-		indent_level++;
-		fprintf(file,"subtract\n%*s<",indent_level * 4,"");
-		print_symbol_value_1(file,exp->X_add_symbol);
-		fprintf(file,">\n%*s<",indent_level * 4,"");
-		print_symbol_value_1(file,exp->X_op_symbol);
-		fprintf(file,">");
-		goto maybe_print_addnum;
-	default:
-		fprintf(file,"{unknown opcode %d}",(int)exp->X_op);
-		break;
-	}
-	fflush(stdout);
-}
-
-static void	symbol_print_statistics(FILE * file)
-{
-	htab_print_statistics(file,"symbol table",sy_hash);
-	fprintf(file,"%lu mini local symbols created,%lu converted\n",
-		local_symbol_count,local_symbol_conversion_count);
 }
 
 /* ============================================================* write.c */
@@ -21541,49 +20882,6 @@ static void	number_to_chars_littleendian(char *buf,valueT val,int n)
 	}
 }
 
-static void	write_print_statistics(FILE * file)
-{
-	fprintf(file,"fixups: %d\n",n_fixups);
-}
-
-#ifdef DEBUG
-/* For debugging.  */
-extern int	indent_level;
-
-static void	print_fixup(fixS * fixp)
-{
-	indent_level = 1;
-	fprintf(stderr,"fix %p %s:%d",fixp,fixp->fx_file,fixp->fx_line);
-	if (fixp->fx_pcrel)
-		fprintf(stderr," pcrel");
-	if (fixp->fx_pcrel_adjust)
-		fprintf(stderr," pcrel_adjust=%d",fixp->fx_pcrel_adjust);
-	if (fixp->fx_tcbit)
-		fprintf(stderr," tcbit");
-	if (fixp->fx_done)
-		fprintf(stderr," done");
-	fprintf(stderr,"\n    size=%d frag=%p",fixp->fx_size,fixp->fx_frag);
-	fprintf(stderr," where=%ld offset=%" PRIx64 " addnumber=%" PRIx64,
-		fixp->fx_where,(uint64_t) fixp->fx_offset,
-		(uint64_t) fixp->fx_addnumber);
-	fprintf(stderr,"\n    %s (%d)",bfd_get_reloc_code_name(fixp->fx_r_type),
-		fixp->fx_r_type);
-	if (fixp->fx_addsy) {
-		fprintf(stderr,"\n   +<");
-		print_symbol_value_1(stderr,fixp->fx_addsy);
-		fprintf(stderr,">");
-	}
-	if (fixp->fx_subsy) {
-		fprintf(stderr,"\n   -<");
-		print_symbol_value_1(stderr,fixp->fx_subsy);
-		fprintf(stderr,">");
-	}
-	fprintf(stderr,"\n");
-#ifdef TC_FIX_DATA_PRINT
-	TC_FIX_DATA_PRINT(stderr,fixp);
-#endif
-}
-#endif
 /* ====================================================================== app.c */
 static char	lex [256];
 static const char symbol_chars[] =
@@ -30808,10 +30106,6 @@ static void	elf_file_symbol(const char *s)
 		symbol_remove(sym,&symbol_rootP,&symbol_lastP);
 		symbol_insert(sym,symbol_rootP,&symbol_rootP,&symbol_lastP);
 	}
-#ifdef DEBUG
-	verify_symbol_chain(symbol_rootP,symbol_lastP);
-#endif
-
 }
 
 /* Called from read.c:s_comm after we've parsed .comm symbol,size. Parse a
@@ -33758,10 +33052,6 @@ static		size_t  (htab_size) (htab_t htab)
 
 /* Return the current number of elements in given hash table. */
 #define htab_elements(htab)  ((htab)->n_elements - (htab)->n_deleted)
-static		size_t (htab_elements) (htab_t htab) {
-	return htab_elements(htab);
-}
-
 /* Return X % Y.  */
 static inline	hashval_t htab_mod_1(hashval_t x,hashval_t y,
 				hashval_t inv ATTRIBUTE_UNUSED,
@@ -33769,23 +33059,6 @@ static inline	hashval_t htab_mod_1(hashval_t x,hashval_t y,
 {
 	/* The multiplicative inverses computed above are for 32-bit types,and
 	 * requires that we be able to compute a highpart multiply.  */
-#ifdef UNSIGNED_64BIT_TYPE
-ssss
-	__extension__ typedef UNSIGNED_64BIT_TYPE ull;
-	if (sizeof(hashval_t) * CHAR_BIT <= 32) {
-		hashval_t	t1   ,t2,t3,t4,q,r;
-
-		t1 = ((ull) x * inv) >> 32;
-		t2 = x - t1;
-		t3 = t2 >> 1;
-		t4 = t1 + t3;
-		q = t4 >> shift;
-		r = x - (q * y);
-
-		return r;
-	}
-#endif
-
 	/* Otherwise just use the native division routines.  */
 	return x % y;
 }
@@ -34790,27 +34063,6 @@ char           *getpwd(void)
  * find out which way is correct for a given host.
  */
 
-#ifdef TIME_WITH_SYS_TIME
-#include <sys/time.h>
-#include <time.h>
-#else
-#if HAVE_SYS_TIME_H
-#include <sys/time.h>
-#else
-#ifdef HAVE_TIME_H
-#include <time.h>
-#endif
-#endif
-#endif
-
-#if defined (HAVE_GETRUSAGE) && defined (HAVE_SYS_RESOURCE_H)
-#include <sys/resource.h>
-#endif
-
-#ifdef HAVE_TIMES
-#include <sys/times.h>
-#endif
-
 #ifndef RUSAGE_SELF
 #define RUSAGE_SELF 0
 #endif
@@ -34839,27 +34091,12 @@ char           *getpwd(void)
 
 static long	get_run_time(void)
 {
-#if defined (HAVE_GETRUSAGE) && defined (HAVE_SYS_RESOURCE_H)
-	struct rusage	rusage;
-
-	getrusage(RUSAGE_SELF,&rusage);
-	return (rusage.ru_utime.tv_sec * 1000000 + rusage.ru_utime.tv_usec
-		+ rusage.ru_stime.tv_sec * 1000000 + rusage.ru_stime.tv_usec);
-#else				/* ! HAVE_GETRUSAGE */
-#ifdef HAVE_TIMES
-	struct tms	tms;
-
-	times(&tms);
-	return (tms.tms_utime + tms.tms_stime) * (1000000 / GNU_HZ);
-#else				/* ! HAVE_TIMES */
 	/* Fall back on clock and hope it's correctly implemented. */
 	const long	clocks_per_sec = CLOCKS_PER_SEC;
 	if (clocks_per_sec <= 1000000)
 		return clock() * (1000000 / clocks_per_sec);
 	else
 		return clock() / clocks_per_sec;
-#endif				/* HAVE_TIMES */
-#endif				/* HAVE_GETRUSAGE */
 }
 /*
  * xstrerror.c -- jacket routine for more robust strerror() usage. Fri Jun 16
@@ -34946,22 +34183,6 @@ static void	xexit(int code)
 #if defined(HAVE_CANONICALIZE_FILE_NAME) \
     && defined(NEED_DECLARATION_CANONICALIZE_FILE_NAME)
 extern char    *canonicalize_file_name(const char *);
-#endif
-
-#if defined(HAVE_REALPATH)
-#if defined (PATH_MAX)
-#define REALPATH_LIMIT PATH_MAX
-#else
-#if defined (MAXPATHLEN)
-#define REALPATH_LIMIT MAXPATHLEN
-#endif
-#endif
-#else
-/* cygwin has realpath,so it won't get here.  */
-#if defined (_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>		/* for GetFullPathName */
-#endif
 #endif
 
 static void	xatexit_cleanup(void);
@@ -35435,11 +34656,6 @@ static bool	elf_map_symbols(bfd * abfd,unsigned int *pnum_locals)
 	asection       *asect;
 	asymbol       **new_syms;
 	size_t		amt;
-
-#ifdef DEBUG
-	fprintf(stderr,"elf_map_symbols\n");
-	fflush(stderr);
-#endif
 
 	for (asect = abfd->sections; asect; asect = asect->next) {
 		if (max_index < asect->index)
@@ -36531,24 +35747,14 @@ static bool	assign_section_numbers(bfd * abfd,void *link_info)
 			d = elf_section_data(sec);
 
 			if (d->this_hdr.sh_type == SHT_GROUP) {
-				if (sec->flags & SEC_LINKER_CREATED) {
-					/*
-					 * Remove the linker created SHT_GROUP
-					 * sections.
-					 */
-					bfd_section_list_remove(abfd,sec);
-					abfd->section_count--;
-				} else
-					d->this_idx = section_number++;
+				d->this_idx = section_number++;
 			}
 			/* Count relocations.  */
 			reloc_count += sec->reloc_count;
 		}
 
-		/*
-		 * Set/clear HAS_RELOC depending on whether there are
-		 * relocations.
-		 */
+		/* Set/clear HAS_RELOC depending on whether there are
+		 * relocations.  */
 		if (reloc_count == 0)
 			abfd->flags &= ~HAS_RELOC;
 		else
@@ -37245,9 +36451,6 @@ static bool	elf_write_shdrs_and_ehdr(bfd * abfd)
 
 	/* swap the header before spitting it out...  */
 
-#if DEBUG & 1
-	elf_debug_file(i_ehdrp);
-#endif
 	elf_swap_ehdr_out(abfd,i_ehdrp,&x_ehdr);
 	amt = sizeof(x_ehdr);
 	if (Seek(abfd,(file_ptr) 0,SEEK_SET) != 0
@@ -37275,9 +36478,6 @@ static bool	elf_write_shdrs_and_ehdr(bfd * abfd)
 		return false;
 
 	for (count = 0; count < i_ehdrp->e_shnum; i_shdrp++,count++) {
-#if DEBUG & 2
-		elf_debug_section(count,*i_shdrp);
-#endif
 		elf_swap_shdr_out(abfd,*i_shdrp,x_shdrp + count);
 	}
 	amt = (size_t) i_ehdrp->e_shnum * sizeof(*x_shdrp);
@@ -37332,16 +36532,6 @@ static int	_bfd_elf_symbol_from_bfd_symbol(bfd * abfd,asymbol ** asym_ptr_ptr)
 		bfd_set_error(bfd_error_no_symbols);
 		return -1;
 	}
-#if DEBUG & 4
-	{
-		fprintf(stderr,
-		"elf_symbol_from_bfd_symbol 0x%.8lx,name = %s,sym num = %d,"
-			" flags = 0x%.8x\n",
-			(long)asym_ptr,asym_ptr->name,idx,flags);
-		fflush(stderr);
-	}
-#endif
-
 	return idx;
 }
 static void	elf_write_relocs(asection * sec,void *data)
@@ -38987,11 +38177,6 @@ static void	bfd_rename_section(asection * sec,const char *newname)
 	bfd_hash_rename(&sec->owner->section_htab,newname,&sh->root);
 }
 /* Compressed section support (intended for debug sections). */
-#include <zlib.h>
-#ifdef HAVE_ZSTD
-#include <zstd.h>
-#endif
-
 #define MAX_COMPRESSION_HEADER_SIZE 24
 
 /* FUNCTION bfd_update_compression_header

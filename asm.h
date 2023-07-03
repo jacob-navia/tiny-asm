@@ -1,9 +1,9 @@
 /* as.h - global header file
    Copyright (C) 1987-2023 Free Software Foundation, Inc.
 
-   This file is part of GAS, the GNU Assembler.
+   This file is part of tiny-GAS, the tiny GNU Assembler.
 
-   GAS is free software; you can redistribute it and/or modify
+   tiny-GAS is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 3, or (at your option)
    any later version.
@@ -96,6 +96,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
+#include <wchar.h>
+#include <zlib.h>
 
 #include "getopt.h"
 /* Compiler compatibility macros */
@@ -116,17 +118,6 @@
 #define GCC_VERSION (__GNUC__ * 1000 + __GNUC_MINOR__)
 #endif /* GCC_VERSION */
 
-/* Attribute __malloc__ on functions was valid as of gcc 2.96. */
-#ifndef ATTRIBUTE_MALLOC
-# if (GCC_VERSION >= 2096)
-#  define ATTRIBUTE_MALLOC __attribute__ ((__malloc__))
-# else
-#  define ATTRIBUTE_MALLOC
-# endif /* GNUC >= 2.96 */
-#endif /* ATTRIBUTE_MALLOC */
-
-/* Attributes on labels were valid as of gcc 2.93 and g++ 4.5.  For
-   g++ an attribute on a label must be followed by a semicolon.  */
 #ifndef ATTRIBUTE_UNUSED_LABEL
 # ifndef __cplusplus
 #  if GCC_VERSION >= 2093
@@ -153,14 +144,6 @@
 #define ATTRIBUTE_UNUSED
 #endif
 #endif /* ATTRIBUTE_UNUSED */
-
-/* Before GCC 3.4, the C++ frontend couldn't parse attributes placed after the
-   identifier name.  */
-#if ! defined(__cplusplus) || (GCC_VERSION >= 3004)
-# define ARG_UNUSED(NAME) NAME ATTRIBUTE_UNUSED
-#else /* !__cplusplus || GNUC >= 3.4 */
-# define ARG_UNUSED(NAME) NAME
-#endif /* !__cplusplus || GNUC >= 3.4 */
 
 #ifndef ATTRIBUTE_NORETURN
 #define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
@@ -206,151 +189,14 @@
 #define ATTRIBUTE_PRINTF_5 ATTRIBUTE_PRINTF(5, 6)
 #endif /* ATTRIBUTE_PRINTF */
 
-/* Use ATTRIBUTE_FPTR_PRINTF when the format attribute is to be set on
-   a function pointer.  Format attributes were allowed on function
-   pointers as of gcc 3.1.  */
-#ifndef ATTRIBUTE_FPTR_PRINTF
-# if (GCC_VERSION >= 3001)
-#  define ATTRIBUTE_FPTR_PRINTF(m, n) ATTRIBUTE_PRINTF(m, n)
-# else
-#  define ATTRIBUTE_FPTR_PRINTF(m, n)
-# endif /* GNUC >= 3.1 */
-# define ATTRIBUTE_FPTR_PRINTF_1 ATTRIBUTE_FPTR_PRINTF(1, 2)
-# define ATTRIBUTE_FPTR_PRINTF_2 ATTRIBUTE_FPTR_PRINTF(2, 3)
-# define ATTRIBUTE_FPTR_PRINTF_3 ATTRIBUTE_FPTR_PRINTF(3, 4)
-# define ATTRIBUTE_FPTR_PRINTF_4 ATTRIBUTE_FPTR_PRINTF(4, 5)
-# define ATTRIBUTE_FPTR_PRINTF_5 ATTRIBUTE_FPTR_PRINTF(5, 6)
-#endif /* ATTRIBUTE_FPTR_PRINTF */
-
-/* Use ATTRIBUTE_NULL_PRINTF when the format specifier may be NULL.  A
-   NULL format specifier was allowed as of gcc 3.3.  */
-#ifndef ATTRIBUTE_NULL_PRINTF
-# if (GCC_VERSION >= 3003)
-#  define ATTRIBUTE_NULL_PRINTF(m, n) __attribute__ ((__format__ (__printf__, m, n)))
-# else
-#  define ATTRIBUTE_NULL_PRINTF(m, n)
-# endif /* GNUC >= 3.3 */
-# define ATTRIBUTE_NULL_PRINTF_1 ATTRIBUTE_NULL_PRINTF(1, 2)
-# define ATTRIBUTE_NULL_PRINTF_2 ATTRIBUTE_NULL_PRINTF(2, 3)
-# define ATTRIBUTE_NULL_PRINTF_3 ATTRIBUTE_NULL_PRINTF(3, 4)
-# define ATTRIBUTE_NULL_PRINTF_4 ATTRIBUTE_NULL_PRINTF(4, 5)
-# define ATTRIBUTE_NULL_PRINTF_5 ATTRIBUTE_NULL_PRINTF(5, 6)
-#endif /* ATTRIBUTE_NULL_PRINTF */
-
-/* Attribute `sentinel' was valid as of gcc 3.5.  */
-#ifndef ATTRIBUTE_SENTINEL
-# if (GCC_VERSION >= 3005)
-#  define ATTRIBUTE_SENTINEL __attribute__ ((__sentinel__))
-# else
-#  define ATTRIBUTE_SENTINEL
-# endif /* GNUC >= 3.5 */
-#endif /* ATTRIBUTE_SENTINEL */
-
-
-#ifndef ATTRIBUTE_ALIGNED_ALIGNOF
-# if (GCC_VERSION >= 3000)
-#  define ATTRIBUTE_ALIGNED_ALIGNOF(m) __attribute__ ((__aligned__ (__alignof__ (m))))
-# else
-#  define ATTRIBUTE_ALIGNED_ALIGNOF(m)
-# endif /* GNUC >= 3.0 */
-#endif /* ATTRIBUTE_ALIGNED_ALIGNOF */
-
 /* Useful for structures whose layout must match some binary specification
    regardless of the alignment and padding qualities of the compiler.  */
 #ifndef ATTRIBUTE_PACKED
 # define ATTRIBUTE_PACKED __attribute__ ((packed))
 #endif
 
-/* Attribute `hot' and `cold' was valid as of gcc 4.3.  */
-#ifndef ATTRIBUTE_COLD
-# if (GCC_VERSION >= 4003)
-#  define ATTRIBUTE_COLD __attribute__ ((__cold__))
-# else
-#  define ATTRIBUTE_COLD
-# endif /* GNUC >= 4.3 */
-#endif /* ATTRIBUTE_COLD */
-#ifndef ATTRIBUTE_HOT
-# if (GCC_VERSION >= 4003)
-#  define ATTRIBUTE_HOT __attribute__ ((__hot__))
-# else
-#  define ATTRIBUTE_HOT
-# endif /* GNUC >= 4.3 */
-#endif /* ATTRIBUTE_HOT */
-
-/* Attribute 'no_sanitize_undefined' was valid as of gcc 4.9.  */
-#ifndef ATTRIBUTE_NO_SANITIZE_UNDEFINED
-# if (GCC_VERSION >= 4009)
-#  define ATTRIBUTE_NO_SANITIZE_UNDEFINED __attribute__ ((no_sanitize_undefined))
-# else
-#  define ATTRIBUTE_NO_SANITIZE_UNDEFINED
-# endif /* GNUC >= 4.9 */
-#endif /* ATTRIBUTE_NO_SANITIZE_UNDEFINED */
-
-/* Attribute 'nonstring' was valid as of gcc 8.  */
-#ifndef ATTRIBUTE_NONSTRING
-# if GCC_VERSION >= 8000
-#  define ATTRIBUTE_NONSTRING __attribute__ ((__nonstring__))
-# else
-#  define ATTRIBUTE_NONSTRING
-# endif
-#endif
-
-/* Attribute `alloc_size' was valid as of gcc 4.3.  */
-#ifndef ATTRIBUTE_RESULT_SIZE_1
-# if (GCC_VERSION >= 4003)
-#  define ATTRIBUTE_RESULT_SIZE_1 __attribute__ ((alloc_size (1)))
-# else
-#  define ATTRIBUTE_RESULT_SIZE_1
-#endif
-#endif
-
-#ifndef ATTRIBUTE_RESULT_SIZE_2
-# if (GCC_VERSION >= 4003)
-#  define ATTRIBUTE_RESULT_SIZE_2 __attribute__ ((alloc_size (2)))
-# else
-#  define ATTRIBUTE_RESULT_SIZE_2
-#endif
-#endif
-
-#ifndef ATTRIBUTE_RESULT_SIZE_1_2
-# if (GCC_VERSION >= 4003)
-#  define ATTRIBUTE_RESULT_SIZE_1_2 __attribute__ ((alloc_size (1, 2)))
-# else
-#  define ATTRIBUTE_RESULT_SIZE_1_2
-#endif
-#endif
-
-/* Attribute `warn_unused_result' was valid as of gcc 3.3.  */
-#ifndef ATTRIBUTE_WARN_UNUSED_RESULT
-# if GCC_VERSION >= 3003
-#  define ATTRIBUTE_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
-# else
-#  define ATTRIBUTE_WARN_UNUSED_RESULT
-# endif
-#endif
-
-/* We use __extension__ in some places to suppress -pedantic warnings
-   about GCC extensions.  This feature didn't work properly before
-   gcc 2.8.  */
-#if GCC_VERSION < 2008
-#define __extension__
-#endif
-
-/* This is used to declare a const variable which should be visible
-   outside of the current compilation unit.  Use it as
-     EXPORTED_CONST int i = 1;
-   This is because the semantics of const are different in C and C++.
-   "extern const" is permitted in C but it looks strange, and gcc
-   warns about it when -Wc++-compat is not used.  */
-#ifdef __cplusplus
-#define EXPORTED_CONST extern const
-#else
-#define EXPORTED_CONST const
-#endif
-
 /* Be conservative and only use enum bitfields with C++ or GCC.
    FIXME: provide a complete autoconf test for buggy enum bitfields.  */
-
 #ifdef __cplusplus
 #define ENUM_BITFIELD(TYPE) enum TYPE
 #elif (GCC_VERSION > 2000)
@@ -358,38 +204,6 @@
 #else
 #define ENUM_BITFIELD(TYPE) unsigned int
 #endif
-
-#if defined(__cplusplus) && __cpp_constexpr >= 200704
-#define CONSTEXPR constexpr
-#else
-#define CONSTEXPR
-#endif
-
-/* A macro to disable the copy constructor and assignment operator.
-   When building with C++11 and above, the methods are explicitly
-   deleted, causing a compile-time error if something tries to copy.
-   For C++03, this just declares the methods, causing a link-time
-   error if the methods end up called (assuming you don't
-   define them).  For C++03, for best results, place the macro
-   under the private: access specifier, like this,
-
-   class name_lookup
-   {
-     private:
-       DISABLE_COPY_AND_ASSIGN (name_lookup);
-   };
-
-   so that most attempts at copy are caught at compile-time.  */
-
-#if defined(__cplusplus) && __cplusplus >= 201103
-#define DISABLE_COPY_AND_ASSIGN(TYPE)		\
-  TYPE (const TYPE&) = delete;			\
-  void operator= (const TYPE &) = delete
-  #else
-#define DISABLE_COPY_AND_ASSIGN(TYPE)		\
-  TYPE (const TYPE&);				\
-  void operator= (const TYPE &)
-#endif /* __cplusplus >= 201103 */
 
 #endif	/* ansidecl.h	*/
 /* The first getopt value for machine-independent long options.
@@ -416,65 +230,17 @@
 #ifndef __BFD_H_SEEN__
 #define __BFD_H_SEEN__
 
-/* Symbol concatenation utilities. */
-#ifndef SYM_CAT_H
-#define SYM_CAT_H
-
-#define CONCAT2(a,b)	 a##b
-#define CONCAT3(a,b,c)	 a##b##c
-#define CONCAT4(a,b,c,d) a##b##c##d
-#define CONCAT5(a,b,c,d,e) a##b##c##d##e
-#define CONCAT6(a,b,c,d,e,f) a##b##c##d##e##f
-#define STRINGX(s) #s
-#define XCONCAT2(a,b)     CONCAT2(a,b)
-#define XCONCAT3(a,b,c)   CONCAT3(a,b,c)
-#define XCONCAT4(a,b,c,d) CONCAT4(a,b,c,d)
-#define XCONCAT5(a,b,c,d,e) CONCAT5(a,b,c,d,e)
-#define XCONCAT6(a,b,c,d,e,f) CONCAT6(a,b,c,d,e,f)
-/* Note the layer of indirection here is typically used to allow
-   stringification of the expansion of macros.  I.e. "#define foo
-   bar", "XSTRING(foo)", to yield "bar".  Be aware that this only
-   works for __STDC__, not for traditional C which will still resolve
-   to "foo".  */
-#define XSTRING(s) STRINGX(s) 
-#endif /* SYM_CAT_H */
-#if defined (__STDC__) || defined (ALMOST_STDC) || defined (HAVE_STRINGIZE)
-#ifndef SABER
-/* This hack is to avoid a problem with some strict ANSI C preprocessors.
-   The problem is, "32_" is not a valid preprocessing token, and we don't
-   want extra underscores (e.g., "nlm_32_").  The XCONCAT2 macro will
-   cause the inner CONCAT2 macros to be evaluated first, producing
-   still-valid pp-tokens.  Then the final concatenation can be done.  */
-#undef CONCAT4
-#define CONCAT4(a,b,c,d) XCONCAT2(CONCAT2(a,b),CONCAT2(c,d))
-#endif
-#endif
-
 /* This is a utility macro to handle the situation where the code
    wants to place a constant string into the code, followed by a
    comma and then the length of the string.  Doing this by hand
    is error prone, so using this macro is safer.  */
 #define STRING_COMMA_LEN(STR) (STR), (sizeof (STR) - 1)
-#define BFD_SUPPORTS_PLUGINS 1
-
-/* The word size used by BFD on the host.  This may be 64 with a 32
-   bit target if the host is 64 bit, or if other 64 bit targets have
-   been selected with --enable-targets, or if --enable-64-bit-bfd.  */
-#define BFD_ARCH_SIZE 64
-
-/* The word size of the default bfd target.  */
-#define BFD_DEFAULT_TARGET_SIZE 64
 
 /* Boolean type used in bfd.
    General rule: Functions which are bfd_boolean return TRUE on
    success and FALSE on failure (unless they're a predicate).  */
 # define FALSE 0
 # define TRUE 1
-
-/* Silence "applying zero offset to null pointer" UBSAN warnings.  */
-#define PTR_ADD(P,A) ((A) != 0 ? (P) + (A) : (P))
-/* Also prevent non-zero offsets from being applied to a null pointer.  */
-#define NPTR_ADD(P,A) ((P) != NULL ? (P) + (A) : (P))
 
 /* Represent a target address.  Also used as a generic unsigned type
    which is guaranteed to be big enough to hold any arithmetic types
@@ -488,8 +254,6 @@ typedef uint64_t bfd_vma;
 typedef int64_t bfd_signed_vma;
 typedef uint64_t symvalue;
 
-#define HALF_BFD_SIZE_TYPE \
-  (((size_t) 1) << (8 * sizeof (size_t) / 2))
 /* An offset into a file.  BFD always uses the largest possible offset
    based on the build time availability of fseek, fseeko, or fseeko64.  */
 typedef int64_t file_ptr;
@@ -505,9 +269,6 @@ typedef struct bfd_section *sec_ptr;
 typedef struct reloc_cache_entry arelent;
 struct orl;
 
-#define	align_power(addr, align)	\
-  (((addr) + ((bfd_vma) 1 << (align)) - 1) & (-((bfd_vma) 1 << (align))))
-
 /* Align an address upward to a boundary, expressed as a number of bytes.
    E.g. align to an 8-byte boundary with argument of 8.  Take care never
    to wrap around if the address is within boundary-1 of the end of the
@@ -518,7 +279,6 @@ struct orl;
    : ~ (bfd_vma) 0)
 
 /* Return TRUE if the start of STR matches PREFIX, FALSE otherwise.  */
-
 static inline bool startswith (const char *str, const char *prefix)
 {
   return strncmp (str, prefix, strlen (prefix)) == 0;
@@ -558,7 +318,6 @@ static void bfd_putl64 (bfd_vma src, void *p);
    : (bits) == 32 ? bfd_putl32 (val, ptr)        \
    : (bits) == 64 ? bfd_putl64 (val, ptr)        \
    : (abort (), (void) 0))
-
 
 /* Byte swapping macros for file header data.  */
 #define bfd_h_put_signed_16 bfd_putl16
@@ -2289,32 +2048,16 @@ the section containing the relocation.  It depends on the specific target.  */
   BFD_RELOC_SIZE32, BFD_RELOC_SIZE64,
 
 /* Relocations used by 68K ELF.  */
-  BFD_RELOC_68K_GLOB_DAT,
-  BFD_RELOC_68K_JMP_SLOT,
-  BFD_RELOC_68K_RELATIVE,
-  BFD_RELOC_68K_TLS_GD32,
-  BFD_RELOC_68K_TLS_GD16,
-  BFD_RELOC_68K_TLS_GD8,
-  BFD_RELOC_68K_TLS_LDM32,
-  BFD_RELOC_68K_TLS_LDM16,
-  BFD_RELOC_68K_TLS_LDM8,
-  BFD_RELOC_68K_TLS_LDO32,
-  BFD_RELOC_68K_TLS_LDO16,
-  BFD_RELOC_68K_TLS_LDO8,
-  BFD_RELOC_68K_TLS_IE32,
-  BFD_RELOC_68K_TLS_IE16,
-  BFD_RELOC_68K_TLS_IE8,
-  BFD_RELOC_68K_TLS_LE32,
-  BFD_RELOC_68K_TLS_LE16,
-  BFD_RELOC_68K_TLS_LE8,
+  BFD_RELOC_68K_GLOB_DAT, BFD_RELOC_68K_JMP_SLOT, BFD_RELOC_68K_RELATIVE,
+  BFD_RELOC_68K_TLS_GD32, BFD_RELOC_68K_TLS_GD16, BFD_RELOC_68K_TLS_GD8,
+  BFD_RELOC_68K_TLS_LDM32, BFD_RELOC_68K_TLS_LDM16, BFD_RELOC_68K_TLS_LDM8,
+  BFD_RELOC_68K_TLS_LDO32, BFD_RELOC_68K_TLS_LDO16, BFD_RELOC_68K_TLS_LDO8,
+  BFD_RELOC_68K_TLS_IE32, BFD_RELOC_68K_TLS_IE16, BFD_RELOC_68K_TLS_IE8,
+  BFD_RELOC_68K_TLS_LE32, BFD_RELOC_68K_TLS_LE16, BFD_RELOC_68K_TLS_LE8,
 
 /* Linkage-table relative.  */
-  BFD_RELOC_32_BASEREL,
-  BFD_RELOC_16_BASEREL,
-  BFD_RELOC_LO16_BASEREL,
-  BFD_RELOC_HI16_BASEREL,
-  BFD_RELOC_HI16_S_BASEREL,
-  BFD_RELOC_8_BASEREL,
+  BFD_RELOC_32_BASEREL, BFD_RELOC_16_BASEREL, BFD_RELOC_LO16_BASEREL,
+  BFD_RELOC_HI16_BASEREL, BFD_RELOC_HI16_S_BASEREL, BFD_RELOC_8_BASEREL,
   BFD_RELOC_RVA,
 
 /* These PC-relative relocations are stored as word displacements --
@@ -2323,25 +2066,18 @@ displacement (<<32_PCREL_S2>> -- 32 bits, shifted 2) is used on the
 SPARC.  (SPARC tools generally refer to this as <<WDISP30>>.)  The
 signed 16-bit displacement is used on the MIPS, and the 23-bit
 displacement is used on the Alpha.  */
-  BFD_RELOC_32_PCREL_S2,
-  BFD_RELOC_16_PCREL_S2,
-  BFD_RELOC_23_PCREL_S2,
+  BFD_RELOC_32_PCREL_S2, BFD_RELOC_16_PCREL_S2, BFD_RELOC_23_PCREL_S2,
 
 /* High 22 bits and low 10 bits of 32-bit value, placed into lower bits of
 the target word.  These are used on the SPARC.  */
-  BFD_RELOC_HI22,
-  BFD_RELOC_LO10,
+  BFD_RELOC_HI22, BFD_RELOC_LO10,
 
 /* For systems that allocate a Global Pointer register, these are
 displacements off that register.  These relocation types are
 handled specially, because the value the register will have is
 decided relatively late.  */
-  BFD_RELOC_GPREL16,
-  BFD_RELOC_GPREL32,
-
-  BFD_RELOC_NONE,
-  BFD_RELOC_VTABLE_INHERIT,
-  BFD_RELOC_VTABLE_ENTRY,
+  BFD_RELOC_GPREL16, BFD_RELOC_GPREL32,
+  BFD_RELOC_NONE, BFD_RELOC_VTABLE_INHERIT, BFD_RELOC_VTABLE_ENTRY,
 
 /* RISC-V relocations.  */
   BFD_RELOC_RISCV_HI20=1321, BFD_RELOC_RISCV_PCREL_HI20, BFD_RELOC_RISCV_PCREL_LO12_I,
@@ -2363,7 +2099,6 @@ decided relatively late.  */
 
   BFD_RELOC_UNUSED };
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
-
 static reloc_howto_type *riscv_reloc_type_lookup (bfd *abfd, bfd_reloc_code_real_type code);
 static reloc_howto_type *riscv_reloc_name_lookup (bfd *abfd, const char *reloc_name);
 static void riscv_init_ext_order(void);
@@ -5049,22 +4784,12 @@ struct elf_obj_tdata
 #define elf_local_got_refcounts(bfd) (elf_tdata(bfd) -> local_got.refcounts)
 #define elf_local_got_offsets(bfd) (elf_tdata(bfd) -> local_got.offsets)
 #define elf_local_got_ents(bfd) (elf_tdata(bfd) -> local_got.ents)
-#define elf_dt_name(bfd)	(elf_tdata(bfd) -> dt_name)
-#define elf_dt_audit(bfd)	(elf_tdata(bfd) -> dt_audit)
-#define elf_dyn_lib_class(bfd)	(elf_tdata(bfd) -> dyn_lib_class)
-#define elf_bad_symtab(bfd)	(elf_tdata(bfd) -> bad_symtab)
-#define elf_flags_init(bfd)	(elf_tdata(bfd) -> o->flags_init)
 #define elf_known_obj_attributes(bfd) (elf_tdata (bfd) -> known_obj_attributes)
 #define elf_other_obj_attributes(bfd) (elf_tdata (bfd) -> other_obj_attributes)
 #define elf_known_obj_attributes_proc(bfd) \
   (elf_known_obj_attributes (bfd) [OBJ_ATTR_PROC])
 #define elf_other_obj_attributes_proc(bfd) \
   (elf_other_obj_attributes (bfd) [OBJ_ATTR_PROC])
-#define elf_properties(bfd) (elf_tdata (bfd) -> properties)
-#define elf_has_no_copy_on_protected(bfd) \
-  (elf_tdata(bfd) -> has_no_copy_on_protected)
-#define elf_has_indirect_extern_access(bfd) \
-  (elf_tdata(bfd) -> has_indirect_extern_access)
 
 static unsigned int _bfd_elf_section_from_bfd_section
   (bfd *, asection *);
@@ -5134,2775 +4859,919 @@ enum linkonce_type {
 
 //----------------------------------------------------include "riscv-opc.h"
 /* riscv-opc.h.  RISC-V instruction opcode and CSR macros. */
-#ifndef RISCV_ENCODING_H
-#define RISCV_ENCODING_H
-/* Instruction opcode macros.  */
-#define MATCH_SLLI_RV32 0x1013
-#define MASK_SLLI_RV32  0xfe00707f
-#define MATCH_SRLI_RV32 0x5013
-#define MASK_SRLI_RV32  0xfe00707f
-#define MATCH_SRAI_RV32 0x40005013
-#define MASK_SRAI_RV32  0xfe00707f
-#define MATCH_FRFLAGS 0x102073
-#define MASK_FRFLAGS  0xfffff07f
-#define MATCH_FSFLAGS 0x101073
-#define MASK_FSFLAGS  0xfff0707f
-#define MATCH_FSFLAGSI 0x105073
-#define MASK_FSFLAGSI  0xfff0707f
-#define MATCH_FRRM 0x202073
-#define MASK_FRRM  0xfffff07f
-#define MATCH_FSRM 0x201073
-#define MASK_FSRM  0xfff0707f
-#define MATCH_FSRMI 0x205073
-#define MASK_FSRMI  0xfff0707f
-#define MATCH_FSCSR 0x301073
-#define MASK_FSCSR  0xfff0707f
-#define MATCH_FRCSR 0x302073
-#define MASK_FRCSR  0xfffff07f
-#define MATCH_RDCYCLE 0xc0002073
-#define MASK_RDCYCLE  0xfffff07f
-#define MATCH_RDTIME 0xc0102073
-#define MASK_RDTIME  0xfffff07f
-#define MATCH_RDINSTRET 0xc0202073
-#define MASK_RDINSTRET  0xfffff07f
-#define MATCH_RDCYCLEH 0xc8002073
-#define MASK_RDCYCLEH  0xfffff07f
-#define MATCH_RDTIMEH 0xc8102073
-#define MASK_RDTIMEH  0xfffff07f
-#define MATCH_RDINSTRETH 0xc8202073
-#define MASK_RDINSTRETH  0xfffff07f
-#define MATCH_SCALL 0x73
-#define MASK_SCALL  0xffffffff
-#define MATCH_SBREAK 0x100073
-#define MASK_SBREAK  0xffffffff
-#define MATCH_BEQ 0x63
-#define MASK_BEQ  0x707f
-#define MATCH_BNE 0x1063
-#define MASK_BNE  0x707f
-#define MATCH_BLT 0x4063
-#define MASK_BLT  0x707f
-#define MATCH_BGE 0x5063
-#define MASK_BGE  0x707f
-#define MATCH_BLTU 0x6063
-#define MASK_BLTU  0x707f
-#define MATCH_BGEU 0x7063
-#define MASK_BGEU  0x707f
-#define MATCH_JALR 0x67
-#define MASK_JALR  0x707f
-#define MATCH_JAL 0x6f
-#define MASK_JAL  0x7f
-#define MATCH_LUI 0x37
-#define MASK_LUI  0x7f
-#define MATCH_AUIPC 0x17
-#define MASK_AUIPC  0x7f
-#define MATCH_ADDI 0x13
-#define MASK_ADDI  0x707f
-#define MATCH_SLLI 0x1013
-#define MASK_SLLI  0xfc00707f
-#define MATCH_SLTI 0x2013
-#define MASK_SLTI  0x707f
-#define MATCH_SLTIU 0x3013
-#define MASK_SLTIU  0x707f
-#define MATCH_XORI 0x4013
-#define MASK_XORI  0x707f
-#define MATCH_SRLI 0x5013
-#define MASK_SRLI  0xfc00707f
-#define MATCH_SRAI 0x40005013
-#define MASK_SRAI  0xfc00707f
-#define MATCH_ORI 0x6013
-#define MASK_ORI  0x707f
-#define MATCH_ANDI 0x7013
-#define MASK_ANDI  0x707f
-#define MATCH_ADD 0x33
-#define MASK_ADD  0xfe00707f
-#define MATCH_SUB 0x40000033
-#define MASK_SUB  0xfe00707f
-#define MATCH_SLL 0x1033
-#define MASK_SLL  0xfe00707f
-#define MATCH_SLT 0x2033
-#define MASK_SLT  0xfe00707f
-#define MATCH_SLTU 0x3033
-#define MASK_SLTU  0xfe00707f
-#define MATCH_XOR 0x4033
-#define MASK_XOR  0xfe00707f
-#define MATCH_SRL 0x5033
-#define MASK_SRL  0xfe00707f
-#define MATCH_SRA 0x40005033
-#define MASK_SRA  0xfe00707f
-#define MATCH_OR 0x6033
-#define MASK_OR  0xfe00707f
-#define MATCH_AND 0x7033
-#define MASK_AND  0xfe00707f
-#define MATCH_ADDIW 0x1b
-#define MASK_ADDIW  0x707f
-#define MATCH_SLLIW 0x101b
-#define MASK_SLLIW  0xfe00707f
-#define MATCH_SRLIW 0x501b
-#define MASK_SRLIW  0xfe00707f
-#define MATCH_SRAIW 0x4000501b
-#define MASK_SRAIW  0xfe00707f
-#define MATCH_ADDW 0x3b
-#define MASK_ADDW  0xfe00707f
-#define MATCH_SUBW 0x4000003b
-#define MASK_SUBW  0xfe00707f
-#define MATCH_SLLW 0x103b
-#define MASK_SLLW  0xfe00707f
-#define MATCH_SRLW 0x503b
-#define MASK_SRLW  0xfe00707f
-#define MATCH_SRAW 0x4000503b
-#define MASK_SRAW  0xfe00707f
-#define MATCH_LB 0x3
-#define MASK_LB  0x707f
-#define MATCH_LH 0x1003
-#define MASK_LH  0x707f
-#define MATCH_LW 0x2003
-#define MASK_LW  0x707f
-#define MATCH_LD 0x3003
-#define MASK_LD  0x707f
-#define MATCH_LBU 0x4003
-#define MASK_LBU  0x707f
-#define MATCH_LHU 0x5003
-#define MASK_LHU  0x707f
-#define MATCH_LWU 0x6003
-#define MASK_LWU  0x707f
-#define MATCH_SB 0x23
-#define MASK_SB  0x707f
-#define MATCH_SH 0x1023
-#define MASK_SH  0x707f
-#define MATCH_SW 0x2023
-#define MASK_SW  0x707f
-#define MATCH_SD 0x3023
-#define MASK_SD  0x707f
-#define MATCH_PAUSE 0x0100000f
-#define MASK_PAUSE  0xffffffff
-#define MATCH_FENCE 0xf
-#define MASK_FENCE  0x707f
-#define MATCH_FENCE_I 0x100f
-#define MASK_FENCE_I  0x707f
-#define MATCH_FENCE_TSO 0x8330000f
-#define MASK_FENCE_TSO  0xfff0707f
-#define MATCH_MUL 0x2000033
-#define MASK_MUL  0xfe00707f
-#define MATCH_MULH 0x2001033
-#define MASK_MULH  0xfe00707f
-#define MATCH_MULHSU 0x2002033
-#define MASK_MULHSU  0xfe00707f
-#define MATCH_MULHU 0x2003033
-#define MASK_MULHU  0xfe00707f
-#define MATCH_DIV 0x2004033
-#define MASK_DIV  0xfe00707f
-#define MATCH_DIVU 0x2005033
-#define MASK_DIVU  0xfe00707f
-#define MATCH_REM 0x2006033
-#define MASK_REM  0xfe00707f
-#define MATCH_REMU 0x2007033
-#define MASK_REMU  0xfe00707f
-#define MATCH_MULW 0x200003b
-#define MASK_MULW  0xfe00707f
-#define MATCH_DIVW 0x200403b
-#define MASK_DIVW  0xfe00707f
-#define MATCH_DIVUW 0x200503b
-#define MASK_DIVUW  0xfe00707f
-#define MATCH_REMW 0x200603b
-#define MASK_REMW  0xfe00707f
-#define MATCH_REMUW 0x200703b
-#define MASK_REMUW  0xfe00707f
-#define MATCH_AMOADD_W 0x202f
-#define MASK_AMOADD_W  0xf800707f
-#define MATCH_AMOXOR_W 0x2000202f
-#define MASK_AMOXOR_W  0xf800707f
-#define MATCH_AMOOR_W 0x4000202f
-#define MASK_AMOOR_W  0xf800707f
-#define MATCH_AMOAND_W 0x6000202f
-#define MASK_AMOAND_W  0xf800707f
-#define MATCH_AMOMIN_W 0x8000202f
-#define MASK_AMOMIN_W  0xf800707f
-#define MATCH_AMOMAX_W 0xa000202f
-#define MASK_AMOMAX_W  0xf800707f
-#define MATCH_AMOMINU_W 0xc000202f
-#define MASK_AMOMINU_W  0xf800707f
-#define MATCH_AMOMAXU_W 0xe000202f
-#define MASK_AMOMAXU_W  0xf800707f
-#define MATCH_AMOSWAP_W 0x800202f
-#define MASK_AMOSWAP_W  0xf800707f
-#define MATCH_LR_W 0x1000202f
-#define MASK_LR_W  0xf9f0707f
-#define MATCH_SC_W 0x1800202f
-#define MASK_SC_W  0xf800707f
-#define MATCH_AMOADD_D 0x302f
-#define MASK_AMOADD_D  0xf800707f
-#define MATCH_AMOXOR_D 0x2000302f
-#define MASK_AMOXOR_D  0xf800707f
-#define MATCH_AMOOR_D 0x4000302f
-#define MASK_AMOOR_D  0xf800707f
-#define MATCH_AMOAND_D 0x6000302f
-#define MASK_AMOAND_D  0xf800707f
-#define MATCH_AMOMIN_D 0x8000302f
-#define MASK_AMOMIN_D  0xf800707f
-#define MATCH_AMOMAX_D 0xa000302f
-#define MASK_AMOMAX_D  0xf800707f
-#define MATCH_AMOMINU_D 0xc000302f
-#define MASK_AMOMINU_D  0xf800707f
-#define MATCH_AMOMAXU_D 0xe000302f
-#define MASK_AMOMAXU_D  0xf800707f
-#define MATCH_AMOSWAP_D 0x800302f
-#define MASK_AMOSWAP_D  0xf800707f
-#define MATCH_LR_D 0x1000302f
-#define MASK_LR_D  0xf9f0707f
-#define MATCH_SC_D 0x1800302f
-#define MASK_SC_D  0xf800707f
-#define MATCH_ECALL 0x73
-#define MASK_ECALL  0xffffffff
-#define MATCH_EBREAK 0x100073
-#define MASK_EBREAK  0xffffffff
-#define MATCH_URET 0x200073
-#define MASK_URET  0xffffffff
-#define MATCH_SRET 0x10200073
-#define MASK_SRET  0xffffffff
-#define MATCH_HRET 0x20200073
-#define MASK_HRET  0xffffffff
-#define MATCH_MRET 0x30200073
-#define MASK_MRET  0xffffffff
-#define MATCH_DRET 0x7b200073
-#define MASK_DRET  0xffffffff
-#define MATCH_SFENCE_VM 0x10400073
-#define MASK_SFENCE_VM  0xfff07fff
-#define MATCH_SFENCE_VMA 0x12000073
-#define MASK_SFENCE_VMA  0xfe007fff
-#define MATCH_WFI 0x10500073
-#define MASK_WFI  0xffffffff
-#define MATCH_CSRRW 0x1073
-#define MASK_CSRRW  0x707f
-#define MATCH_CSRRS 0x2073
-#define MASK_CSRRS  0x707f
-#define MATCH_CSRRC 0x3073
-#define MASK_CSRRC  0x707f
-#define MATCH_CSRRWI 0x5073
-#define MASK_CSRRWI  0x707f
-#define MATCH_CSRRSI 0x6073
-#define MASK_CSRRSI  0x707f
-#define MATCH_CSRRCI 0x7073
-#define MASK_CSRRCI  0x707f
-#define MATCH_FADD_S 0x53
-#define MASK_FADD_S  0xfe00007f
-#define MATCH_FSUB_S 0x8000053
-#define MASK_FSUB_S  0xfe00007f
-#define MATCH_FMUL_S 0x10000053
-#define MASK_FMUL_S  0xfe00007f
-#define MATCH_FDIV_S 0x18000053
-#define MASK_FDIV_S  0xfe00007f
-#define MATCH_FSGNJ_S 0x20000053
-#define MASK_FSGNJ_S  0xfe00707f
-#define MATCH_FSGNJN_S 0x20001053
-#define MASK_FSGNJN_S  0xfe00707f
-#define MATCH_FSGNJX_S 0x20002053
-#define MASK_FSGNJX_S  0xfe00707f
-#define MATCH_FMIN_S 0x28000053
-#define MASK_FMIN_S  0xfe00707f
-#define MATCH_FMAX_S 0x28001053
-#define MASK_FMAX_S  0xfe00707f
-#define MATCH_FSQRT_S 0x58000053
-#define MASK_FSQRT_S  0xfff0007f
-#define MATCH_FADD_D 0x2000053
-#define MASK_FADD_D  0xfe00007f
-#define MATCH_FSUB_D 0xa000053
-#define MASK_FSUB_D  0xfe00007f
-#define MATCH_FMUL_D 0x12000053
-#define MASK_FMUL_D  0xfe00007f
-#define MATCH_FDIV_D 0x1a000053
-#define MASK_FDIV_D  0xfe00007f
-#define MATCH_FSGNJ_D 0x22000053
-#define MASK_FSGNJ_D  0xfe00707f
-#define MATCH_FSGNJN_D 0x22001053
-#define MASK_FSGNJN_D  0xfe00707f
-#define MATCH_FSGNJX_D 0x22002053
-#define MASK_FSGNJX_D  0xfe00707f
-#define MATCH_FMIN_D 0x2a000053
-#define MASK_FMIN_D  0xfe00707f
-#define MATCH_FMAX_D 0x2a001053
-#define MASK_FMAX_D  0xfe00707f
-#define MATCH_FCVT_S_D 0x40100053
-#define MASK_FCVT_S_D  0xfff0007f
-#define MATCH_FCVT_D_S 0x42000053
-#define MASK_FCVT_D_S  0xfff0007f
-#define MATCH_FSQRT_D 0x5a000053
-#define MASK_FSQRT_D  0xfff0007f
-#define MATCH_FADD_Q 0x6000053
-#define MASK_FADD_Q  0xfe00007f
-#define MATCH_FSUB_Q 0xe000053
-#define MASK_FSUB_Q  0xfe00007f
-#define MATCH_FMUL_Q 0x16000053
-#define MASK_FMUL_Q  0xfe00007f
-#define MATCH_FDIV_Q 0x1e000053
-#define MASK_FDIV_Q  0xfe00007f
-#define MATCH_FSGNJ_Q 0x26000053
-#define MASK_FSGNJ_Q  0xfe00707f
-#define MATCH_FSGNJN_Q 0x26001053
-#define MASK_FSGNJN_Q  0xfe00707f
-#define MATCH_FSGNJX_Q 0x26002053
-#define MASK_FSGNJX_Q  0xfe00707f
-#define MATCH_FMIN_Q 0x2e000053
-#define MASK_FMIN_Q  0xfe00707f
-#define MATCH_FMAX_Q 0x2e001053
-#define MASK_FMAX_Q  0xfe00707f
-#define MATCH_FCVT_S_Q 0x40300053
-#define MASK_FCVT_S_Q  0xfff0007f
-#define MATCH_FCVT_Q_S 0x46000053
-#define MASK_FCVT_Q_S  0xfff0007f
-#define MATCH_FCVT_D_Q 0x42300053
-#define MASK_FCVT_D_Q  0xfff0007f
-#define MATCH_FCVT_Q_D 0x46100053
-#define MASK_FCVT_Q_D  0xfff0007f
-#define MATCH_FSQRT_Q 0x5e000053
-#define MASK_FSQRT_Q  0xfff0007f
-#define MATCH_FLE_S 0xa0000053
-#define MASK_FLE_S  0xfe00707f
-#define MATCH_FLT_S 0xa0001053
-#define MASK_FLT_S  0xfe00707f
-#define MATCH_FEQ_S 0xa0002053
-#define MASK_FEQ_S  0xfe00707f
-#define MATCH_FLE_D 0xa2000053
-#define MASK_FLE_D  0xfe00707f
-#define MATCH_FLT_D 0xa2001053
-#define MASK_FLT_D  0xfe00707f
-#define MATCH_FEQ_D 0xa2002053
-#define MASK_FEQ_D  0xfe00707f
-#define MATCH_FLE_Q 0xa6000053
-#define MASK_FLE_Q  0xfe00707f
-#define MATCH_FLT_Q 0xa6001053
-#define MASK_FLT_Q  0xfe00707f
-#define MATCH_FEQ_Q 0xa6002053
-#define MASK_FEQ_Q  0xfe00707f
-#define MATCH_FCVT_W_S 0xc0000053
-#define MASK_FCVT_W_S  0xfff0007f
-#define MATCH_FCVT_WU_S 0xc0100053
-#define MASK_FCVT_WU_S  0xfff0007f
-#define MATCH_FCVT_L_S 0xc0200053
-#define MASK_FCVT_L_S  0xfff0007f
-#define MATCH_FCVT_LU_S 0xc0300053
-#define MASK_FCVT_LU_S  0xfff0007f
-#define MATCH_FMV_X_S 0xe0000053
-#define MASK_FMV_X_S  0xfff0707f
-#define MATCH_FCLASS_S 0xe0001053
-#define MASK_FCLASS_S  0xfff0707f
-#define MATCH_FCVT_W_D 0xc2000053
-#define MASK_FCVT_W_D  0xfff0007f
-#define MATCH_FCVT_WU_D 0xc2100053
-#define MASK_FCVT_WU_D  0xfff0007f
-#define MATCH_FCVT_L_D 0xc2200053
-#define MASK_FCVT_L_D  0xfff0007f
-#define MATCH_FCVT_LU_D 0xc2300053
-#define MASK_FCVT_LU_D  0xfff0007f
-#define MATCH_FMV_X_D 0xe2000053
-#define MASK_FMV_X_D  0xfff0707f
-#define MATCH_FCLASS_D 0xe2001053
-#define MASK_FCLASS_D  0xfff0707f
-#define MATCH_FCVT_W_Q 0xc6000053
-#define MASK_FCVT_W_Q  0xfff0007f
-#define MATCH_FCVT_WU_Q 0xc6100053
-#define MASK_FCVT_WU_Q  0xfff0007f
-#define MATCH_FCVT_L_Q 0xc6200053
-#define MASK_FCVT_L_Q  0xfff0007f
-#define MATCH_FCVT_LU_Q 0xc6300053
-#define MASK_FCVT_LU_Q  0xfff0007f
-#define MATCH_FCLASS_Q 0xe6001053
-#define MASK_FCLASS_Q  0xfff0707f
-#define MATCH_FCVT_S_W 0xd0000053
-#define MASK_FCVT_S_W  0xfff0007f
-#define MATCH_FCVT_S_WU 0xd0100053
-#define MASK_FCVT_S_WU  0xfff0007f
-#define MATCH_FCVT_S_L 0xd0200053
-#define MASK_FCVT_S_L  0xfff0007f
-#define MATCH_FCVT_S_LU 0xd0300053
-#define MASK_FCVT_S_LU  0xfff0007f
-#define MATCH_FMV_S_X 0xf0000053
-#define MASK_FMV_S_X  0xfff0707f
-#define MATCH_FCVT_D_W 0xd2000053
-#define MASK_FCVT_D_W  0xfff0007f
-#define MATCH_FCVT_D_WU 0xd2100053
-#define MASK_FCVT_D_WU  0xfff0007f
-#define MATCH_FCVT_D_L 0xd2200053
-#define MASK_FCVT_D_L  0xfff0007f
-#define MATCH_FCVT_D_LU 0xd2300053
-#define MASK_FCVT_D_LU  0xfff0007f
-#define MATCH_FMV_D_X 0xf2000053
-#define MASK_FMV_D_X  0xfff0707f
-#define MATCH_FCVT_Q_W 0xd6000053
-#define MASK_FCVT_Q_W  0xfff0007f
-#define MATCH_FCVT_Q_WU 0xd6100053
-#define MASK_FCVT_Q_WU  0xfff0007f
-#define MATCH_FCVT_Q_L 0xd6200053
-#define MASK_FCVT_Q_L  0xfff0007f
-#define MATCH_FCVT_Q_LU 0xd6300053
-#define MASK_FCVT_Q_LU  0xfff0007f
-#define MATCH_CLZ 0x60001013
-#define MASK_CLZ  0xfff0707f
-#define MATCH_CTZ 0x60101013
-#define MASK_CTZ  0xfff0707f
-#define MATCH_CPOP 0x60201013
-#define MASK_CPOP  0xfff0707f
-#define MATCH_MIN 0xa004033
-#define MASK_MIN  0xfe00707f
-#define MATCH_MINU 0xa005033
-#define MASK_MINU  0xfe00707f
-#define MATCH_MAX 0xa006033
-#define MASK_MAX  0xfe00707f
-#define MATCH_MAXU 0xa007033
-#define MASK_MAXU  0xfe00707f
-#define MATCH_SEXT_B 0x60401013
-#define MASK_SEXT_B  0xfff0707f
-#define MATCH_SEXT_H 0x60501013
-#define MASK_SEXT_H  0xfff0707f
-#define MATCH_PACK 0x8004033
-#define MASK_PACK  0xfe00707f
-#define MATCH_PACKH 0x8007033
-#define MASK_PACKH  0xfe00707f
-#define MATCH_PACKW 0x800403b
-#define MASK_PACKW  0xfe00707f
-#define MATCH_ANDN 0x40007033
-#define MASK_ANDN  0xfe00707f
-#define MATCH_ORN 0x40006033
-#define MASK_ORN  0xfe00707f
-#define MATCH_XNOR 0x40004033
-#define MASK_XNOR  0xfe00707f
-#define MATCH_ROL 0x60001033
-#define MASK_ROL  0xfe00707f
-#define MATCH_ROR 0x60005033
-#define MASK_ROR  0xfe00707f
-#define MATCH_RORI 0x60005013
-#define MASK_RORI  0xfc00707f
-#define MATCH_GREVI 0x68005013
-#define MASK_GREVI  0xfc00707f
-#define MATCH_GORCI 0x28005013
-#define MASK_GORCI  0xfc00707f
-#define MATCH_SHFLI 0x8001013
-#define MASK_SHFLI  0xfe00707f
-#define MATCH_UNSHFLI 0x8005013
-#define MASK_UNSHFLI  0xfe00707f
-#define MATCH_CLZW 0x6000101b
-#define MASK_CLZW  0xfff0707f
-#define MATCH_CTZW 0x6010101b
-#define MASK_CTZW  0xfff0707f
-#define MATCH_CPOPW 0x6020101b
-#define MASK_CPOPW  0xfff0707f
-#define MATCH_ROLW 0x6000103b
-#define MASK_ROLW  0xfe00707f
-#define MATCH_RORW 0x6000503b
-#define MASK_RORW  0xfe00707f
-#define MATCH_RORIW 0x6000501b
-#define MASK_RORIW  0xfe00707f
-#define MATCH_SH1ADD 0x20002033
-#define MASK_SH1ADD  0xfe00707f
-#define MATCH_SH2ADD 0x20004033
-#define MASK_SH2ADD  0xfe00707f
-#define MATCH_SH3ADD 0x20006033
-#define MASK_SH3ADD  0xfe00707f
-#define MATCH_SH1ADD_UW 0x2000203b
-#define MASK_SH1ADD_UW  0xfe00707f
-#define MATCH_SH2ADD_UW 0x2000403b
-#define MASK_SH2ADD_UW  0xfe00707f
-#define MATCH_SH3ADD_UW 0x2000603b
-#define MASK_SH3ADD_UW  0xfe00707f
-#define MATCH_ADD_UW 0x800003b
-#define MASK_ADD_UW  0xfe00707f
-#define MATCH_SLLI_UW 0x800101b
-#define MASK_SLLI_UW  0xfc00707f
-#define MATCH_CLMUL 0xa001033
-#define MASK_CLMUL  0xfe00707f
-#define MATCH_CLMULH 0xa003033
-#define MASK_CLMULH  0xfe00707f
-#define MATCH_CLMULR 0xa002033
-#define MASK_CLMULR  0xfe00707f
-#define MATCH_XPERM4 0x28002033
-#define MASK_XPERM4  0xfe00707f
-#define MATCH_XPERM8 0x28004033
-#define MASK_XPERM8  0xfe00707f
-#define MATCH_BCLRI 0x48001013
-#define MASK_BCLRI  0xfc00707f
-#define MATCH_BSETI 0x28001013
-#define MASK_BSETI  0xfc00707f
-#define MATCH_BINVI 0x68001013
-#define MASK_BINVI  0xfc00707f
-#define MATCH_BEXTI 0x48005013
-#define MASK_BEXTI  0xfc00707f
-#define MATCH_BCLR  0x48001033
-#define MASK_BCLR   0xfe00707f
-#define MATCH_BSET  0x28001033
-#define MASK_BSET   0xfe00707f
-#define MATCH_BINV  0x68001033
-#define MASK_BINV   0xfe00707f
-#define MATCH_BEXT  0x48005033
-#define MASK_BEXT   0xfe00707f
-#define MATCH_FLW 0x2007
-#define MASK_FLW  0x707f
-#define MATCH_FLD 0x3007
-#define MASK_FLD  0x707f
-#define MATCH_FLQ 0x4007
-#define MASK_FLQ  0x707f
-#define MATCH_FSW 0x2027
-#define MASK_FSW  0x707f
-#define MATCH_FSD 0x3027
-#define MASK_FSD  0x707f
-#define MATCH_FSQ 0x4027
-#define MASK_FSQ  0x707f
-#define MATCH_FMADD_S 0x43
-#define MASK_FMADD_S  0x600007f
-#define MATCH_FMSUB_S 0x47
-#define MASK_FMSUB_S  0x600007f
-#define MATCH_FNMSUB_S 0x4b
-#define MASK_FNMSUB_S  0x600007f
-#define MATCH_FNMADD_S 0x4f
-#define MASK_FNMADD_S  0x600007f
-#define MATCH_FMADD_D 0x2000043
-#define MASK_FMADD_D  0x600007f
-#define MATCH_FMSUB_D 0x2000047
-#define MASK_FMSUB_D  0x600007f
-#define MATCH_FNMSUB_D 0x200004b
-#define MASK_FNMSUB_D  0x600007f
-#define MATCH_FNMADD_D 0x200004f
-#define MASK_FNMADD_D  0x600007f
-#define MATCH_FMADD_Q 0x6000043
-#define MASK_FMADD_Q  0x600007f
-#define MATCH_FMSUB_Q 0x6000047
-#define MASK_FMSUB_Q  0x600007f
-#define MATCH_FNMSUB_Q 0x600004b
-#define MASK_FNMSUB_Q  0x600007f
-#define MATCH_FNMADD_Q 0x600004f
-#define MASK_FNMADD_Q  0x600007f
-#define MATCH_C_ADDI4SPN 0x0
-#define MASK_C_ADDI4SPN  0xe003
-#define MATCH_C_FLD 0x2000
-#define MASK_C_FLD  0xe003
-#define MATCH_C_LW 0x4000
-#define MASK_C_LW  0xe003
-#define MATCH_C_FLW 0x6000
-#define MASK_C_FLW  0xe003
-#define MATCH_C_FSD 0xa000
-#define MASK_C_FSD  0xe003
-#define MATCH_C_SW 0xc000
-#define MASK_C_SW  0xe003
-#define MATCH_C_FSW 0xe000
-#define MASK_C_FSW  0xe003
-#define MATCH_C_ADDI 0x1
-#define MASK_C_ADDI  0xe003
-#define MATCH_C_JAL 0x2001
-#define MASK_C_JAL  0xe003
-#define MATCH_C_LI 0x4001
-#define MASK_C_LI  0xe003
-#define MATCH_C_LUI 0x6001
-#define MASK_C_LUI  0xe003
-#define MATCH_C_SRLI 0x8001
-#define MASK_C_SRLI  0xec03
-#define MATCH_C_SRLI64 0x8001
-#define MASK_C_SRLI64  0xfc7f
-#define MATCH_C_SRAI 0x8401
-#define MASK_C_SRAI  0xec03
-#define MATCH_C_SRAI64 0x8401
-#define MASK_C_SRAI64  0xfc7f
-#define MATCH_C_ANDI 0x8801
-#define MASK_C_ANDI  0xec03
-#define MATCH_C_SUB 0x8c01
-#define MASK_C_SUB  0xfc63
-#define MATCH_C_XOR 0x8c21
-#define MASK_C_XOR  0xfc63
-#define MATCH_C_OR 0x8c41
-#define MASK_C_OR  0xfc63
-#define MATCH_C_AND 0x8c61
-#define MASK_C_AND  0xfc63
-#define MATCH_C_SUBW 0x9c01
-#define MASK_C_SUBW  0xfc63
-#define MATCH_C_ADDW 0x9c21
-#define MASK_C_ADDW  0xfc63
-#define MATCH_C_J 0xa001
-#define MASK_C_J  0xe003
-#define MATCH_C_BEQZ 0xc001
-#define MASK_C_BEQZ  0xe003
-#define MATCH_C_BNEZ 0xe001
-#define MASK_C_BNEZ  0xe003
-#define MATCH_C_SLLI 0x2
-#define MASK_C_SLLI  0xe003
-#define MATCH_C_SLLI64 0x2
-#define MASK_C_SLLI64 0xf07f
-#define MATCH_C_FLDSP 0x2002
-#define MASK_C_FLDSP  0xe003
-#define MATCH_C_LWSP 0x4002
-#define MASK_C_LWSP  0xe003
-#define MATCH_C_FLWSP 0x6002
-#define MASK_C_FLWSP  0xe003
-#define MATCH_C_MV 0x8002
-#define MASK_C_MV  0xf003
-#define MATCH_C_ADD 0x9002
-#define MASK_C_ADD  0xf003
-#define MATCH_C_FSDSP 0xa002
-#define MASK_C_FSDSP  0xe003
-#define MATCH_C_SWSP 0xc002
-#define MASK_C_SWSP  0xe003
-#define MATCH_C_FSWSP 0xe002
-#define MASK_C_FSWSP  0xe003
-#define MATCH_C_NOP 0x1
-#define MASK_C_NOP  0xffff
-#define MATCH_C_ADDI16SP 0x6101
-#define MASK_C_ADDI16SP  0xef83
-#define MATCH_C_JR 0x8002
-#define MASK_C_JR  0xf07f
-#define MATCH_C_JALR 0x9002
-#define MASK_C_JALR  0xf07f
-#define MATCH_C_EBREAK 0x9002
-#define MASK_C_EBREAK  0xffff
-#define MATCH_C_LD 0x6000
-#define MASK_C_LD  0xe003
-#define MATCH_C_SD 0xe000
-#define MASK_C_SD  0xe003
-#define MATCH_C_ADDIW 0x2001
-#define MASK_C_ADDIW  0xe003
-#define MATCH_C_LDSP 0x6002
-#define MASK_C_LDSP  0xe003
-#define MATCH_C_SDSP 0xe002
-#define MASK_C_SDSP  0xe003
-#define MATCH_SM3P0 0x10801013
-#define MASK_SM3P0  0xfff0707f
-#define MATCH_SM3P1 0x10901013
-#define MASK_SM3P1  0xfff0707f
-#define MATCH_SHA256SUM0 0x10001013
-#define MASK_SHA256SUM0  0xfff0707f
-#define MATCH_SHA256SUM1 0x10101013
-#define MASK_SHA256SUM1  0xfff0707f
-#define MATCH_SHA256SIG0 0x10201013
-#define MASK_SHA256SIG0  0xfff0707f
-#define MATCH_SHA256SIG1 0x10301013
-#define MASK_SHA256SIG1  0xfff0707f
-#define MATCH_SHA512SUM0R 0x50000033
-#define MASK_SHA512SUM0R  0xfe00707f
-#define MATCH_SHA512SUM1R 0x52000033
-#define MASK_SHA512SUM1R  0xfe00707f
-#define MATCH_SHA512SIG0L 0x54000033
-#define MASK_SHA512SIG0L  0xfe00707f
-#define MATCH_SHA512SIG0H 0x5c000033
-#define MASK_SHA512SIG0H  0xfe00707f
-#define MATCH_SHA512SIG1L 0x56000033
-#define MASK_SHA512SIG1L  0xfe00707f
-#define MATCH_SHA512SIG1H 0x5e000033
-#define MASK_SHA512SIG1H  0xfe00707f
-#define MATCH_SM4ED 0x30000033
-#define MASK_SM4ED  0x3e00707f
-#define MATCH_SM4KS 0x34000033
-#define MASK_SM4KS  0x3e00707f
-#define MATCH_AES32ESMI 0x26000033
-#define MASK_AES32ESMI  0x3e00707f
-#define MATCH_AES32ESI 0x22000033
-#define MASK_AES32ESI  0x3e00707f
-#define MATCH_AES32DSMI 0x2e000033
-#define MASK_AES32DSMI  0x3e00707f
-#define MATCH_AES32DSI 0x2a000033
-#define MASK_AES32DSI  0x3e00707f
-#define MATCH_SHA512SUM0 0x10401013
-#define MASK_SHA512SUM0  0xfff0707f
-#define MATCH_SHA512SUM1 0x10501013
-#define MASK_SHA512SUM1  0xfff0707f
-#define MATCH_SHA512SIG0 0x10601013
-#define MASK_SHA512SIG0  0xfff0707f
-#define MATCH_SHA512SIG1 0x10701013
-#define MASK_SHA512SIG1  0xfff0707f
-#define MATCH_AES64KS1I 0x31001013
-#define MASK_AES64KS1I  0xff00707f
-#define MATCH_AES64IM 0x30001013
-#define MASK_AES64IM  0xfff0707f
-#define MATCH_AES64KS2 0x7e000033
-#define MASK_AES64KS2  0xfe00707f
-#define MATCH_AES64ESM 0x36000033
-#define MASK_AES64ESM  0xfe00707f
-#define MATCH_AES64ES 0x32000033
-#define MASK_AES64ES  0xfe00707f
-#define MATCH_AES64DSM 0x3e000033
-#define MASK_AES64DSM  0xfe00707f
-#define MATCH_AES64DS 0x3a000033
-#define MASK_AES64DS  0xfe00707f
-#define MATCH_FADD_H 0x4000053
-#define MASK_FADD_H 0xfe00007f
-#define MATCH_FSUB_H 0xc000053
-#define MASK_FSUB_H 0xfe00007f
-#define MATCH_FMUL_H 0x14000053
-#define MASK_FMUL_H 0xfe00007f
-#define MATCH_FDIV_H 0x1c000053
-#define MASK_FDIV_H 0xfe00007f
-#define MATCH_FSGNJ_H 0x24000053
-#define MASK_FSGNJ_H 0xfe00707f
-#define MATCH_FSGNJN_H 0x24001053
-#define MASK_FSGNJN_H 0xfe00707f
-#define MATCH_FSGNJX_H 0x24002053
-#define MASK_FSGNJX_H 0xfe00707f
-#define MATCH_FMIN_H 0x2c000053
-#define MASK_FMIN_H 0xfe00707f
-#define MATCH_FMAX_H 0x2c001053
-#define MASK_FMAX_H 0xfe00707f
-#define MATCH_FCVT_H_S 0x44000053
-#define MASK_FCVT_H_S 0xfff0007f
-#define MATCH_FCVT_S_H 0x40200053
-#define MASK_FCVT_S_H 0xfff0007f
-#define MATCH_FSQRT_H 0x5c000053
-#define MASK_FSQRT_H 0xfff0007f
-#define MATCH_FLE_H 0xa4000053
-#define MASK_FLE_H 0xfe00707f
-#define MATCH_FLT_H 0xa4001053
-#define MASK_FLT_H 0xfe00707f
-#define MATCH_FEQ_H 0xa4002053
-#define MASK_FEQ_H 0xfe00707f
-#define MATCH_FCVT_W_H 0xc4000053
-#define MASK_FCVT_W_H 0xfff0007f
-#define MATCH_FCVT_WU_H 0xc4100053
-#define MASK_FCVT_WU_H 0xfff0007f
-#define MATCH_FMV_X_H 0xe4000053
-#define MASK_FMV_X_H 0xfff0707f
-#define MATCH_FCLASS_H 0xe4001053
-#define MASK_FCLASS_H 0xfff0707f
-#define MATCH_FCVT_H_W 0xd4000053
-#define MASK_FCVT_H_W 0xfff0007f
-#define MATCH_FCVT_H_WU 0xd4100053
-#define MASK_FCVT_H_WU 0xfff0007f
-#define MATCH_FMV_H_X 0xf4000053
-#define MASK_FMV_H_X 0xfff0707f
-#define MATCH_FLH 0x1007
-#define MASK_FLH 0x707f
-#define MATCH_FSH 0x1027
-#define MASK_FSH 0x707f
-#define MATCH_FMADD_H 0x4000043
-#define MASK_FMADD_H 0x600007f
-#define MATCH_FMSUB_H 0x4000047
-#define MASK_FMSUB_H 0x600007f
-#define MATCH_FNMSUB_H 0x400004b
-#define MASK_FNMSUB_H 0x600007f
-#define MATCH_FNMADD_H 0x400004f
-#define MASK_FNMADD_H 0x600007f
-#define MATCH_FCVT_H_D 0x44100053
-#define MASK_FCVT_H_D 0xfff0007f
-#define MATCH_FCVT_D_H 0x42200053
-#define MASK_FCVT_D_H 0xfff0007f
-#define MATCH_FCVT_H_Q 0x44300053
-#define MASK_FCVT_H_Q 0xfff0007f
-#define MATCH_FCVT_Q_H 0x46200053
-#define MASK_FCVT_Q_H 0xfff0007f
-#define MATCH_FCVT_L_H 0xc4200053
-#define MASK_FCVT_L_H 0xfff0007f
-#define MATCH_FCVT_LU_H 0xc4300053
-#define MASK_FCVT_LU_H 0xfff0007f
-#define MATCH_FCVT_H_L 0xd4200053
-#define MASK_FCVT_H_L 0xfff0007f
-#define MATCH_FCVT_H_LU 0xd4300053
-#define MASK_FCVT_H_LU 0xfff0007f
-#define MATCH_VSETVL  0x80007057
-#define MASK_VSETVL  0xfe00707f
-#define MATCH_VSETIVLI  0xc0007057
-#define MASK_VSETIVLI  0xc000707f
-#define MATCH_VSETVLI  0x00007057
-#define MASK_VSETVLI  0x8000707f
-#define MATCH_VLMV  0x02b00007
-#define MASK_VLMV  0xfff0707f
-#define MATCH_VSMV  0x02b00027
-#define MASK_VSMV  0xfff0707f
-#define MATCH_VLE8V  0x00000007
-#define MASK_VLE8V  0xfdf0707f
-#define MATCH_VLE16V  0x00005007
-#define MASK_VLE16V  0xfdf0707f
-#define MATCH_VLE32V  0x00006007
-#define MASK_VLE32V  0xfdf0707f
-#define MATCH_VLE64V  0x00007007
-#define MASK_VLE64V  0xfdf0707f
-#define MATCH_VSE8V  0x00000027
-#define MASK_VSE8V  0xfdf0707f
-#define MATCH_VSE16V  0x00005027
-#define MASK_VSE16V  0xfdf0707f
-#define MATCH_VSE32V  0x00006027
-#define MASK_VSE32V  0xfdf0707f
-#define MATCH_VSE64V  0x00007027
-#define MASK_VSE64V  0xfdf0707f
-#define MATCH_VLSE8V  0x08000007
-#define MASK_VLSE8V  0xfc00707f
-#define MATCH_VLSE16V  0x08005007
-#define MASK_VLSE16V  0xfc00707f
-#define MATCH_VLSE32V  0x08006007
-#define MASK_VLSE32V  0xfc00707f
-#define MATCH_VLSE64V  0x08007007
-#define MASK_VLSE64V  0xfc00707f
-#define MATCH_VSSE8V  0x08000027
-#define MASK_VSSE8V  0xfc00707f
-#define MATCH_VSSE16V  0x08005027
-#define MASK_VSSE16V  0xfc00707f
-#define MATCH_VSSE32V  0x08006027
-#define MASK_VSSE32V  0xfc00707f
-#define MATCH_VSSE64V  0x08007027
-#define MASK_VSSE64V  0xfc00707f
-#define MATCH_VLOXEI8V  0x0c000007
-#define MASK_VLOXEI8V  0xfc00707f
-#define MATCH_VLOXEI16V  0x0c005007
-#define MASK_VLOXEI16V  0xfc00707f
-#define MATCH_VLOXEI32V  0x0c006007
-#define MASK_VLOXEI32V  0xfc00707f
-#define MATCH_VLOXEI64V  0x0c007007
-#define MASK_VLOXEI64V  0xfc00707f
-#define MATCH_VSOXEI8V  0x0c000027
-#define MASK_VSOXEI8V  0xfc00707f
-#define MATCH_VSOXEI16V  0x0c005027
-#define MASK_VSOXEI16V  0xfc00707f
-#define MATCH_VSOXEI32V  0x0c006027
-#define MASK_VSOXEI32V  0xfc00707f
-#define MATCH_VSOXEI64V  0x0c007027
-#define MASK_VSOXEI64V  0xfc00707f
-#define MATCH_VLUXEI8V  0x04000007
-#define MASK_VLUXEI8V  0xfc00707f
-#define MATCH_VLUXEI16V  0x04005007
-#define MASK_VLUXEI16V  0xfc00707f
-#define MATCH_VLUXEI32V  0x04006007
-#define MASK_VLUXEI32V  0xfc00707f
-#define MATCH_VLUXEI64V  0x04007007
-#define MASK_VLUXEI64V  0xfc00707f
-#define MATCH_VSUXEI8V  0x04000027
-#define MASK_VSUXEI8V  0xfc00707f
-#define MATCH_VSUXEI16V  0x04005027
-#define MASK_VSUXEI16V  0xfc00707f
-#define MATCH_VSUXEI32V  0x04006027
-#define MASK_VSUXEI32V  0xfc00707f
-#define MATCH_VSUXEI64V  0x04007027
-#define MASK_VSUXEI64V  0xfc00707f
-#define MATCH_VLE8FFV  0x01000007
-#define MASK_VLE8FFV  0xfdf0707f
-#define MATCH_VLE16FFV  0x01005007
-#define MASK_VLE16FFV  0xfdf0707f
-#define MATCH_VLE32FFV  0x01006007
-#define MASK_VLE32FFV  0xfdf0707f
-#define MATCH_VLE64FFV  0x01007007
-#define MASK_VLE64FFV  0xfdf0707f
-#define MATCH_VLSEG2E8V  0x20000007
-#define MASK_VLSEG2E8V  0xfdf0707f
-#define MATCH_VSSEG2E8V  0x20000027
-#define MASK_VSSEG2E8V  0xfdf0707f
-#define MATCH_VLSEG3E8V  0x40000007
-#define MASK_VLSEG3E8V  0xfdf0707f
-#define MATCH_VSSEG3E8V  0x40000027
-#define MASK_VSSEG3E8V  0xfdf0707f
-#define MATCH_VLSEG4E8V  0x60000007
-#define MASK_VLSEG4E8V  0xfdf0707f
-#define MATCH_VSSEG4E8V  0x60000027
-#define MASK_VSSEG4E8V  0xfdf0707f
-#define MATCH_VLSEG5E8V  0x80000007
-#define MASK_VLSEG5E8V  0xfdf0707f
-#define MATCH_VSSEG5E8V  0x80000027
-#define MASK_VSSEG5E8V  0xfdf0707f
-#define MATCH_VLSEG6E8V  0xa0000007
-#define MASK_VLSEG6E8V  0xfdf0707f
-#define MATCH_VSSEG6E8V  0xa0000027
-#define MASK_VSSEG6E8V  0xfdf0707f
-#define MATCH_VLSEG7E8V  0xc0000007
-#define MASK_VLSEG7E8V  0xfdf0707f
-#define MATCH_VSSEG7E8V  0xc0000027
-#define MASK_VSSEG7E8V  0xfdf0707f
-#define MATCH_VLSEG8E8V  0xe0000007
-#define MASK_VLSEG8E8V  0xfdf0707f
-#define MATCH_VSSEG8E8V  0xe0000027
-#define MASK_VSSEG8E8V  0xfdf0707f
-#define MATCH_VLSEG2E16V 0x20005007
-#define MASK_VLSEG2E16V  0xfdf0707f
-#define MATCH_VSSEG2E16V 0x20005027
-#define MASK_VSSEG2E16V  0xfdf0707f
-#define MATCH_VLSEG3E16V 0x40005007
-#define MASK_VLSEG3E16V  0xfdf0707f
-#define MATCH_VSSEG3E16V 0x40005027
-#define MASK_VSSEG3E16V  0xfdf0707f
-#define MATCH_VLSEG4E16V 0x60005007
-#define MASK_VLSEG4E16V  0xfdf0707f
-#define MATCH_VSSEG4E16V 0x60005027
-#define MASK_VSSEG4E16V  0xfdf0707f
-#define MATCH_VLSEG5E16V 0x80005007
-#define MASK_VLSEG5E16V  0xfdf0707f
-#define MATCH_VSSEG5E16V 0x80005027
-#define MASK_VSSEG5E16V  0xfdf0707f
-#define MATCH_VLSEG6E16V 0xa0005007
-#define MASK_VLSEG6E16V  0xfdf0707f
-#define MATCH_VSSEG6E16V 0xa0005027
-#define MASK_VSSEG6E16V  0xfdf0707f
-#define MATCH_VLSEG7E16V 0xc0005007
-#define MASK_VLSEG7E16V  0xfdf0707f
-#define MATCH_VSSEG7E16V 0xc0005027
-#define MASK_VSSEG7E16V  0xfdf0707f
-#define MATCH_VLSEG8E16V 0xe0005007
-#define MASK_VLSEG8E16V  0xfdf0707f
-#define MATCH_VSSEG8E16V 0xe0005027
-#define MASK_VSSEG8E16V  0xfdf0707f
-#define MATCH_VLSEG2E32V 0x20006007
-#define MASK_VLSEG2E32V  0xfdf0707f
-#define MATCH_VSSEG2E32V 0x20006027
-#define MASK_VSSEG2E32V  0xfdf0707f
-#define MATCH_VLSEG3E32V 0x40006007
-#define MASK_VLSEG3E32V  0xfdf0707f
-#define MATCH_VSSEG3E32V 0x40006027
-#define MASK_VSSEG3E32V  0xfdf0707f
-#define MATCH_VLSEG4E32V 0x60006007
-#define MASK_VLSEG4E32V  0xfdf0707f
-#define MATCH_VSSEG4E32V 0x60006027
-#define MASK_VSSEG4E32V  0xfdf0707f
-#define MATCH_VLSEG5E32V 0x80006007
-#define MASK_VLSEG5E32V  0xfdf0707f
-#define MATCH_VSSEG5E32V 0x80006027
-#define MASK_VSSEG5E32V  0xfdf0707f
-#define MATCH_VLSEG6E32V 0xa0006007
-#define MASK_VLSEG6E32V  0xfdf0707f
-#define MATCH_VSSEG6E32V 0xa0006027
-#define MASK_VSSEG6E32V  0xfdf0707f
-#define MATCH_VLSEG7E32V 0xc0006007
-#define MASK_VLSEG7E32V  0xfdf0707f
-#define MATCH_VSSEG7E32V 0xc0006027
-#define MASK_VSSEG7E32V  0xfdf0707f
-#define MATCH_VLSEG8E32V 0xe0006007
-#define MASK_VLSEG8E32V  0xfdf0707f
-#define MATCH_VSSEG8E32V 0xe0006027
-#define MASK_VSSEG8E32V  0xfdf0707f
-#define MATCH_VLSEG2E64V 0x20007007
-#define MASK_VLSEG2E64V  0xfdf0707f
-#define MATCH_VSSEG2E64V 0x20007027
-#define MASK_VSSEG2E64V  0xfdf0707f
-#define MATCH_VLSEG3E64V 0x40007007
-#define MASK_VLSEG3E64V  0xfdf0707f
-#define MATCH_VSSEG3E64V 0x40007027
-#define MASK_VSSEG3E64V  0xfdf0707f
-#define MATCH_VLSEG4E64V 0x60007007
-#define MASK_VLSEG4E64V  0xfdf0707f
-#define MATCH_VSSEG4E64V 0x60007027
-#define MASK_VSSEG4E64V  0xfdf0707f
-#define MATCH_VLSEG5E64V 0x80007007
-#define MASK_VLSEG5E64V  0xfdf0707f
-#define MATCH_VSSEG5E64V 0x80007027
-#define MASK_VSSEG5E64V  0xfdf0707f
-#define MATCH_VLSEG6E64V 0xa0007007
-#define MASK_VLSEG6E64V  0xfdf0707f
-#define MATCH_VSSEG6E64V 0xa0007027
-#define MASK_VSSEG6E64V  0xfdf0707f
-#define MATCH_VLSEG7E64V 0xc0007007
-#define MASK_VLSEG7E64V  0xfdf0707f
-#define MATCH_VSSEG7E64V 0xc0007027
-#define MASK_VSSEG7E64V  0xfdf0707f
-#define MATCH_VLSEG8E64V 0xe0007007
-#define MASK_VLSEG8E64V  0xfdf0707f
-#define MATCH_VSSEG8E64V 0xe0007027
-#define MASK_VSSEG8E64V  0xfdf0707f
-#define MATCH_VLSSEG2E8V 0x28000007
-#define MASK_VLSSEG2E8V  0xfc00707f
-#define MATCH_VSSSEG2E8V 0x28000027
-#define MASK_VSSSEG2E8V  0xfc00707f
-#define MATCH_VLSSEG3E8V 0x48000007
-#define MASK_VLSSEG3E8V  0xfc00707f
-#define MATCH_VSSSEG3E8V 0x48000027
-#define MASK_VSSSEG3E8V  0xfc00707f
-#define MATCH_VLSSEG4E8V 0x68000007
-#define MASK_VLSSEG4E8V  0xfc00707f
-#define MATCH_VSSSEG4E8V 0x68000027
-#define MASK_VSSSEG4E8V  0xfc00707f
-#define MATCH_VLSSEG5E8V 0x88000007
-#define MASK_VLSSEG5E8V  0xfc00707f
-#define MATCH_VSSSEG5E8V 0x88000027
-#define MASK_VSSSEG5E8V  0xfc00707f
-#define MATCH_VLSSEG6E8V 0xa8000007
-#define MASK_VLSSEG6E8V  0xfc00707f
-#define MATCH_VSSSEG6E8V 0xa8000027
-#define MASK_VSSSEG6E8V  0xfc00707f
-#define MATCH_VLSSEG7E8V 0xc8000007
-#define MASK_VLSSEG7E8V  0xfc00707f
-#define MATCH_VSSSEG7E8V 0xc8000027
-#define MASK_VSSSEG7E8V  0xfc00707f
-#define MATCH_VLSSEG8E8V 0xe8000007
-#define MASK_VLSSEG8E8V  0xfc00707f
-#define MATCH_VSSSEG8E8V 0xe8000027
-#define MASK_VSSSEG8E8V  0xfc00707f
-#define MATCH_VLSSEG2E16V 0x28005007
-#define MASK_VLSSEG2E16V 0xfc00707f
-#define MATCH_VSSSEG2E16V 0x28005027
-#define MASK_VSSSEG2E16V 0xfc00707f
-#define MATCH_VLSSEG3E16V 0x48005007
-#define MASK_VLSSEG3E16V 0xfc00707f
-#define MATCH_VSSSEG3E16V 0x48005027
-#define MASK_VSSSEG3E16V 0xfc00707f
-#define MATCH_VLSSEG4E16V 0x68005007
-#define MASK_VLSSEG4E16V 0xfc00707f
-#define MATCH_VSSSEG4E16V 0x68005027
-#define MASK_VSSSEG4E16V 0xfc00707f
-#define MATCH_VLSSEG5E16V 0x88005007
-#define MASK_VLSSEG5E16V 0xfc00707f
-#define MATCH_VSSSEG5E16V 0x88005027
-#define MASK_VSSSEG5E16V 0xfc00707f
-#define MATCH_VLSSEG6E16V 0xa8005007
-#define MASK_VLSSEG6E16V 0xfc00707f
-#define MATCH_VSSSEG6E16V 0xa8005027
-#define MASK_VSSSEG6E16V 0xfc00707f
-#define MATCH_VLSSEG7E16V 0xc8005007
-#define MASK_VLSSEG7E16V 0xfc00707f
-#define MATCH_VSSSEG7E16V 0xc8005027
-#define MASK_VSSSEG7E16V 0xfc00707f
-#define MATCH_VLSSEG8E16V 0xe8005007
-#define MASK_VLSSEG8E16V 0xfc00707f
-#define MATCH_VSSSEG8E16V 0xe8005027
-#define MASK_VSSSEG8E16V 0xfc00707f
-#define MATCH_VLSSEG2E32V 0x28006007
-#define MASK_VLSSEG2E32V 0xfc00707f
-#define MATCH_VSSSEG2E32V 0x28006027
-#define MASK_VSSSEG2E32V 0xfc00707f
-#define MATCH_VLSSEG3E32V 0x48006007
-#define MASK_VLSSEG3E32V 0xfc00707f
-#define MATCH_VSSSEG3E32V 0x48006027
-#define MASK_VSSSEG3E32V 0xfc00707f
-#define MATCH_VLSSEG4E32V 0x68006007
-#define MASK_VLSSEG4E32V 0xfc00707f
-#define MATCH_VSSSEG4E32V 0x68006027
-#define MASK_VSSSEG4E32V 0xfc00707f
-#define MATCH_VLSSEG5E32V 0x88006007
-#define MASK_VLSSEG5E32V 0xfc00707f
-#define MATCH_VSSSEG5E32V 0x88006027
-#define MASK_VSSSEG5E32V 0xfc00707f
-#define MATCH_VLSSEG6E32V 0xa8006007
-#define MASK_VLSSEG6E32V 0xfc00707f
-#define MATCH_VSSSEG6E32V 0xa8006027
-#define MASK_VSSSEG6E32V 0xfc00707f
-#define MATCH_VLSSEG7E32V 0xc8006007
-#define MASK_VLSSEG7E32V 0xfc00707f
-#define MATCH_VSSSEG7E32V 0xc8006027
-#define MASK_VSSSEG7E32V 0xfc00707f
-#define MATCH_VLSSEG8E32V 0xe8006007
-#define MASK_VLSSEG8E32V 0xfc00707f
-#define MATCH_VSSSEG8E32V 0xe8006027
-#define MASK_VSSSEG8E32V 0xfc00707f
-#define MATCH_VLSSEG2E64V 0x28007007
-#define MASK_VLSSEG2E64V 0xfc00707f
-#define MATCH_VSSSEG2E64V 0x28007027
-#define MASK_VSSSEG2E64V 0xfc00707f
-#define MATCH_VLSSEG3E64V 0x48007007
-#define MASK_VLSSEG3E64V 0xfc00707f
-#define MATCH_VSSSEG3E64V 0x48007027
-#define MASK_VSSSEG3E64V 0xfc00707f
-#define MATCH_VLSSEG4E64V 0x68007007
-#define MASK_VLSSEG4E64V 0xfc00707f
-#define MATCH_VSSSEG4E64V 0x68007027
-#define MASK_VSSSEG4E64V 0xfc00707f
-#define MATCH_VLSSEG5E64V 0x88007007
-#define MASK_VLSSEG5E64V 0xfc00707f
-#define MATCH_VSSSEG5E64V 0x88007027
-#define MASK_VSSSEG5E64V 0xfc00707f
-#define MATCH_VLSSEG6E64V 0xa8007007
-#define MASK_VLSSEG6E64V 0xfc00707f
-#define MATCH_VSSSEG6E64V 0xa8007027
-#define MASK_VSSSEG6E64V 0xfc00707f
-#define MATCH_VLSSEG7E64V 0xc8007007
-#define MASK_VLSSEG7E64V 0xfc00707f
-#define MATCH_VSSSEG7E64V 0xc8007027
-#define MASK_VSSSEG7E64V 0xfc00707f
-#define MATCH_VLSSEG8E64V 0xe8007007
-#define MASK_VLSSEG8E64V 0xfc00707f
-#define MATCH_VSSSEG8E64V 0xe8007027
-#define MASK_VSSSEG8E64V 0xfc00707f
-#define MATCH_VLOXSEG2EI8V 0x2c000007
-#define MASK_VLOXSEG2EI8V 0xfc00707f
-#define MATCH_VSOXSEG2EI8V 0x2c000027
-#define MASK_VSOXSEG2EI8V 0xfc00707f
-#define MATCH_VLOXSEG3EI8V 0x4c000007
-#define MASK_VLOXSEG3EI8V 0xfc00707f
-#define MATCH_VSOXSEG3EI8V 0x4c000027
-#define MASK_VSOXSEG3EI8V 0xfc00707f
-#define MATCH_VLOXSEG4EI8V 0x6c000007
-#define MASK_VLOXSEG4EI8V 0xfc00707f
-#define MATCH_VSOXSEG4EI8V 0x6c000027
-#define MASK_VSOXSEG4EI8V 0xfc00707f
-#define MATCH_VLOXSEG5EI8V 0x8c000007
-#define MASK_VLOXSEG5EI8V 0xfc00707f
-#define MATCH_VSOXSEG5EI8V 0x8c000027
-#define MASK_VSOXSEG5EI8V 0xfc00707f
-#define MATCH_VLOXSEG6EI8V 0xac000007
-#define MASK_VLOXSEG6EI8V 0xfc00707f
-#define MATCH_VSOXSEG6EI8V 0xac000027
-#define MASK_VSOXSEG6EI8V 0xfc00707f
-#define MATCH_VLOXSEG7EI8V 0xcc000007
-#define MASK_VLOXSEG7EI8V 0xfc00707f
-#define MATCH_VSOXSEG7EI8V 0xcc000027
-#define MASK_VSOXSEG7EI8V 0xfc00707f
-#define MATCH_VLOXSEG8EI8V 0xec000007
-#define MASK_VLOXSEG8EI8V 0xfc00707f
-#define MATCH_VSOXSEG8EI8V 0xec000027
-#define MASK_VSOXSEG8EI8V 0xfc00707f
-#define MATCH_VLUXSEG2EI8V 0x24000007
-#define MASK_VLUXSEG2EI8V 0xfc00707f
-#define MATCH_VSUXSEG2EI8V 0x24000027
-#define MASK_VSUXSEG2EI8V 0xfc00707f
-#define MATCH_VLUXSEG3EI8V 0x44000007
-#define MASK_VLUXSEG3EI8V 0xfc00707f
-#define MATCH_VSUXSEG3EI8V 0x44000027
-#define MASK_VSUXSEG3EI8V 0xfc00707f
-#define MATCH_VLUXSEG4EI8V 0x64000007
-#define MASK_VLUXSEG4EI8V 0xfc00707f
-#define MATCH_VSUXSEG4EI8V 0x64000027
-#define MASK_VSUXSEG4EI8V 0xfc00707f
-#define MATCH_VLUXSEG5EI8V 0x84000007
-#define MASK_VLUXSEG5EI8V 0xfc00707f
-#define MATCH_VSUXSEG5EI8V 0x84000027
-#define MASK_VSUXSEG5EI8V 0xfc00707f
-#define MATCH_VLUXSEG6EI8V 0xa4000007
-#define MASK_VLUXSEG6EI8V 0xfc00707f
-#define MATCH_VSUXSEG6EI8V 0xa4000027
-#define MASK_VSUXSEG6EI8V 0xfc00707f
-#define MATCH_VLUXSEG7EI8V 0xc4000007
-#define MASK_VLUXSEG7EI8V 0xfc00707f
-#define MATCH_VSUXSEG7EI8V 0xc4000027
-#define MASK_VSUXSEG7EI8V 0xfc00707f
-#define MATCH_VLUXSEG8EI8V 0xe4000007
-#define MASK_VLUXSEG8EI8V 0xfc00707f
-#define MATCH_VSUXSEG8EI8V 0xe4000027
-#define MASK_VSUXSEG8EI8V 0xfc00707f
-#define MATCH_VLOXSEG2EI16V 0x2c005007
-#define MASK_VLOXSEG2EI16V 0xfc00707f
-#define MATCH_VSOXSEG2EI16V 0x2c005027
-#define MASK_VSOXSEG2EI16V 0xfc00707f
-#define MATCH_VLOXSEG3EI16V 0x4c005007
-#define MASK_VLOXSEG3EI16V 0xfc00707f
-#define MATCH_VSOXSEG3EI16V 0x4c005027
-#define MASK_VSOXSEG3EI16V 0xfc00707f
-#define MATCH_VLOXSEG4EI16V 0x6c005007
-#define MASK_VLOXSEG4EI16V 0xfc00707f
-#define MATCH_VSOXSEG4EI16V 0x6c005027
-#define MASK_VSOXSEG4EI16V 0xfc00707f
-#define MATCH_VLOXSEG5EI16V 0x8c005007
-#define MASK_VLOXSEG5EI16V 0xfc00707f
-#define MATCH_VSOXSEG5EI16V 0x8c005027
-#define MASK_VSOXSEG5EI16V 0xfc00707f
-#define MATCH_VLOXSEG6EI16V 0xac005007
-#define MASK_VLOXSEG6EI16V 0xfc00707f
-#define MATCH_VSOXSEG6EI16V 0xac005027
-#define MASK_VSOXSEG6EI16V 0xfc00707f
-#define MATCH_VLOXSEG7EI16V 0xcc005007
-#define MASK_VLOXSEG7EI16V 0xfc00707f
-#define MATCH_VSOXSEG7EI16V 0xcc005027
-#define MASK_VSOXSEG7EI16V 0xfc00707f
-#define MATCH_VLOXSEG8EI16V 0xec005007
-#define MASK_VLOXSEG8EI16V 0xfc00707f
-#define MATCH_VSOXSEG8EI16V 0xec005027
-#define MASK_VSOXSEG8EI16V 0xfc00707f
-#define MATCH_VLUXSEG2EI16V 0x24005007
-#define MASK_VLUXSEG2EI16V 0xfc00707f
-#define MATCH_VSUXSEG2EI16V 0x24005027
-#define MASK_VSUXSEG2EI16V 0xfc00707f
-#define MATCH_VLUXSEG3EI16V 0x44005007
-#define MASK_VLUXSEG3EI16V 0xfc00707f
-#define MATCH_VSUXSEG3EI16V 0x44005027
-#define MASK_VSUXSEG3EI16V 0xfc00707f
-#define MATCH_VLUXSEG4EI16V 0x64005007
-#define MASK_VLUXSEG4EI16V 0xfc00707f
-#define MATCH_VSUXSEG4EI16V 0x64005027
-#define MASK_VSUXSEG4EI16V 0xfc00707f
-#define MATCH_VLUXSEG5EI16V 0x84005007
-#define MASK_VLUXSEG5EI16V 0xfc00707f
-#define MATCH_VSUXSEG5EI16V 0x84005027
-#define MASK_VSUXSEG5EI16V 0xfc00707f
-#define MATCH_VLUXSEG6EI16V 0xa4005007
-#define MASK_VLUXSEG6EI16V 0xfc00707f
-#define MATCH_VSUXSEG6EI16V 0xa4005027
-#define MASK_VSUXSEG6EI16V 0xfc00707f
-#define MATCH_VLUXSEG7EI16V 0xc4005007
-#define MASK_VLUXSEG7EI16V 0xfc00707f
-#define MATCH_VSUXSEG7EI16V 0xc4005027
-#define MASK_VSUXSEG7EI16V 0xfc00707f
-#define MATCH_VLUXSEG8EI16V 0xe4005007
-#define MASK_VLUXSEG8EI16V 0xfc00707f
-#define MATCH_VSUXSEG8EI16V 0xe4005027
-#define MASK_VSUXSEG8EI16V 0xfc00707f
-#define MATCH_VLOXSEG2EI32V 0x2c006007
-#define MASK_VLOXSEG2EI32V 0xfc00707f
-#define MATCH_VSOXSEG2EI32V 0x2c006027
-#define MASK_VSOXSEG2EI32V 0xfc00707f
-#define MATCH_VLOXSEG3EI32V 0x4c006007
-#define MASK_VLOXSEG3EI32V 0xfc00707f
-#define MATCH_VSOXSEG3EI32V 0x4c006027
-#define MASK_VSOXSEG3EI32V 0xfc00707f
-#define MATCH_VLOXSEG4EI32V 0x6c006007
-#define MASK_VLOXSEG4EI32V 0xfc00707f
-#define MATCH_VSOXSEG4EI32V 0x6c006027
-#define MASK_VSOXSEG4EI32V 0xfc00707f
-#define MATCH_VLOXSEG5EI32V 0x8c006007
-#define MASK_VLOXSEG5EI32V 0xfc00707f
-#define MATCH_VSOXSEG5EI32V 0x8c006027
-#define MASK_VSOXSEG5EI32V 0xfc00707f
-#define MATCH_VLOXSEG6EI32V 0xac006007
-#define MASK_VLOXSEG6EI32V 0xfc00707f
-#define MATCH_VSOXSEG6EI32V 0xac006027
-#define MASK_VSOXSEG6EI32V 0xfc00707f
-#define MATCH_VLOXSEG7EI32V 0xcc006007
-#define MASK_VLOXSEG7EI32V 0xfc00707f
-#define MATCH_VSOXSEG7EI32V 0xcc006027
-#define MASK_VSOXSEG7EI32V 0xfc00707f
-#define MATCH_VLOXSEG8EI32V 0xec006007
-#define MASK_VLOXSEG8EI32V 0xfc00707f
-#define MATCH_VSOXSEG8EI32V 0xec006027
-#define MASK_VSOXSEG8EI32V 0xfc00707f
-#define MATCH_VLUXSEG2EI32V 0x24006007
-#define MASK_VLUXSEG2EI32V 0xfc00707f
-#define MATCH_VSUXSEG2EI32V 0x24006027
-#define MASK_VSUXSEG2EI32V 0xfc00707f
-#define MATCH_VLUXSEG3EI32V 0x44006007
-#define MASK_VLUXSEG3EI32V 0xfc00707f
-#define MATCH_VSUXSEG3EI32V 0x44006027
-#define MASK_VSUXSEG3EI32V 0xfc00707f
-#define MATCH_VLUXSEG4EI32V 0x64006007
-#define MASK_VLUXSEG4EI32V 0xfc00707f
-#define MATCH_VSUXSEG4EI32V 0x64006027
-#define MASK_VSUXSEG4EI32V 0xfc00707f
-#define MATCH_VLUXSEG5EI32V 0x84006007
-#define MASK_VLUXSEG5EI32V 0xfc00707f
-#define MATCH_VSUXSEG5EI32V 0x84006027
-#define MASK_VSUXSEG5EI32V 0xfc00707f
-#define MATCH_VLUXSEG6EI32V 0xa4006007
-#define MASK_VLUXSEG6EI32V 0xfc00707f
-#define MATCH_VSUXSEG6EI32V 0xa4006027
-#define MASK_VSUXSEG6EI32V 0xfc00707f
-#define MATCH_VLUXSEG7EI32V 0xc4006007
-#define MASK_VLUXSEG7EI32V 0xfc00707f
-#define MATCH_VSUXSEG7EI32V 0xc4006027
-#define MASK_VSUXSEG7EI32V 0xfc00707f
-#define MATCH_VLUXSEG8EI32V 0xe4006007
-#define MASK_VLUXSEG8EI32V 0xfc00707f
-#define MATCH_VSUXSEG8EI32V 0xe4006027
-#define MASK_VSUXSEG8EI32V 0xfc00707f
-#define MATCH_VLOXSEG2EI64V 0x2c007007
-#define MASK_VLOXSEG2EI64V 0xfc00707f
-#define MATCH_VSOXSEG2EI64V 0x2c007027
-#define MASK_VSOXSEG2EI64V 0xfc00707f
-#define MATCH_VLOXSEG3EI64V 0x4c007007
-#define MASK_VLOXSEG3EI64V 0xfc00707f
-#define MATCH_VSOXSEG3EI64V 0x4c007027
-#define MASK_VSOXSEG3EI64V 0xfc00707f
-#define MATCH_VLOXSEG4EI64V 0x6c007007
-#define MASK_VLOXSEG4EI64V 0xfc00707f
-#define MATCH_VSOXSEG4EI64V 0x6c007027
-#define MASK_VSOXSEG4EI64V 0xfc00707f
-#define MATCH_VLOXSEG5EI64V 0x8c007007
-#define MASK_VLOXSEG5EI64V 0xfc00707f
-#define MATCH_VSOXSEG5EI64V 0x8c007027
-#define MASK_VSOXSEG5EI64V 0xfc00707f
-#define MATCH_VLOXSEG6EI64V 0xac007007
-#define MASK_VLOXSEG6EI64V 0xfc00707f
-#define MATCH_VSOXSEG6EI64V 0xac007027
-#define MASK_VSOXSEG6EI64V 0xfc00707f
-#define MATCH_VLOXSEG7EI64V 0xcc007007
-#define MASK_VLOXSEG7EI64V 0xfc00707f
-#define MATCH_VSOXSEG7EI64V 0xcc007027
-#define MASK_VSOXSEG7EI64V 0xfc00707f
-#define MATCH_VLOXSEG8EI64V 0xec007007
-#define MASK_VLOXSEG8EI64V 0xfc00707f
-#define MATCH_VSOXSEG8EI64V 0xec007027
-#define MASK_VSOXSEG8EI64V 0xfc00707f
-#define MATCH_VLUXSEG2EI64V 0x24007007
-#define MASK_VLUXSEG2EI64V 0xfc00707f
-#define MATCH_VSUXSEG2EI64V 0x24007027
-#define MASK_VSUXSEG2EI64V 0xfc00707f
-#define MATCH_VLUXSEG3EI64V 0x44007007
-#define MASK_VLUXSEG3EI64V 0xfc00707f
-#define MATCH_VSUXSEG3EI64V 0x44007027
-#define MASK_VSUXSEG3EI64V 0xfc00707f
-#define MATCH_VLUXSEG4EI64V 0x64007007
-#define MASK_VLUXSEG4EI64V 0xfc00707f
-#define MATCH_VSUXSEG4EI64V 0x64007027
-#define MASK_VSUXSEG4EI64V 0xfc00707f
-#define MATCH_VLUXSEG5EI64V 0x84007007
-#define MASK_VLUXSEG5EI64V 0xfc00707f
-#define MATCH_VSUXSEG5EI64V 0x84007027
-#define MASK_VSUXSEG5EI64V 0xfc00707f
-#define MATCH_VLUXSEG6EI64V 0xa4007007
-#define MASK_VLUXSEG6EI64V 0xfc00707f
-#define MATCH_VSUXSEG6EI64V 0xa4007027
-#define MASK_VSUXSEG6EI64V 0xfc00707f
-#define MATCH_VLUXSEG7EI64V 0xc4007007
-#define MASK_VLUXSEG7EI64V 0xfc00707f
-#define MATCH_VSUXSEG7EI64V 0xc4007027
-#define MASK_VSUXSEG7EI64V 0xfc00707f
-#define MATCH_VLUXSEG8EI64V 0xe4007007
-#define MASK_VLUXSEG8EI64V 0xfc00707f
-#define MATCH_VSUXSEG8EI64V 0xe4007027
-#define MASK_VSUXSEG8EI64V 0xfc00707f
-#define MATCH_VLSEG2E8FFV 0x21000007
-#define MASK_VLSEG2E8FFV 0xfdf0707f
-#define MATCH_VLSEG3E8FFV 0x41000007
-#define MASK_VLSEG3E8FFV 0xfdf0707f
-#define MATCH_VLSEG4E8FFV 0x61000007
-#define MASK_VLSEG4E8FFV 0xfdf0707f
-#define MATCH_VLSEG5E8FFV 0x81000007
-#define MASK_VLSEG5E8FFV 0xfdf0707f
-#define MATCH_VLSEG6E8FFV 0xa1000007
-#define MASK_VLSEG6E8FFV 0xfdf0707f
-#define MATCH_VLSEG7E8FFV 0xc1000007
-#define MASK_VLSEG7E8FFV 0xfdf0707f
-#define MATCH_VLSEG8E8FFV 0xe1000007
-#define MASK_VLSEG8E8FFV 0xfdf0707f
-#define MATCH_VLSEG2E16FFV 0x21005007
-#define MASK_VLSEG2E16FFV 0xfdf0707f
-#define MATCH_VLSEG3E16FFV 0x41005007
-#define MASK_VLSEG3E16FFV 0xfdf0707f
-#define MATCH_VLSEG4E16FFV 0x61005007
-#define MASK_VLSEG4E16FFV 0xfdf0707f
-#define MATCH_VLSEG5E16FFV 0x81005007
-#define MASK_VLSEG5E16FFV 0xfdf0707f
-#define MATCH_VLSEG6E16FFV 0xa1005007
-#define MASK_VLSEG6E16FFV 0xfdf0707f
-#define MATCH_VLSEG7E16FFV 0xc1005007
-#define MASK_VLSEG7E16FFV 0xfdf0707f
-#define MATCH_VLSEG8E16FFV 0xe1005007
-#define MASK_VLSEG8E16FFV 0xfdf0707f
-#define MATCH_VLSEG2E32FFV 0x21006007
-#define MASK_VLSEG2E32FFV 0xfdf0707f
-#define MATCH_VLSEG3E32FFV 0x41006007
-#define MASK_VLSEG3E32FFV 0xfdf0707f
-#define MATCH_VLSEG4E32FFV 0x61006007
-#define MASK_VLSEG4E32FFV 0xfdf0707f
-#define MATCH_VLSEG5E32FFV 0x81006007
-#define MASK_VLSEG5E32FFV 0xfdf0707f
-#define MATCH_VLSEG6E32FFV 0xa1006007
-#define MASK_VLSEG6E32FFV 0xfdf0707f
-#define MATCH_VLSEG7E32FFV 0xc1006007
-#define MASK_VLSEG7E32FFV 0xfdf0707f
-#define MATCH_VLSEG8E32FFV 0xe1006007
-#define MASK_VLSEG8E32FFV 0xfdf0707f
-#define MATCH_VLSEG2E64FFV 0x21007007
-#define MASK_VLSEG2E64FFV 0xfdf0707f
-#define MATCH_VLSEG3E64FFV 0x41007007
-#define MASK_VLSEG3E64FFV 0xfdf0707f
-#define MATCH_VLSEG4E64FFV 0x61007007
-#define MASK_VLSEG4E64FFV 0xfdf0707f
-#define MATCH_VLSEG5E64FFV 0x81007007
-#define MASK_VLSEG5E64FFV 0xfdf0707f
-#define MATCH_VLSEG6E64FFV 0xa1007007
-#define MASK_VLSEG6E64FFV 0xfdf0707f
-#define MATCH_VLSEG7E64FFV 0xc1007007
-#define MASK_VLSEG7E64FFV 0xfdf0707f
-#define MATCH_VLSEG8E64FFV 0xe1007007
-#define MASK_VLSEG8E64FFV 0xfdf0707f
-#define MATCH_VL1RE8V  0x02800007
-#define MASK_VL1RE8V  0xfff0707f
-#define MATCH_VL1RE16V  0x02805007
-#define MASK_VL1RE16V  0xfff0707f
-#define MATCH_VL1RE32V  0x02806007
-#define MASK_VL1RE32V  0xfff0707f
-#define MATCH_VL1RE64V  0x02807007
-#define MASK_VL1RE64V  0xfff0707f
-#define MATCH_VL2RE8V  0x22800007
-#define MASK_VL2RE8V  0xfff0707f
-#define MATCH_VL2RE16V  0x22805007
-#define MASK_VL2RE16V  0xfff0707f
-#define MATCH_VL2RE32V  0x22806007
-#define MASK_VL2RE32V  0xfff0707f
-#define MATCH_VL2RE64V  0x22807007
-#define MASK_VL2RE64V  0xfff0707f
-#define MATCH_VL4RE8V  0x62800007
-#define MASK_VL4RE8V  0xfff0707f
-#define MATCH_VL4RE16V  0x62805007
-#define MASK_VL4RE16V  0xfff0707f
-#define MATCH_VL4RE32V  0x62806007
-#define MASK_VL4RE32V  0xfff0707f
-#define MATCH_VL4RE64V  0x62807007
-#define MASK_VL4RE64V  0xfff0707f
-#define MATCH_VL8RE8V  0xe2800007
-#define MASK_VL8RE8V  0xfff0707f
-#define MATCH_VL8RE16V  0xe2805007
-#define MASK_VL8RE16V  0xfff0707f
-#define MATCH_VL8RE32V  0xe2806007
-#define MASK_VL8RE32V  0xfff0707f
-#define MATCH_VL8RE64V  0xe2807007
-#define MASK_VL8RE64V  0xfff0707f
-#define MATCH_VS1RV  0x02800027
-#define MASK_VS1RV  0xfff0707f
-#define MATCH_VS2RV  0x22800027
-#define MASK_VS2RV  0xfff0707f
-#define MATCH_VS4RV  0x62800027
-#define MASK_VS4RV  0xfff0707f
-#define MATCH_VS8RV  0xe2800027
-#define MASK_VS8RV  0xfff0707f
-#define MATCH_VADDVV  0x00000057
-#define MASK_VADDVV  0xfc00707f
-#define MATCH_VADDVX  0x00004057
-#define MASK_VADDVX  0xfc00707f
-#define MATCH_VADDVI  0x00003057
-#define MASK_VADDVI  0xfc00707f
-#define MATCH_VSUBVV  0x08000057
-#define MASK_VSUBVV  0xfc00707f
-#define MATCH_VSUBVX  0x08004057
-#define MASK_VSUBVX  0xfc00707f
-#define MATCH_VRSUBVX  0x0c004057
-#define MASK_VRSUBVX  0xfc00707f
-#define MATCH_VRSUBVI  0x0c003057
-#define MASK_VRSUBVI  0xfc00707f
-#define MATCH_VWCVTXXV  0xc4006057
-#define MASK_VWCVTXXV  0xfc0ff07f
-#define MATCH_VWCVTUXXV  0xc0006057
-#define MASK_VWCVTUXXV  0xfc0ff07f
-#define MATCH_VWADDVV  0xc4002057
-#define MASK_VWADDVV  0xfc00707f
-#define MATCH_VWADDVX  0xc4006057
-#define MASK_VWADDVX  0xfc00707f
-#define MATCH_VWSUBVV  0xcc002057
-#define MASK_VWSUBVV  0xfc00707f
-#define MATCH_VWSUBVX  0xcc006057
-#define MASK_VWSUBVX  0xfc00707f
-#define MATCH_VWADDWV  0xd4002057
-#define MASK_VWADDWV  0xfc00707f
-#define MATCH_VWADDWX  0xd4006057
-#define MASK_VWADDWX  0xfc00707f
-#define MATCH_VWSUBWV  0xdc002057
-#define MASK_VWSUBWV  0xfc00707f
-#define MATCH_VWSUBWX  0xdc006057
-#define MASK_VWSUBWX  0xfc00707f
-#define MATCH_VWADDUVV  0xc0002057
-#define MASK_VWADDUVV  0xfc00707f
-#define MATCH_VWADDUVX  0xc0006057
-#define MASK_VWADDUVX  0xfc00707f
-#define MATCH_VWSUBUVV  0xc8002057
-#define MASK_VWSUBUVV  0xfc00707f
-#define MATCH_VWSUBUVX  0xc8006057
-#define MASK_VWSUBUVX  0xfc00707f
-#define MATCH_VWADDUWV  0xd0002057
-#define MASK_VWADDUWV  0xfc00707f
-#define MATCH_VWADDUWX  0xd0006057
-#define MASK_VWADDUWX  0xfc00707f
-#define MATCH_VWSUBUWV  0xd8002057
-#define MASK_VWSUBUWV  0xfc00707f
-#define MATCH_VWSUBUWX  0xd8006057
-#define MASK_VWSUBUWX  0xfc00707f
-#define MATCH_VZEXT_VF8  0x48012057
-#define MASK_VZEXT_VF8  0xfc0ff07f
-#define MATCH_VSEXT_VF8  0x4801a057
-#define MASK_VSEXT_VF8  0xfc0ff07f
-#define MATCH_VZEXT_VF4  0x48022057
-#define MASK_VZEXT_VF4  0xfc0ff07f
-#define MATCH_VSEXT_VF4  0x4802a057
-#define MASK_VSEXT_VF4  0xfc0ff07f
-#define MATCH_VZEXT_VF2  0x48032057
-#define MASK_VZEXT_VF2  0xfc0ff07f
-#define MATCH_VSEXT_VF2  0x4803a057
-#define MASK_VSEXT_VF2  0xfc0ff07f
-#define MATCH_VADCVVM  0x40000057
-#define MASK_VADCVVM  0xfe00707f
-#define MATCH_VADCVXM  0x40004057
-#define MASK_VADCVXM  0xfe00707f
-#define MATCH_VADCVIM  0x40003057
-#define MASK_VADCVIM  0xfe00707f
-#define MATCH_VMADCVVM  0x44000057
-#define MASK_VMADCVVM  0xfe00707f
-#define MATCH_VMADCVXM  0x44004057
-#define MASK_VMADCVXM  0xfe00707f
-#define MATCH_VMADCVIM  0x44003057
-#define MASK_VMADCVIM  0xfe00707f
-#define MATCH_VMADCVV  0x46000057
-#define MASK_VMADCVV  0xfe00707f
-#define MATCH_VMADCVX  0x46004057
-#define MASK_VMADCVX  0xfe00707f
-#define MATCH_VMADCVI  0x46003057
-#define MASK_VMADCVI  0xfe00707f
-#define MATCH_VSBCVVM  0x48000057
-#define MASK_VSBCVVM  0xfe00707f
-#define MATCH_VSBCVXM  0x48004057
-#define MASK_VSBCVXM  0xfe00707f
-#define MATCH_VMSBCVVM  0x4c000057
-#define MASK_VMSBCVVM  0xfe00707f
-#define MATCH_VMSBCVXM  0x4c004057
-#define MASK_VMSBCVXM  0xfe00707f
-#define MATCH_VMSBCVV  0x4e000057
-#define MASK_VMSBCVV  0xfe00707f
-#define MATCH_VMSBCVX  0x4e004057
-#define MASK_VMSBCVX  0xfe00707f
-#define MATCH_VNOTV  0x2c0fb057
-#define MASK_VNOTV  0xfc0ff07f
-#define MATCH_VANDVV  0x24000057
-#define MASK_VANDVV  0xfc00707f
-#define MATCH_VANDVX  0x24004057
-#define MASK_VANDVX  0xfc00707f
-#define MATCH_VANDVI  0x24003057
-#define MASK_VANDVI  0xfc00707f
-#define MATCH_VORVV  0x28000057
-#define MASK_VORVV  0xfc00707f
-#define MATCH_VORVX  0x28004057
-#define MASK_VORVX  0xfc00707f
-#define MATCH_VORVI  0x28003057
-#define MASK_VORVI  0xfc00707f
-#define MATCH_VXORVV  0x2c000057
-#define MASK_VXORVV  0xfc00707f
-#define MATCH_VXORVX  0x2c004057
-#define MASK_VXORVX  0xfc00707f
-#define MATCH_VXORVI  0x2c003057
-#define MASK_VXORVI  0xfc00707f
-#define MATCH_VSLLVV  0x94000057
-#define MASK_VSLLVV  0xfc00707f
-#define MATCH_VSLLVX  0x94004057
-#define MASK_VSLLVX  0xfc00707f
-#define MATCH_VSLLVI  0x94003057
-#define MASK_VSLLVI  0xfc00707f
-#define MATCH_VSRLVV  0xa0000057
-#define MASK_VSRLVV  0xfc00707f
-#define MATCH_VSRLVX  0xa0004057
-#define MASK_VSRLVX  0xfc00707f
-#define MATCH_VSRLVI  0xa0003057
-#define MASK_VSRLVI  0xfc00707f
-#define MATCH_VSRAVV  0xa4000057
-#define MASK_VSRAVV  0xfc00707f
-#define MATCH_VSRAVX  0xa4004057
-#define MASK_VSRAVX  0xfc00707f
-#define MATCH_VSRAVI  0xa4003057
-#define MASK_VSRAVI  0xfc00707f
-#define MATCH_VNCVTXXW  0xb0004057
-#define MASK_VNCVTXXW  0xfc0ff07f
-#define MATCH_VNSRLWV  0xb0000057
-#define MASK_VNSRLWV  0xfc00707f
-#define MATCH_VNSRLWX  0xb0004057
-#define MASK_VNSRLWX  0xfc00707f
-#define MATCH_VNSRLWI  0xb0003057
-#define MASK_VNSRLWI  0xfc00707f
-#define MATCH_VNSRAWV  0xb4000057
-#define MASK_VNSRAWV  0xfc00707f
-#define MATCH_VNSRAWX  0xb4004057
-#define MASK_VNSRAWX  0xfc00707f
-#define MATCH_VNSRAWI  0xb4003057
-#define MASK_VNSRAWI  0xfc00707f
-#define MATCH_VMSEQVV  0x60000057
-#define MASK_VMSEQVV  0xfc00707f
-#define MATCH_VMSEQVX  0x60004057
-#define MASK_VMSEQVX  0xfc00707f
-#define MATCH_VMSEQVI  0x60003057
-#define MASK_VMSEQVI  0xfc00707f
-#define MATCH_VMSNEVV  0x64000057
-#define MASK_VMSNEVV  0xfc00707f
-#define MATCH_VMSNEVX  0x64004057
-#define MASK_VMSNEVX  0xfc00707f
-#define MATCH_VMSNEVI  0x64003057
-#define MASK_VMSNEVI  0xfc00707f
-#define MATCH_VMSLTVV  0x6c000057
-#define MASK_VMSLTVV  0xfc00707f
-#define MATCH_VMSLTVX  0x6c004057
-#define MASK_VMSLTVX  0xfc00707f
-#define MATCH_VMSLTUVV  0x68000057
-#define MASK_VMSLTUVV  0xfc00707f
-#define MATCH_VMSLTUVX  0x68004057
-#define MASK_VMSLTUVX  0xfc00707f
-#define MATCH_VMSLEVV  0x74000057
-#define MASK_VMSLEVV  0xfc00707f
-#define MATCH_VMSLEVX  0x74004057
-#define MASK_VMSLEVX  0xfc00707f
-#define MATCH_VMSLEVI  0x74003057
-#define MASK_VMSLEVI  0xfc00707f
-#define MATCH_VMSLEUVV  0x70000057
-#define MASK_VMSLEUVV  0xfc00707f
-#define MATCH_VMSLEUVX  0x70004057
-#define MASK_VMSLEUVX  0xfc00707f
-#define MATCH_VMSLEUVI  0x70003057
-#define MASK_VMSLEUVI  0xfc00707f
-#define MATCH_VMSGTVX  0x7c004057
-#define MASK_VMSGTVX  0xfc00707f
-#define MATCH_VMSGTVI  0x7c003057
-#define MASK_VMSGTVI  0xfc00707f
-#define MATCH_VMSGTUVX  0x78004057
-#define MASK_VMSGTUVX  0xfc00707f
-#define MATCH_VMSGTUVI  0x78003057
-#define MASK_VMSGTUVI  0xfc00707f
-#define MATCH_VMINVV  0x14000057
-#define MASK_VMINVV  0xfc00707f
-#define MATCH_VMINVX  0x14004057
-#define MASK_VMINVX  0xfc00707f
-#define MATCH_VMAXVV  0x1c000057
-#define MASK_VMAXVV  0xfc00707f
-#define MATCH_VMAXVX  0x1c004057
-#define MASK_VMAXVX  0xfc00707f
-#define MATCH_VMINUVV  0x10000057
-#define MASK_VMINUVV  0xfc00707f
-#define MATCH_VMINUVX  0x10004057
-#define MASK_VMINUVX  0xfc00707f
-#define MATCH_VMAXUVV  0x18000057
-#define MASK_VMAXUVV  0xfc00707f
-#define MATCH_VMAXUVX  0x18004057
-#define MASK_VMAXUVX  0xfc00707f
-#define MATCH_VMULVV  0x94002057
-#define MASK_VMULVV  0xfc00707f
-#define MATCH_VMULVX  0x94006057
-#define MASK_VMULVX  0xfc00707f
-#define MATCH_VMULHVV  0x9c002057
-#define MASK_VMULHVV  0xfc00707f
-#define MATCH_VMULHVX  0x9c006057
-#define MASK_VMULHVX  0xfc00707f
-#define MATCH_VMULHUVV  0x90002057
-#define MASK_VMULHUVV  0xfc00707f
-#define MATCH_VMULHUVX  0x90006057
-#define MASK_VMULHUVX  0xfc00707f
-#define MATCH_VMULHSUVV  0x98002057
-#define MASK_VMULHSUVV  0xfc00707f
-#define MATCH_VMULHSUVX  0x98006057
-#define MASK_VMULHSUVX  0xfc00707f
-#define MATCH_VWMULVV  0xec002057
-#define MASK_VWMULVV  0xfc00707f
-#define MATCH_VWMULVX  0xec006057
-#define MASK_VWMULVX  0xfc00707f
-#define MATCH_VWMULUVV  0xe0002057
-#define MASK_VWMULUVV  0xfc00707f
-#define MATCH_VWMULUVX  0xe0006057
-#define MASK_VWMULUVX  0xfc00707f
-#define MATCH_VWMULSUVV  0xe8002057
-#define MASK_VWMULSUVV  0xfc00707f
-#define MATCH_VWMULSUVX  0xe8006057
-#define MASK_VWMULSUVX  0xfc00707f
-#define MATCH_VMACCVV  0xb4002057
-#define MASK_VMACCVV  0xfc00707f
-#define MATCH_VMACCVX  0xb4006057
-#define MASK_VMACCVX  0xfc00707f
-#define MATCH_VNMSACVV  0xbc002057
-#define MASK_VNMSACVV  0xfc00707f
-#define MATCH_VNMSACVX  0xbc006057
-#define MASK_VNMSACVX  0xfc00707f
-#define MATCH_VMADDVV  0xa4002057
-#define MASK_VMADDVV  0xfc00707f
-#define MATCH_VMADDVX  0xa4006057
-#define MASK_VMADDVX  0xfc00707f
-#define MATCH_VNMSUBVV  0xac002057
-#define MASK_VNMSUBVV  0xfc00707f
-#define MATCH_VNMSUBVX  0xac006057
-#define MASK_VNMSUBVX  0xfc00707f
-#define MATCH_VWMACCUVV  0xf0002057
-#define MASK_VWMACCUVV  0xfc00707f
-#define MATCH_VWMACCUVX  0xf0006057
-#define MASK_VWMACCUVX  0xfc00707f
-#define MATCH_VWMACCVV  0xf4002057
-#define MASK_VWMACCVV  0xfc00707f
-#define MATCH_VWMACCVX  0xf4006057
-#define MASK_VWMACCVX  0xfc00707f
-#define MATCH_VWMACCSUVV 0xfc002057
-#define MASK_VWMACCSUVV  0xfc00707f
-#define MATCH_VWMACCSUVX 0xfc006057
-#define MASK_VWMACCSUVX  0xfc00707f
-#define MATCH_VWMACCUSVX 0xf8006057
-#define MASK_VWMACCUSVX  0xfc00707f
-#define MATCH_VQMACCUVV  0xf0000057
-#define MASK_VQMACCUVV  0xfc00707f
-#define MATCH_VQMACCUVX  0xf0004057
-#define MASK_VQMACCUVX  0xfc00707f
-#define MATCH_VQMACCVV  0xf4000057
-#define MASK_VQMACCVV  0xfc00707f
-#define MATCH_VQMACCVX  0xf4004057
-#define MASK_VQMACCVX  0xfc00707f
-#define MATCH_VQMACCSUVV 0xfc000057
-#define MASK_VQMACCSUVV  0xfc00707f
-#define MATCH_VQMACCSUVX 0xfc004057
-#define MASK_VQMACCSUVX  0xfc00707f
-#define MATCH_VQMACCUSVX 0xf8004057
-#define MASK_VQMACCUSVX  0xfc00707f
-#define MATCH_VDIVVV  0x84002057
-#define MASK_VDIVVV  0xfc00707f
-#define MATCH_VDIVVX  0x84006057
-#define MASK_VDIVVX  0xfc00707f
-#define MATCH_VDIVUVV  0x80002057
-#define MASK_VDIVUVV  0xfc00707f
-#define MATCH_VDIVUVX  0x80006057
-#define MASK_VDIVUVX  0xfc00707f
-#define MATCH_VREMVV  0x8c002057
-#define MASK_VREMVV  0xfc00707f
-#define MATCH_VREMVX  0x8c006057
-#define MASK_VREMVX  0xfc00707f
-#define MATCH_VREMUVV  0x88002057
-#define MASK_VREMUVV  0xfc00707f
-#define MATCH_VREMUVX  0x88006057
-#define MASK_VREMUVX  0xfc00707f
-#define MATCH_VMERGEVVM  0x5c000057
-#define MASK_VMERGEVVM  0xfe00707f
-#define MATCH_VMERGEVXM  0x5c004057
-#define MASK_VMERGEVXM  0xfe00707f
-#define MATCH_VMERGEVIM  0x5c003057
-#define MASK_VMERGEVIM  0xfe00707f
-#define MATCH_VMVVV  0x5e000057
-#define MASK_VMVVV  0xfff0707f
-#define MATCH_VMVVX  0x5e004057
-#define MASK_VMVVX  0xfff0707f
-#define MATCH_VMVVI  0x5e003057
-#define MASK_VMVVI  0xfff0707f
-#define MATCH_VSADDUVV  0x80000057
-#define MASK_VSADDUVV  0xfc00707f
-#define MATCH_VSADDUVX  0x80004057
-#define MASK_VSADDUVX  0xfc00707f
-#define MATCH_VSADDUVI  0x80003057
-#define MASK_VSADDUVI  0xfc00707f
-#define MATCH_VSADDVV  0x84000057
-#define MASK_VSADDVV  0xfc00707f
-#define MATCH_VSADDVX  0x84004057
-#define MASK_VSADDVX  0xfc00707f
-#define MATCH_VSADDVI  0x84003057
-#define MASK_VSADDVI  0xfc00707f
-#define MATCH_VSSUBUVV  0x88000057
-#define MASK_VSSUBUVV  0xfc00707f
-#define MATCH_VSSUBUVX  0x88004057
-#define MASK_VSSUBUVX  0xfc00707f
-#define MATCH_VSSUBVV  0x8c000057
-#define MASK_VSSUBVV  0xfc00707f
-#define MATCH_VSSUBVX  0x8c004057
-#define MASK_VSSUBVX  0xfc00707f
-#define MATCH_VAADDUVV  0x20002057
-#define MASK_VAADDUVV  0xfc00707f
-#define MATCH_VAADDUVX  0x20006057
-#define MASK_VAADDUVX  0xfc00707f
-#define MATCH_VAADDVV  0x24002057
-#define MASK_VAADDVV  0xfc00707f
-#define MATCH_VAADDVX  0x24006057
-#define MASK_VAADDVX  0xfc00707f
-#define MATCH_VASUBUVV  0x28002057
-#define MASK_VASUBUVV  0xfc00707f
-#define MATCH_VASUBUVX  0x28006057
-#define MASK_VASUBUVX  0xfc00707f
-#define MATCH_VASUBVV  0x2c002057
-#define MASK_VASUBVV  0xfc00707f
-#define MATCH_VASUBVX  0x2c006057
-#define MASK_VASUBVX  0xfc00707f
-#define MATCH_VSMULVV  0x9c000057
-#define MASK_VSMULVV  0xfc00707f
-#define MATCH_VSMULVX  0x9c004057
-#define MASK_VSMULVX  0xfc00707f
-#define MATCH_VSSRLVV  0xa8000057
-#define MASK_VSSRLVV  0xfc00707f
-#define MATCH_VSSRLVX  0xa8004057
-#define MASK_VSSRLVX  0xfc00707f
-#define MATCH_VSSRLVI  0xa8003057
-#define MASK_VSSRLVI  0xfc00707f
-#define MATCH_VSSRAVV  0xac000057
-#define MASK_VSSRAVV  0xfc00707f
-#define MATCH_VSSRAVX  0xac004057
-#define MASK_VSSRAVX  0xfc00707f
-#define MATCH_VSSRAVI  0xac003057
-#define MASK_VSSRAVI  0xfc00707f
-#define MATCH_VNCLIPUWV  0xb8000057
-#define MASK_VNCLIPUWV  0xfc00707f
-#define MATCH_VNCLIPUWX  0xb8004057
-#define MASK_VNCLIPUWX  0xfc00707f
-#define MATCH_VNCLIPUWI  0xb8003057
-#define MASK_VNCLIPUWI  0xfc00707f
-#define MATCH_VNCLIPWV  0xbc000057
-#define MASK_VNCLIPWV  0xfc00707f
-#define MATCH_VNCLIPWX  0xbc004057
-#define MASK_VNCLIPWX  0xfc00707f
-#define MATCH_VNCLIPWI  0xbc003057
-#define MASK_VNCLIPWI  0xfc00707f
-#define MATCH_VFADDVV  0x00001057
-#define MASK_VFADDVV  0xfc00707f
-#define MATCH_VFADDVF  0x00005057
-#define MASK_VFADDVF  0xfc00707f
-#define MATCH_VFSUBVV  0x08001057
-#define MASK_VFSUBVV  0xfc00707f
-#define MATCH_VFSUBVF  0x08005057
-#define MASK_VFSUBVF  0xfc00707f
-#define MATCH_VFRSUBVF  0x9c005057
-#define MASK_VFRSUBVF  0xfc00707f
-#define MATCH_VFWADDVV  0xc0001057
-#define MASK_VFWADDVV  0xfc00707f
-#define MATCH_VFWADDVF  0xc0005057
-#define MASK_VFWADDVF  0xfc00707f
-#define MATCH_VFWSUBVV  0xc8001057
-#define MASK_VFWSUBVV  0xfc00707f
-#define MATCH_VFWSUBVF  0xc8005057
-#define MASK_VFWSUBVF  0xfc00707f
-#define MATCH_VFWADDWV  0xd0001057
-#define MASK_VFWADDWV  0xfc00707f
-#define MATCH_VFWADDWF  0xd0005057
-#define MASK_VFWADDWF  0xfc00707f
-#define MATCH_VFWSUBWV  0xd8001057
-#define MASK_VFWSUBWV  0xfc00707f
-#define MATCH_VFWSUBWF  0xd8005057
-#define MASK_VFWSUBWF  0xfc00707f
-#define MATCH_VFMULVV  0x90001057
-#define MASK_VFMULVV  0xfc00707f
-#define MATCH_VFMULVF  0x90005057
-#define MASK_VFMULVF  0xfc00707f
-#define MATCH_VFDIVVV  0x80001057
-#define MASK_VFDIVVV  0xfc00707f
-#define MATCH_VFDIVVF  0x80005057
-#define MASK_VFDIVVF  0xfc00707f
-#define MATCH_VFRDIVVF  0x84005057
-#define MASK_VFRDIVVF  0xfc00707f
-#define MATCH_VFWMULVV  0xe0001057
-#define MASK_VFWMULVV  0xfc00707f
-#define MATCH_VFWMULVF  0xe0005057
-#define MASK_VFWMULVF  0xfc00707f
-#define MATCH_VFMADDVV  0xa0001057
-#define MASK_VFMADDVV  0xfc00707f
-#define MATCH_VFMADDVF  0xa0005057
-#define MASK_VFMADDVF  0xfc00707f
-#define MATCH_VFNMADDVV  0xa4001057
-#define MASK_VFNMADDVV  0xfc00707f
-#define MATCH_VFNMADDVF  0xa4005057
-#define MASK_VFNMADDVF  0xfc00707f
-#define MATCH_VFMSUBVV  0xa8001057
-#define MASK_VFMSUBVV  0xfc00707f
-#define MATCH_VFMSUBVF  0xa8005057
-#define MASK_VFMSUBVF  0xfc00707f
-#define MATCH_VFNMSUBVV  0xac001057
-#define MASK_VFNMSUBVV  0xfc00707f
-#define MATCH_VFNMSUBVF  0xac005057
-#define MASK_VFNMSUBVF  0xfc00707f
-#define MATCH_VFMACCVV  0xb0001057
-#define MASK_VFMACCVV  0xfc00707f
-#define MATCH_VFMACCVF  0xb0005057
-#define MASK_VFMACCVF  0xfc00707f
-#define MATCH_VFNMACCVV  0xb4001057
-#define MASK_VFNMACCVV  0xfc00707f
-#define MATCH_VFNMACCVF  0xb4005057
-#define MASK_VFNMACCVF  0xfc00707f
-#define MATCH_VFMSACVV  0xb8001057
-#define MASK_VFMSACVV  0xfc00707f
-#define MATCH_VFMSACVF  0xb8005057
-#define MASK_VFMSACVF  0xfc00707f
-#define MATCH_VFNMSACVV  0xbc001057
-#define MASK_VFNMSACVV  0xfc00707f
-#define MATCH_VFNMSACVF  0xbc005057
-#define MASK_VFNMSACVF  0xfc00707f
-#define MATCH_VFWMACCVV  0xf0001057
-#define MASK_VFWMACCVV  0xfc00707f
-#define MATCH_VFWMACCVF  0xf0005057
-#define MASK_VFWMACCVF  0xfc00707f
-#define MATCH_VFWNMACCVV 0xf4001057
-#define MASK_VFWNMACCVV  0xfc00707f
-#define MATCH_VFWNMACCVF 0xf4005057
-#define MASK_VFWNMACCVF  0xfc00707f
-#define MATCH_VFWMSACVV  0xf8001057
-#define MASK_VFWMSACVV  0xfc00707f
-#define MATCH_VFWMSACVF  0xf8005057
-#define MASK_VFWMSACVF  0xfc00707f
-#define MATCH_VFWNMSACVV 0xfc001057
-#define MASK_VFWNMSACVV  0xfc00707f
-#define MATCH_VFWNMSACVF 0xfc005057
-#define MASK_VFWNMSACVF  0xfc00707f
-#define MATCH_VFSQRTV  0x4c001057
-#define MASK_VFSQRTV  0xfc0ff07f
-#define MATCH_VFRSQRT7V  0x4c021057
-#define MASK_VFRSQRT7V  0xfc0ff07f
-#define MATCH_VFREC7V  0x4c029057
-#define MASK_VFREC7V  0xfc0ff07f
-#define MATCH_VFCLASSV  0x4c081057
-#define MASK_VFCLASSV  0xfc0ff07f
-#define MATCH_VFMINVV  0x10001057
-#define MASK_VFMINVV  0xfc00707f
-#define MATCH_VFMINVF  0x10005057
-#define MASK_VFMINVF  0xfc00707f
-#define MATCH_VFMAXVV  0x18001057
-#define MASK_VFMAXVV  0xfc00707f
-#define MATCH_VFMAXVF  0x18005057
-#define MASK_VFMAXVF  0xfc00707f
-#define MATCH_VFSGNJVV  0x20001057
-#define MASK_VFSGNJVV  0xfc00707f
-#define MATCH_VFSGNJVF  0x20005057
-#define MASK_VFSGNJVF  0xfc00707f
-#define MATCH_VFSGNJNVV  0x24001057
-#define MASK_VFSGNJNVV  0xfc00707f
-#define MATCH_VFSGNJNVF  0x24005057
-#define MASK_VFSGNJNVF  0xfc00707f
-#define MATCH_VFSGNJXVV  0x28001057
-#define MASK_VFSGNJXVV  0xfc00707f
-#define MATCH_VFSGNJXVF  0x28005057
-#define MASK_VFSGNJXVF  0xfc00707f
-#define MATCH_VMFEQVV  0x60001057
-#define MASK_VMFEQVV  0xfc00707f
-#define MATCH_VMFEQVF  0x60005057
-#define MASK_VMFEQVF  0xfc00707f
-#define MATCH_VMFNEVV  0x70001057
-#define MASK_VMFNEVV  0xfc00707f
-#define MATCH_VMFNEVF  0x70005057
-#define MASK_VMFNEVF  0xfc00707f
-#define MATCH_VMFLTVV  0x6c001057
-#define MASK_VMFLTVV  0xfc00707f
-#define MATCH_VMFLTVF  0x6c005057
-#define MASK_VMFLTVF  0xfc00707f
-#define MATCH_VMFLEVV  0x64001057
-#define MASK_VMFLEVV  0xfc00707f
-#define MATCH_VMFLEVF  0x64005057
-#define MASK_VMFLEVF  0xfc00707f
-#define MATCH_VMFGTVF  0x74005057
-#define MASK_VMFGTVF  0xfc00707f
-#define MATCH_VMFGEVF  0x7c005057
-#define MASK_VMFGEVF  0xfc00707f
-#define MATCH_VFMERGEVFM 0x5c005057
-#define MASK_VFMERGEVFM  0xfe00707f
-#define MATCH_VFMVVF  0x5e005057
-#define MASK_VFMVVF  0xfff0707f
-#define MATCH_VFCVTXUFV  0x48001057
-#define MASK_VFCVTXUFV  0xfc0ff07f
-#define MATCH_VFCVTXFV  0x48009057
-#define MASK_VFCVTXFV  0xfc0ff07f
-#define MATCH_VFCVTFXUV  0x48011057
-#define MASK_VFCVTFXUV  0xfc0ff07f
-#define MATCH_VFCVTFXV  0x48019057
-#define MASK_VFCVTFXV  0xfc0ff07f
-#define MATCH_VFCVTRTZXUFV 0x48031057
-#define MASK_VFCVTRTZXUFV 0xfc0ff07f
-#define MATCH_VFCVTRTZXFV 0x48039057
-#define MASK_VFCVTRTZXFV 0xfc0ff07f
-#define MATCH_VFWCVTXUFV 0x48041057
-#define MASK_VFWCVTXUFV  0xfc0ff07f
-#define MATCH_VFWCVTXFV  0x48049057
-#define MASK_VFWCVTXFV  0xfc0ff07f
-#define MATCH_VFWCVTFXUV 0x48051057
-#define MASK_VFWCVTFXUV  0xfc0ff07f
-#define MATCH_VFWCVTFXV  0x48059057
-#define MASK_VFWCVTFXV  0xfc0ff07f
-#define MATCH_VFWCVTFFV  0x48061057
-#define MASK_VFWCVTFFV  0xfc0ff07f
-#define MATCH_VFWCVTRTZXUFV 0x48071057
-#define MASK_VFWCVTRTZXUFV 0xfc0ff07f
-#define MATCH_VFWCVTRTZXFV 0x48079057
-#define MASK_VFWCVTRTZXFV 0xfc0ff07f
-#define MATCH_VFNCVTXUFW 0x48081057
-#define MASK_VFNCVTXUFW  0xfc0ff07f
-#define MATCH_VFNCVTXFW  0x48089057
-#define MASK_VFNCVTXFW  0xfc0ff07f
-#define MATCH_VFNCVTFXUW 0x48091057
-#define MASK_VFNCVTFXUW  0xfc0ff07f
-#define MATCH_VFNCVTFXW  0x48099057
-#define MASK_VFNCVTFXW  0xfc0ff07f
-#define MATCH_VFNCVTFFW  0x480a1057
-#define MASK_VFNCVTFFW  0xfc0ff07f
-#define MATCH_VFNCVTRODFFW 0x480a9057
-#define MASK_VFNCVTRODFFW 0xfc0ff07f
-#define MATCH_VFNCVTRTZXUFW 0x480b1057
-#define MASK_VFNCVTRTZXUFW 0xfc0ff07f
-#define MATCH_VFNCVTRTZXFW 0x480b9057
-#define MASK_VFNCVTRTZXFW 0xfc0ff07f
-#define MATCH_VREDSUMVS  0x00002057
-#define MASK_VREDSUMVS  0xfc00707f
-#define MATCH_VREDMAXVS  0x1c002057
-#define MASK_VREDMAXVS  0xfc00707f
-#define MATCH_VREDMAXUVS 0x18002057
-#define MASK_VREDMAXUVS  0xfc00707f
-#define MATCH_VREDMINVS  0x14002057
-#define MASK_VREDMINVS  0xfc00707f
-#define MATCH_VREDMINUVS 0x10002057
-#define MASK_VREDMINUVS  0xfc00707f
-#define MATCH_VREDANDVS  0x04002057
-#define MASK_VREDANDVS  0xfc00707f
-#define MATCH_VREDORVS  0x08002057
-#define MASK_VREDORVS  0xfc00707f
-#define MATCH_VREDXORVS  0x0c002057
-#define MASK_VREDXORVS  0xfc00707f
-#define MATCH_VWREDSUMUVS 0xc0000057
-#define MASK_VWREDSUMUVS 0xfc00707f
-#define MATCH_VWREDSUMVS 0xc4000057
-#define MASK_VWREDSUMVS  0xfc00707f
-#define MATCH_VFREDOSUMVS 0x0c001057
-#define MASK_VFREDOSUMVS 0xfc00707f
-#define MATCH_VFREDUSUMVS 0x04001057
-#define MASK_VFREDUSUMVS 0xfc00707f
-#define MATCH_VFREDMAXVS 0x1c001057
-#define MASK_VFREDMAXVS  0xfc00707f
-#define MATCH_VFREDMINVS 0x14001057
-#define MASK_VFREDMINVS  0xfc00707f
-#define MATCH_VFWREDOSUMVS 0xcc001057
-#define MASK_VFWREDOSUMVS 0xfc00707f
-#define MATCH_VFWREDUSUMVS 0xc4001057
-#define MASK_VFWREDUSUMVS 0xfc00707f
-#define MATCH_VMANDMM  0x66002057
-#define MASK_VMANDMM  0xfe00707f
-#define MATCH_VMNANDMM  0x76002057
-#define MASK_VMNANDMM  0xfe00707f
-#define MATCH_VMANDNMM 0x62002057
-#define MASK_VMANDNMM  0xfe00707f
-#define MATCH_VMXORMM  0x6e002057
-#define MASK_VMXORMM  0xfe00707f
-#define MATCH_VMORMM  0x6a002057
-#define MASK_VMORMM  0xfe00707f
-#define MATCH_VMNORMM  0x7a002057
-#define MASK_VMNORMM  0xfe00707f
-#define MATCH_VMORNMM  0x72002057
-#define MASK_VMORNMM  0xfe00707f
-#define MATCH_VMXNORMM  0x7e002057
-#define MASK_VMXNORMM  0xfe00707f
-#define MATCH_VCPOPM  0x40082057
-#define MASK_VCPOPM  0xfc0ff07f
-#define MATCH_VFIRSTM  0x4008a057
-#define MASK_VFIRSTM  0xfc0ff07f
-#define MATCH_VMSBFM  0x5000a057
-#define MASK_VMSBFM  0xfc0ff07f
-#define MATCH_VMSIFM  0x5001a057
-#define MASK_VMSIFM  0xfc0ff07f
-#define MATCH_VMSOFM  0x50012057
-#define MASK_VMSOFM  0xfc0ff07f
-#define MATCH_VIOTAM  0x50082057
-#define MASK_VIOTAM  0xfc0ff07f
-#define MATCH_VIDV  0x5008a057
-#define MASK_VIDV  0xfdfff07f
-#define MATCH_VMVXS  0x42002057
-#define MASK_VMVXS  0xfe0ff07f
-#define MATCH_VMVSX  0x42006057
-#define MASK_VMVSX  0xfff0707f
-#define MATCH_VFMVFS  0x42001057
-#define MASK_VFMVFS  0xfe0ff07f
-#define MATCH_VFMVSF  0x42005057
-#define MASK_VFMVSF  0xfff0707f
-#define MATCH_VSLIDEUPVX 0x38004057
-#define MASK_VSLIDEUPVX  0xfc00707f
-#define MATCH_VSLIDEUPVI 0x38003057
-#define MASK_VSLIDEUPVI  0xfc00707f
-#define MATCH_VSLIDEDOWNVX 0x3c004057
-#define MASK_VSLIDEDOWNVX 0xfc00707f
-#define MATCH_VSLIDEDOWNVI 0x3c003057
-#define MASK_VSLIDEDOWNVI 0xfc00707f
-#define MATCH_VSLIDE1UPVX 0x38006057
-#define MASK_VSLIDE1UPVX 0xfc00707f
-#define MATCH_VSLIDE1DOWNVX 0x3c006057
-#define MASK_VSLIDE1DOWNVX 0xfc00707f
-#define MATCH_VFSLIDE1UPVF 0x38005057
-#define MASK_VFSLIDE1UPVF 0xfc00707f
-#define MATCH_VFSLIDE1DOWNVF 0x3c005057
-#define MASK_VFSLIDE1DOWNVF 0xfc00707f
-#define MATCH_VRGATHERVV 0x30000057
-#define MASK_VRGATHERVV  0xfc00707f
-#define MATCH_VRGATHERVX 0x30004057
-#define MASK_VRGATHERVX  0xfc00707f
-#define MATCH_VRGATHERVI 0x30003057
-#define MASK_VRGATHERVI  0xfc00707f
-#define MATCH_VRGATHEREI16VV 0x38000057
-#define MASK_VRGATHEREI16VV 0xfc00707f
-#define MATCH_VCOMPRESSVM 0x5e002057
-#define MASK_VCOMPRESSVM 0xfe00707f
-#define MATCH_VMV1RV  0x9e003057
-#define MASK_VMV1RV  0xfe0ff07f
-#define MATCH_VMV2RV  0x9e00b057
-#define MASK_VMV2RV  0xfe0ff07f
-#define MATCH_VMV4RV  0x9e01b057
-#define MASK_VMV4RV  0xfe0ff07f
-#define MATCH_VMV8RV  0x9e03b057
-#define MASK_VMV8RV  0xfe0ff07f
-#define MATCH_VDOTVV  0xe4000057
-#define MASK_VDOTVV  0xfc00707f
-#define MATCH_VDOTUVV  0xe0000057
-#define MASK_VDOTUVV  0xfc00707f
-#define MATCH_VFDOTVV  0xe4001057
-#define MASK_VFDOTVV  0xfc00707f
+enum riscv_encodings {
+MATCH_SLLI_RV32=0x1013, MASK_SLLI_RV32= 0xfe00707f, MATCH_SRLI_RV32=0x5013,
+MASK_SRLI_RV32= 0xfe00707f, MATCH_SRAI_RV32=0x40005013, MASK_SRAI_RV32= 0xfe00707f,
+MATCH_FRFLAGS=0x102073, MASK_FRFLAGS= 0xfffff07f, MATCH_FSFLAGS=0x101073,
+MASK_FSFLAGS= 0xfff0707f, MATCH_FSFLAGSI=0x105073, MASK_FSFLAGSI= 0xfff0707f,
+MATCH_FRRM=0x202073, MASK_FRRM= 0xfffff07f, MATCH_FSRM=0x201073,
+MASK_FSRM= 0xfff0707f, MATCH_FSRMI=0x205073, MASK_FSRMI= 0xfff0707f,
+MATCH_FSCSR=0x301073, MASK_FSCSR= 0xfff0707f, MATCH_FRCSR=0x302073,
+MASK_FRCSR= 0xfffff07f, MATCH_RDCYCLE=0xc0002073, MASK_RDCYCLE= 0xfffff07f,
+MATCH_RDTIME=0xc0102073, MASK_RDTIME= 0xfffff07f, MATCH_RDINSTRET=0xc0202073,
+MASK_RDINSTRET= 0xfffff07f, MATCH_RDCYCLEH=0xc8002073, MASK_RDCYCLEH= 0xfffff07f,
+MATCH_RDTIMEH=0xc8102073, MASK_RDTIMEH= 0xfffff07f, MATCH_RDINSTRETH=0xc8202073,
+MASK_RDINSTRETH= 0xfffff07f, MATCH_SCALL=0x73, MASK_SCALL= 0xffffffff,
+MATCH_SBREAK=0x100073, MASK_SBREAK= 0xffffffff, MATCH_BEQ=0x63,
+MASK_BEQ= 0x707f, MATCH_BNE=0x1063, MASK_BNE= 0x707f, MATCH_BLT=0x4063,
+MASK_BLT= 0x707f, MATCH_BGE=0x5063, MASK_BGE= 0x707f, MATCH_BLTU=0x6063,
+MASK_BLTU= 0x707f, MATCH_BGEU=0x7063, MASK_BGEU= 0x707f, MATCH_JALR=0x67,
+MASK_JALR= 0x707f, MATCH_JAL=0x6f, MASK_JAL= 0x7f, MATCH_LUI=0x37,
+MASK_LUI= 0x7f, MATCH_AUIPC=0x17, MASK_AUIPC= 0x7f, MATCH_ADDI=0x13,
+MASK_ADDI= 0x707f, MATCH_SLLI=0x1013, MASK_SLLI= 0xfc00707f, MATCH_SLTI=0x2013,
+MASK_SLTI= 0x707f, MATCH_SLTIU=0x3013, MASK_SLTIU= 0x707f, MATCH_XORI=0x4013,
+MASK_XORI= 0x707f, MATCH_SRLI=0x5013, MASK_SRLI= 0xfc00707f, MATCH_SRAI=0x40005013,
+MASK_SRAI= 0xfc00707f, MATCH_ORI=0x6013, MASK_ORI= 0x707f, MATCH_ANDI=0x7013,
+MASK_ANDI= 0x707f, MATCH_ADD=0x33, MASK_ADD= 0xfe00707f, MATCH_SUB=0x40000033,
+MASK_SUB= 0xfe00707f, MATCH_SLL=0x1033, MASK_SLL= 0xfe00707f, MATCH_SLT=0x2033,
+MASK_SLT= 0xfe00707f, MATCH_SLTU=0x3033, MASK_SLTU= 0xfe00707f, MATCH_XOR=0x4033,
+MASK_XOR= 0xfe00707f, MATCH_SRL=0x5033, MASK_SRL= 0xfe00707f, MATCH_SRA=0x40005033,
+MASK_SRA= 0xfe00707f, MATCH_OR=0x6033, MASK_OR= 0xfe00707f, MATCH_AND=0x7033,
+MASK_AND= 0xfe00707f, MATCH_ADDIW=0x1b, MASK_ADDIW= 0x707f, MATCH_SLLIW=0x101b,
+MASK_SLLIW= 0xfe00707f, MATCH_SRLIW=0x501b, MASK_SRLIW= 0xfe00707f, MATCH_SRAIW=0x4000501b,
+MASK_SRAIW= 0xfe00707f, MATCH_ADDW=0x3b, MASK_ADDW= 0xfe00707f, MATCH_SUBW=0x4000003b,
+MASK_SUBW= 0xfe00707f, MATCH_SLLW=0x103b, MASK_SLLW= 0xfe00707f, MATCH_SRLW=0x503b,
+MASK_SRLW= 0xfe00707f, MATCH_SRAW=0x4000503b, MASK_SRAW= 0xfe00707f, MATCH_LB=0x3,
+MASK_LB= 0x707f, MATCH_LH=0x1003, MASK_LH= 0x707f, MATCH_LW=0x2003,
+MASK_LW= 0x707f, MATCH_LD=0x3003, MASK_LD= 0x707f, MATCH_LBU=0x4003,
+MASK_LBU= 0x707f, MATCH_LHU=0x5003, MASK_LHU= 0x707f, MATCH_LWU=0x6003,
+MASK_LWU= 0x707f, MATCH_SB=0x23, MASK_SB= 0x707f, MATCH_SH=0x1023,
+MASK_SH= 0x707f, MATCH_SW=0x2023, MASK_SW= 0x707f, MATCH_SD=0x3023,
+MASK_SD= 0x707f, MATCH_PAUSE=0x0100000f, MASK_PAUSE= 0xffffffff, MATCH_FENCE=0xf,
+MASK_FENCE= 0x707f, MATCH_FENCE_I=0x100f, MASK_FENCE_I= 0x707f, MATCH_FENCE_TSO=0x8330000f,
+MASK_FENCE_TSO= 0xfff0707f, MATCH_MUL=0x2000033, MASK_MUL= 0xfe00707f, MATCH_MULH=0x2001033,
+MASK_MULH= 0xfe00707f, MATCH_MULHSU=0x2002033, MASK_MULHSU= 0xfe00707f, MATCH_MULHU=0x2003033,
+MASK_MULHU= 0xfe00707f, MATCH_DIV=0x2004033, MASK_DIV= 0xfe00707f, MATCH_DIVU=0x2005033,
+MASK_DIVU= 0xfe00707f, MATCH_REM=0x2006033, MASK_REM= 0xfe00707f, MATCH_REMU=0x2007033,
+MASK_REMU= 0xfe00707f, MATCH_MULW=0x200003b, MASK_MULW= 0xfe00707f, MATCH_DIVW=0x200403b,
+MASK_DIVW= 0xfe00707f, MATCH_DIVUW=0x200503b, MASK_DIVUW= 0xfe00707f, MATCH_REMW=0x200603b,
+MASK_REMW= 0xfe00707f, MATCH_REMUW=0x200703b, MASK_REMUW= 0xfe00707f, MATCH_AMOADD_W=0x202f,
+MASK_AMOADD_W= 0xf800707f, MATCH_AMOXOR_W=0x2000202f, MASK_AMOXOR_W= 0xf800707f,
+MATCH_AMOOR_W=0x4000202f, MASK_AMOOR_W= 0xf800707f, MATCH_AMOAND_W=0x6000202f,
+MASK_AMOAND_W= 0xf800707f, MATCH_AMOMIN_W=0x8000202f, MASK_AMOMIN_W= 0xf800707f,
+MATCH_AMOMAX_W=0xa000202f, MASK_AMOMAX_W= 0xf800707f, MATCH_AMOMINU_W=0xc000202f,
+MASK_AMOMINU_W= 0xf800707f, MATCH_AMOMAXU_W=0xe000202f, MASK_AMOMAXU_W= 0xf800707f,
+MATCH_AMOSWAP_W=0x800202f, MASK_AMOSWAP_W= 0xf800707f, MATCH_LR_W=0x1000202f,
+MASK_LR_W= 0xf9f0707f, MATCH_SC_W=0x1800202f, MASK_SC_W= 0xf800707f,
+MATCH_AMOADD_D=0x302f, MASK_AMOADD_D= 0xf800707f, MATCH_AMOXOR_D=0x2000302f,
+MASK_AMOXOR_D= 0xf800707f, MATCH_AMOOR_D=0x4000302f, MASK_AMOOR_D= 0xf800707f,
+MATCH_AMOAND_D=0x6000302f, MASK_AMOAND_D= 0xf800707f, MATCH_AMOMIN_D=0x8000302f,
+MASK_AMOMIN_D= 0xf800707f, MATCH_AMOMAX_D=0xa000302f, MASK_AMOMAX_D= 0xf800707f,
+MATCH_AMOMINU_D=0xc000302f, MASK_AMOMINU_D= 0xf800707f, MATCH_AMOMAXU_D=0xe000302f,
+MASK_AMOMAXU_D= 0xf800707f, MATCH_AMOSWAP_D=0x800302f, MASK_AMOSWAP_D= 0xf800707f,
+MATCH_LR_D=0x1000302f, MASK_LR_D= 0xf9f0707f, MATCH_SC_D=0x1800302f,
+MASK_SC_D= 0xf800707f, MATCH_ECALL=0x73, MASK_ECALL= 0xffffffff,
+MATCH_EBREAK=0x100073, MASK_EBREAK= 0xffffffff, MATCH_URET=0x200073,
+MASK_URET= 0xffffffff, MATCH_SRET=0x10200073, MASK_SRET= 0xffffffff,
+MATCH_HRET=0x20200073, MASK_HRET= 0xffffffff, MATCH_MRET=0x30200073,
+MASK_MRET= 0xffffffff, MATCH_DRET=0x7b200073, MASK_DRET= 0xffffffff,
+MATCH_SFENCE_VM=0x10400073, MASK_SFENCE_VM= 0xfff07fff, MATCH_SFENCE_VMA=0x12000073,
+MASK_SFENCE_VMA= 0xfe007fff, MATCH_WFI=0x10500073, MASK_WFI= 0xffffffff,
+MATCH_CSRRW=0x1073, MASK_CSRRW= 0x707f, MATCH_CSRRS=0x2073,
+MASK_CSRRS= 0x707f, MATCH_CSRRC=0x3073, MASK_CSRRC= 0x707f,
+MATCH_CSRRWI=0x5073, MASK_CSRRWI= 0x707f, MATCH_CSRRSI=0x6073,
+MASK_CSRRSI= 0x707f, MATCH_CSRRCI=0x7073, MASK_CSRRCI= 0x707f,
+MATCH_FADD_S=0x53, MASK_FADD_S= 0xfe00007f, MATCH_FSUB_S=0x8000053,
+MASK_FSUB_S= 0xfe00007f, MATCH_FMUL_S=0x10000053, MASK_FMUL_S= 0xfe00007f,
+MATCH_FDIV_S=0x18000053, MASK_FDIV_S= 0xfe00007f, MATCH_FSGNJ_S=0x20000053,
+MASK_FSGNJ_S= 0xfe00707f, MATCH_FSGNJN_S=0x20001053, MASK_FSGNJN_S= 0xfe00707f,
+MATCH_FSGNJX_S=0x20002053, MASK_FSGNJX_S= 0xfe00707f, MATCH_FMIN_S=0x28000053,
+MASK_FMIN_S= 0xfe00707f, MATCH_FMAX_S=0x28001053, MASK_FMAX_S= 0xfe00707f,
+MATCH_FSQRT_S=0x58000053, MASK_FSQRT_S= 0xfff0007f, MATCH_FADD_D=0x2000053,
+MASK_FADD_D= 0xfe00007f, MATCH_FSUB_D=0xa000053, MASK_FSUB_D= 0xfe00007f,
+MATCH_FMUL_D=0x12000053, MASK_FMUL_D= 0xfe00007f, MATCH_FDIV_D=0x1a000053,
+MASK_FDIV_D= 0xfe00007f, MATCH_FSGNJ_D=0x22000053, MASK_FSGNJ_D= 0xfe00707f,
+MATCH_FSGNJN_D=0x22001053, MASK_FSGNJN_D= 0xfe00707f, MATCH_FSGNJX_D=0x22002053,
+MASK_FSGNJX_D= 0xfe00707f, MATCH_FMIN_D=0x2a000053, MASK_FMIN_D= 0xfe00707f,
+MATCH_FMAX_D=0x2a001053, MASK_FMAX_D= 0xfe00707f, MATCH_FCVT_S_D=0x40100053,
+MASK_FCVT_S_D= 0xfff0007f, MATCH_FCVT_D_S=0x42000053, MASK_FCVT_D_S= 0xfff0007f,
+MATCH_FSQRT_D=0x5a000053, MASK_FSQRT_D= 0xfff0007f, MATCH_FADD_Q=0x6000053,
+MASK_FADD_Q= 0xfe00007f, MATCH_FSUB_Q=0xe000053, MASK_FSUB_Q= 0xfe00007f,
+MATCH_FMUL_Q=0x16000053, MASK_FMUL_Q= 0xfe00007f, MATCH_FDIV_Q=0x1e000053,
+MASK_FDIV_Q= 0xfe00007f, MATCH_FSGNJ_Q=0x26000053, MASK_FSGNJ_Q= 0xfe00707f,
+MATCH_FSGNJN_Q=0x26001053, MASK_FSGNJN_Q= 0xfe00707f, MATCH_FSGNJX_Q=0x26002053,
+MASK_FSGNJX_Q= 0xfe00707f, MATCH_FMIN_Q=0x2e000053, MASK_FMIN_Q= 0xfe00707f,
+MATCH_FMAX_Q=0x2e001053, MASK_FMAX_Q= 0xfe00707f, MATCH_FCVT_S_Q=0x40300053,
+MASK_FCVT_S_Q= 0xfff0007f, MATCH_FCVT_Q_S=0x46000053, MASK_FCVT_Q_S= 0xfff0007f,
+MATCH_FCVT_D_Q=0x42300053, MASK_FCVT_D_Q= 0xfff0007f, MATCH_FCVT_Q_D=0x46100053,
+MASK_FCVT_Q_D= 0xfff0007f, MATCH_FSQRT_Q=0x5e000053, MASK_FSQRT_Q= 0xfff0007f,
+MATCH_FLE_S=0xa0000053, MASK_FLE_S= 0xfe00707f, MATCH_FLT_S=0xa0001053,
+MASK_FLT_S= 0xfe00707f, MATCH_FEQ_S=0xa0002053, MASK_FEQ_S= 0xfe00707f,
+MATCH_FLE_D=0xa2000053, MASK_FLE_D= 0xfe00707f, MATCH_FLT_D=0xa2001053,
+MASK_FLT_D= 0xfe00707f, MATCH_FEQ_D=0xa2002053, MASK_FEQ_D= 0xfe00707f,
+MATCH_FLE_Q=0xa6000053, MASK_FLE_Q= 0xfe00707f, MATCH_FLT_Q=0xa6001053,
+MASK_FLT_Q= 0xfe00707f, MATCH_FEQ_Q=0xa6002053, MASK_FEQ_Q= 0xfe00707f,
+MATCH_FCVT_W_S=0xc0000053, MASK_FCVT_W_S= 0xfff0007f, MATCH_FCVT_WU_S=0xc0100053,
+MASK_FCVT_WU_S= 0xfff0007f, MATCH_FCVT_L_S=0xc0200053, MASK_FCVT_L_S= 0xfff0007f,
+MATCH_FCVT_LU_S=0xc0300053, MASK_FCVT_LU_S= 0xfff0007f, MATCH_FMV_X_S=0xe0000053,
+MASK_FMV_X_S= 0xfff0707f, MATCH_FCLASS_S=0xe0001053, MASK_FCLASS_S= 0xfff0707f,
+MATCH_FCVT_W_D=0xc2000053, MASK_FCVT_W_D= 0xfff0007f, MATCH_FCVT_WU_D=0xc2100053,
+MASK_FCVT_WU_D= 0xfff0007f, MATCH_FCVT_L_D=0xc2200053, MASK_FCVT_L_D= 0xfff0007f,
+MATCH_FCVT_LU_D=0xc2300053, MASK_FCVT_LU_D= 0xfff0007f, MATCH_FMV_X_D=0xe2000053,
+MASK_FMV_X_D= 0xfff0707f, MATCH_FCLASS_D=0xe2001053, MASK_FCLASS_D= 0xfff0707f,
+MATCH_FCVT_W_Q=0xc6000053, MASK_FCVT_W_Q= 0xfff0007f, MATCH_FCVT_WU_Q=0xc6100053,
+MASK_FCVT_WU_Q= 0xfff0007f, MATCH_FCVT_L_Q=0xc6200053, MASK_FCVT_L_Q= 0xfff0007f,
+MATCH_FCVT_LU_Q=0xc6300053, MASK_FCVT_LU_Q= 0xfff0007f, MATCH_FCLASS_Q=0xe6001053,
+MASK_FCLASS_Q= 0xfff0707f, MATCH_FCVT_S_W=0xd0000053, MASK_FCVT_S_W= 0xfff0007f,
+MATCH_FCVT_S_WU=0xd0100053, MASK_FCVT_S_WU= 0xfff0007f, MATCH_FCVT_S_L=0xd0200053,
+MASK_FCVT_S_L= 0xfff0007f, MATCH_FCVT_S_LU=0xd0300053, MASK_FCVT_S_LU= 0xfff0007f,
+MATCH_FMV_S_X=0xf0000053, MASK_FMV_S_X= 0xfff0707f, MATCH_FCVT_D_W=0xd2000053,
+MASK_FCVT_D_W= 0xfff0007f, MATCH_FCVT_D_WU=0xd2100053, MASK_FCVT_D_WU= 0xfff0007f,
+MATCH_FCVT_D_L=0xd2200053, MASK_FCVT_D_L= 0xfff0007f, MATCH_FCVT_D_LU=0xd2300053,
+MASK_FCVT_D_LU= 0xfff0007f, MATCH_FMV_D_X=0xf2000053, MASK_FMV_D_X= 0xfff0707f,
+MATCH_FCVT_Q_W=0xd6000053, MASK_FCVT_Q_W= 0xfff0007f, MATCH_FCVT_Q_WU=0xd6100053,
+MASK_FCVT_Q_WU= 0xfff0007f, MATCH_FCVT_Q_L=0xd6200053, MASK_FCVT_Q_L= 0xfff0007f,
+MATCH_FCVT_Q_LU=0xd6300053, MASK_FCVT_Q_LU= 0xfff0007f, MATCH_CLZ=0x60001013,
+MASK_CLZ= 0xfff0707f, MATCH_CTZ=0x60101013, MASK_CTZ= 0xfff0707f,
+MATCH_CPOP=0x60201013, MASK_CPOP= 0xfff0707f, MATCH_MIN=0xa004033,
+MASK_MIN= 0xfe00707f, MATCH_MINU=0xa005033, MASK_MINU= 0xfe00707f,
+MATCH_MAX=0xa006033, MASK_MAX= 0xfe00707f, MATCH_MAXU=0xa007033,
+MASK_MAXU= 0xfe00707f, MATCH_SEXT_B=0x60401013, MASK_SEXT_B= 0xfff0707f,
+MATCH_SEXT_H=0x60501013, MASK_SEXT_H= 0xfff0707f, MATCH_PACK=0x8004033,
+MASK_PACK= 0xfe00707f, MATCH_PACKH=0x8007033, MASK_PACKH= 0xfe00707f,
+MATCH_PACKW=0x800403b, MASK_PACKW= 0xfe00707f, MATCH_ANDN=0x40007033,
+MASK_ANDN= 0xfe00707f, MATCH_ORN=0x40006033, MASK_ORN= 0xfe00707f,
+MATCH_XNOR=0x40004033, MASK_XNOR= 0xfe00707f, MATCH_ROL=0x60001033,
+MASK_ROL= 0xfe00707f, MATCH_ROR=0x60005033, MASK_ROR= 0xfe00707f,
+MATCH_RORI=0x60005013, MASK_RORI= 0xfc00707f, MATCH_GREVI=0x68005013,
+MASK_GREVI= 0xfc00707f, MATCH_GORCI=0x28005013, MASK_GORCI= 0xfc00707f,
+MATCH_SHFLI=0x8001013, MASK_SHFLI= 0xfe00707f, MATCH_UNSHFLI=0x8005013,
+MASK_UNSHFLI= 0xfe00707f, MATCH_CLZW=0x6000101b, MASK_CLZW= 0xfff0707f,
+MATCH_CTZW=0x6010101b, MASK_CTZW= 0xfff0707f, MATCH_CPOPW=0x6020101b,
+MASK_CPOPW= 0xfff0707f, MATCH_ROLW=0x6000103b, MASK_ROLW= 0xfe00707f,
+MATCH_RORW=0x6000503b, MASK_RORW= 0xfe00707f, MATCH_RORIW=0x6000501b,
+MASK_RORIW= 0xfe00707f, MATCH_SH1ADD=0x20002033, MASK_SH1ADD= 0xfe00707f,
+MATCH_SH2ADD=0x20004033, MASK_SH2ADD= 0xfe00707f, MATCH_SH3ADD=0x20006033,
+MASK_SH3ADD= 0xfe00707f, MATCH_SH1ADD_UW=0x2000203b, MASK_SH1ADD_UW= 0xfe00707f,
+MATCH_SH2ADD_UW=0x2000403b, MASK_SH2ADD_UW= 0xfe00707f, MATCH_SH3ADD_UW=0x2000603b,
+MASK_SH3ADD_UW= 0xfe00707f, MATCH_ADD_UW=0x800003b, MASK_ADD_UW= 0xfe00707f,
+MATCH_SLLI_UW=0x800101b, MASK_SLLI_UW= 0xfc00707f, MATCH_CLMUL=0xa001033,
+MASK_CLMUL= 0xfe00707f, MATCH_CLMULH=0xa003033, MASK_CLMULH= 0xfe00707f,
+MATCH_CLMULR=0xa002033, MASK_CLMULR= 0xfe00707f, MATCH_XPERM4=0x28002033,
+MASK_XPERM4= 0xfe00707f, MATCH_XPERM8=0x28004033, MASK_XPERM8= 0xfe00707f,
+MATCH_BCLRI=0x48001013, MASK_BCLRI= 0xfc00707f, MATCH_BSETI=0x28001013,
+MASK_BSETI= 0xfc00707f, MATCH_BINVI=0x68001013, MASK_BINVI= 0xfc00707f,
+MATCH_BEXTI=0x48005013, MASK_BEXTI= 0xfc00707f, MATCH_BCLR= 0x48001033,
+MASK_BCLR=  0xfe00707f, MATCH_BSET= 0x28001033, MASK_BSET=  0xfe00707f,
+MATCH_BINV= 0x68001033, MASK_BINV=  0xfe00707f, MATCH_BEXT= 0x48005033,
+MASK_BEXT=  0xfe00707f, MATCH_FLW=0x2007, MASK_FLW= 0x707f,
+MATCH_FLD=0x3007, MASK_FLD= 0x707f, MATCH_FLQ=0x4007,
+MASK_FLQ= 0x707f, MATCH_FSW=0x2027, MASK_FSW= 0x707f,
+MATCH_FSD=0x3027, MASK_FSD= 0x707f, MATCH_FSQ=0x4027,
+MASK_FSQ= 0x707f, MATCH_FMADD_S=0x43, MASK_FMADD_S= 0x600007f,
+MATCH_FMSUB_S=0x47, MASK_FMSUB_S= 0x600007f, MATCH_FNMSUB_S=0x4b,
+MASK_FNMSUB_S= 0x600007f, MATCH_FNMADD_S=0x4f, MASK_FNMADD_S= 0x600007f,
+MATCH_FMADD_D=0x2000043, MASK_FMADD_D= 0x600007f, MATCH_FMSUB_D=0x2000047,
+MASK_FMSUB_D= 0x600007f, MATCH_FNMSUB_D=0x200004b, MASK_FNMSUB_D= 0x600007f,
+MATCH_FNMADD_D=0x200004f, MASK_FNMADD_D= 0x600007f, MATCH_FMADD_Q=0x6000043,
+MASK_FMADD_Q= 0x600007f, MATCH_FMSUB_Q=0x6000047, MASK_FMSUB_Q= 0x600007f,
+MATCH_FNMSUB_Q=0x600004b, MASK_FNMSUB_Q= 0x600007f, MATCH_FNMADD_Q=0x600004f,
+MASK_FNMADD_Q= 0x600007f, MATCH_C_ADDI4SPN=0x0, MASK_C_ADDI4SPN= 0xe003,
+MATCH_C_FLD=0x2000, MASK_C_FLD= 0xe003, MATCH_C_LW=0x4000,
+MASK_C_LW= 0xe003, MATCH_C_FLW=0x6000, MASK_C_FLW= 0xe003,
+MATCH_C_FSD=0xa000, MASK_C_FSD= 0xe003, MATCH_C_SW=0xc000,
+MASK_C_SW= 0xe003, MATCH_C_FSW=0xe000, MASK_C_FSW= 0xe003,
+MATCH_C_ADDI=0x1, MASK_C_ADDI= 0xe003, MATCH_C_JAL=0x2001,
+MASK_C_JAL= 0xe003, MATCH_C_LI=0x4001, MASK_C_LI= 0xe003,
+MATCH_C_LUI=0x6001, MASK_C_LUI= 0xe003, MATCH_C_SRLI=0x8001,
+MASK_C_SRLI= 0xec03, MATCH_C_SRLI64=0x8001, MASK_C_SRLI64= 0xfc7f,
+MATCH_C_SRAI=0x8401, MASK_C_SRAI= 0xec03, MATCH_C_SRAI64=0x8401,
+MASK_C_SRAI64= 0xfc7f, MATCH_C_ANDI=0x8801, MASK_C_ANDI= 0xec03,
+MATCH_C_SUB=0x8c01, MASK_C_SUB= 0xfc63, MATCH_C_XOR=0x8c21,
+MASK_C_XOR= 0xfc63, MATCH_C_OR=0x8c41, MASK_C_OR= 0xfc63,
+MATCH_C_AND=0x8c61, MASK_C_AND= 0xfc63, MATCH_C_SUBW=0x9c01,
+MASK_C_SUBW= 0xfc63, MATCH_C_ADDW=0x9c21, MASK_C_ADDW= 0xfc63,
+MATCH_C_J=0xa001, MASK_C_J= 0xe003, MATCH_C_BEQZ=0xc001,
+MASK_C_BEQZ= 0xe003, MATCH_C_BNEZ=0xe001, MASK_C_BNEZ= 0xe003,
+MATCH_C_SLLI=0x2, MASK_C_SLLI= 0xe003, MATCH_C_SLLI64=0x2,
+MASK_C_SLLI64=0xf07f, MATCH_C_FLDSP=0x2002, MASK_C_FLDSP= 0xe003,
+MATCH_C_LWSP=0x4002, MASK_C_LWSP= 0xe003, MATCH_C_FLWSP=0x6002,
+MASK_C_FLWSP= 0xe003, MATCH_C_MV=0x8002, MASK_C_MV= 0xf003,
+MATCH_C_ADD=0x9002, MASK_C_ADD= 0xf003, MATCH_C_FSDSP=0xa002,
+MASK_C_FSDSP= 0xe003, MATCH_C_SWSP=0xc002, MASK_C_SWSP= 0xe003,
+MATCH_C_FSWSP=0xe002, MASK_C_FSWSP= 0xe003, MATCH_C_NOP=0x1,
+MASK_C_NOP= 0xffff, MATCH_C_ADDI16SP=0x6101, MASK_C_ADDI16SP= 0xef83,
+MATCH_C_JR=0x8002, MASK_C_JR= 0xf07f, MATCH_C_JALR=0x9002,
+MASK_C_JALR= 0xf07f, MATCH_C_EBREAK=0x9002, MASK_C_EBREAK= 0xffff,
+MATCH_C_LD=0x6000, MASK_C_LD= 0xe003, MATCH_C_SD=0xe000,
+MASK_C_SD= 0xe003, MATCH_C_ADDIW=0x2001, MASK_C_ADDIW= 0xe003,
+MATCH_C_LDSP=0x6002, MASK_C_LDSP= 0xe003, MATCH_C_SDSP=0xe002,
+MASK_C_SDSP= 0xe003, MATCH_SM3P0=0x10801013, MASK_SM3P0= 0xfff0707f,
+MATCH_SM3P1=0x10901013, MASK_SM3P1= 0xfff0707f, MATCH_SHA256SUM0=0x10001013,
+MASK_SHA256SUM0= 0xfff0707f, MATCH_SHA256SUM1=0x10101013, MASK_SHA256SUM1= 0xfff0707f,
+MATCH_SHA256SIG0=0x10201013, MASK_SHA256SIG0= 0xfff0707f, MATCH_SHA256SIG1=0x10301013,
+MASK_SHA256SIG1= 0xfff0707f, MATCH_SHA512SUM0R=0x50000033, MASK_SHA512SUM0R= 0xfe00707f,
+MATCH_SHA512SUM1R=0x52000033, MASK_SHA512SUM1R= 0xfe00707f, MATCH_SHA512SIG0L=0x54000033,
+MASK_SHA512SIG0L= 0xfe00707f, MATCH_SHA512SIG0H=0x5c000033, MASK_SHA512SIG0H= 0xfe00707f,
+MATCH_SHA512SIG1L=0x56000033, MASK_SHA512SIG1L= 0xfe00707f, MATCH_SHA512SIG1H=0x5e000033,
+MASK_SHA512SIG1H= 0xfe00707f, MATCH_SM4ED=0x30000033, MASK_SM4ED= 0x3e00707f,
+MATCH_SM4KS=0x34000033, MASK_SM4KS= 0x3e00707f, MATCH_AES32ESMI=0x26000033,
+MASK_AES32ESMI= 0x3e00707f, MATCH_AES32ESI=0x22000033, MASK_AES32ESI= 0x3e00707f,
+MATCH_AES32DSMI=0x2e000033, MASK_AES32DSMI= 0x3e00707f, MATCH_AES32DSI=0x2a000033,
+MASK_AES32DSI= 0x3e00707f, MATCH_SHA512SUM0=0x10401013, MASK_SHA512SUM0= 0xfff0707f,
+MATCH_SHA512SUM1=0x10501013, MASK_SHA512SUM1= 0xfff0707f, MATCH_SHA512SIG0=0x10601013,
+MASK_SHA512SIG0= 0xfff0707f, MATCH_SHA512SIG1=0x10701013, MASK_SHA512SIG1= 0xfff0707f,
+MATCH_AES64KS1I=0x31001013, MASK_AES64KS1I= 0xff00707f, MATCH_AES64IM=0x30001013,
+MASK_AES64IM= 0xfff0707f, MATCH_AES64KS2=0x7e000033, MASK_AES64KS2= 0xfe00707f,
+MATCH_AES64ESM=0x36000033, MASK_AES64ESM= 0xfe00707f, MATCH_AES64ES=0x32000033,
+MASK_AES64ES= 0xfe00707f, MATCH_AES64DSM=0x3e000033, MASK_AES64DSM= 0xfe00707f,
+MATCH_AES64DS=0x3a000033, MASK_AES64DS= 0xfe00707f, MATCH_FADD_H=0x4000053,
+MASK_FADD_H=0xfe00007f, MATCH_FSUB_H=0xc000053, MASK_FSUB_H=0xfe00007f,
+MATCH_FMUL_H=0x14000053, MASK_FMUL_H=0xfe00007f, MATCH_FDIV_H=0x1c000053,
+MASK_FDIV_H=0xfe00007f, MATCH_FSGNJ_H=0x24000053, MASK_FSGNJ_H=0xfe00707f,
+MATCH_FSGNJN_H=0x24001053, MASK_FSGNJN_H=0xfe00707f, MATCH_FSGNJX_H=0x24002053,
+MASK_FSGNJX_H=0xfe00707f, MATCH_FMIN_H=0x2c000053, MASK_FMIN_H=0xfe00707f,
+MATCH_FMAX_H=0x2c001053, MASK_FMAX_H=0xfe00707f, MATCH_FCVT_H_S=0x44000053,
+MASK_FCVT_H_S=0xfff0007f, MATCH_FCVT_S_H=0x40200053, MASK_FCVT_S_H=0xfff0007f,
+MATCH_FSQRT_H=0x5c000053, MASK_FSQRT_H=0xfff0007f, MATCH_FLE_H=0xa4000053,
+MASK_FLE_H=0xfe00707f, MATCH_FLT_H=0xa4001053, MASK_FLT_H=0xfe00707f,
+MATCH_FEQ_H=0xa4002053, MASK_FEQ_H=0xfe00707f, MATCH_FCVT_W_H=0xc4000053,
+MASK_FCVT_W_H=0xfff0007f, MATCH_FCVT_WU_H=0xc4100053, MASK_FCVT_WU_H=0xfff0007f,
+MATCH_FMV_X_H=0xe4000053, MASK_FMV_X_H=0xfff0707f, MATCH_FCLASS_H=0xe4001053,
+MASK_FCLASS_H=0xfff0707f, MATCH_FCVT_H_W=0xd4000053, MASK_FCVT_H_W=0xfff0007f,
+MATCH_FCVT_H_WU=0xd4100053, MASK_FCVT_H_WU=0xfff0007f, MATCH_FMV_H_X=0xf4000053,
+MASK_FMV_H_X=0xfff0707f, MATCH_FLH=0x1007, MASK_FLH=0x707f,
+MATCH_FSH=0x1027, MASK_FSH=0x707f, MATCH_FMADD_H=0x4000043,
+MASK_FMADD_H=0x600007f, MATCH_FMSUB_H=0x4000047, MASK_FMSUB_H=0x600007f,
+MATCH_FNMSUB_H=0x400004b, MASK_FNMSUB_H=0x600007f, MATCH_FNMADD_H=0x400004f,
+MASK_FNMADD_H=0x600007f, MATCH_FCVT_H_D=0x44100053, MASK_FCVT_H_D=0xfff0007f,
+MATCH_FCVT_D_H=0x42200053, MASK_FCVT_D_H=0xfff0007f, MATCH_FCVT_H_Q=0x44300053,
+MASK_FCVT_H_Q=0xfff0007f, MATCH_FCVT_Q_H=0x46200053, MASK_FCVT_Q_H=0xfff0007f,
+MATCH_FCVT_L_H=0xc4200053, MASK_FCVT_L_H=0xfff0007f, MATCH_FCVT_LU_H=0xc4300053,
+MASK_FCVT_LU_H=0xfff0007f, MATCH_FCVT_H_L=0xd4200053, MASK_FCVT_H_L=0xfff0007f,
+MATCH_FCVT_H_LU=0xd4300053, MASK_FCVT_H_LU=0xfff0007f, MATCH_VSETVL= 0x80007057,
+MASK_VSETVL= 0xfe00707f, MATCH_VSETIVLI= 0xc0007057, MASK_VSETIVLI= 0xc000707f,
+MATCH_VSETVLI= 0x00007057, MASK_VSETVLI= 0x8000707f, MATCH_VLMV= 0x02b00007,
+MASK_VLMV= 0xfff0707f, MATCH_VSMV= 0x02b00027, MASK_VSMV= 0xfff0707f,
+MATCH_VLE8V= 0x00000007, MASK_VLE8V= 0xfdf0707f, MATCH_VLE16V= 0x00005007,
+MASK_VLE16V= 0xfdf0707f, MATCH_VLE32V= 0x00006007, MASK_VLE32V= 0xfdf0707f,
+MATCH_VLE64V= 0x00007007, MASK_VLE64V= 0xfdf0707f, MATCH_VSE8V= 0x00000027,
+MASK_VSE8V= 0xfdf0707f, MATCH_VSE16V= 0x00005027, MASK_VSE16V= 0xfdf0707f,
+MATCH_VSE32V= 0x00006027, MASK_VSE32V= 0xfdf0707f, MATCH_VSE64V= 0x00007027,
+MASK_VSE64V= 0xfdf0707f, MATCH_VLSE8V= 0x08000007, MASK_VLSE8V= 0xfc00707f,
+MATCH_VLSE16V= 0x08005007, MASK_VLSE16V= 0xfc00707f, MATCH_VLSE32V= 0x08006007,
+MASK_VLSE32V= 0xfc00707f, MATCH_VLSE64V= 0x08007007, MASK_VLSE64V= 0xfc00707f,
+MATCH_VSSE8V= 0x08000027, MASK_VSSE8V= 0xfc00707f, MATCH_VSSE16V= 0x08005027,
+MASK_VSSE16V= 0xfc00707f, MATCH_VSSE32V= 0x08006027, MASK_VSSE32V= 0xfc00707f,
+MATCH_VSSE64V= 0x08007027, MASK_VSSE64V= 0xfc00707f, MATCH_VLOXEI8V= 0x0c000007,
+MASK_VLOXEI8V= 0xfc00707f, MATCH_VLOXEI16V= 0x0c005007, MASK_VLOXEI16V= 0xfc00707f,
+MATCH_VLOXEI32V= 0x0c006007, MASK_VLOXEI32V= 0xfc00707f, MATCH_VLOXEI64V= 0x0c007007,
+MASK_VLOXEI64V= 0xfc00707f, MATCH_VSOXEI8V= 0x0c000027, MASK_VSOXEI8V= 0xfc00707f,
+MATCH_VSOXEI16V= 0x0c005027, MASK_VSOXEI16V= 0xfc00707f, MATCH_VSOXEI32V= 0x0c006027,
+MASK_VSOXEI32V= 0xfc00707f, MATCH_VSOXEI64V= 0x0c007027, MASK_VSOXEI64V= 0xfc00707f,
+MATCH_VLUXEI8V= 0x04000007, MASK_VLUXEI8V= 0xfc00707f, MATCH_VLUXEI16V= 0x04005007,
+MASK_VLUXEI16V= 0xfc00707f, MATCH_VLUXEI32V= 0x04006007, MASK_VLUXEI32V= 0xfc00707f,
+MATCH_VLUXEI64V= 0x04007007, MASK_VLUXEI64V= 0xfc00707f, MATCH_VSUXEI8V= 0x04000027,
+MASK_VSUXEI8V= 0xfc00707f, MATCH_VSUXEI16V= 0x04005027, MASK_VSUXEI16V= 0xfc00707f,
+MATCH_VSUXEI32V= 0x04006027, MASK_VSUXEI32V= 0xfc00707f, MATCH_VSUXEI64V= 0x04007027,
+MASK_VSUXEI64V= 0xfc00707f, MATCH_VLE8FFV= 0x01000007, MASK_VLE8FFV= 0xfdf0707f,
+MATCH_VLE16FFV= 0x01005007, MASK_VLE16FFV= 0xfdf0707f, MATCH_VLE32FFV= 0x01006007,
+MASK_VLE32FFV= 0xfdf0707f, MATCH_VLE64FFV= 0x01007007, MASK_VLE64FFV= 0xfdf0707f,
+MATCH_VLSEG2E8V= 0x20000007, MASK_VLSEG2E8V= 0xfdf0707f, MATCH_VSSEG2E8V= 0x20000027,
+MASK_VSSEG2E8V= 0xfdf0707f, MATCH_VLSEG3E8V= 0x40000007, MASK_VLSEG3E8V= 0xfdf0707f,
+MATCH_VSSEG3E8V= 0x40000027, MASK_VSSEG3E8V= 0xfdf0707f, MATCH_VLSEG4E8V= 0x60000007,
+MASK_VLSEG4E8V= 0xfdf0707f, MATCH_VSSEG4E8V= 0x60000027, MASK_VSSEG4E8V= 0xfdf0707f,
+MATCH_VLSEG5E8V= 0x80000007, MASK_VLSEG5E8V= 0xfdf0707f, MATCH_VSSEG5E8V= 0x80000027,
+MASK_VSSEG5E8V= 0xfdf0707f, MATCH_VLSEG6E8V= 0xa0000007, MASK_VLSEG6E8V= 0xfdf0707f,
+MATCH_VSSEG6E8V= 0xa0000027, MASK_VSSEG6E8V= 0xfdf0707f, MATCH_VLSEG7E8V= 0xc0000007,
+MASK_VLSEG7E8V= 0xfdf0707f, MATCH_VSSEG7E8V= 0xc0000027, MASK_VSSEG7E8V= 0xfdf0707f,
+MATCH_VLSEG8E8V= 0xe0000007, MASK_VLSEG8E8V= 0xfdf0707f, MATCH_VSSEG8E8V= 0xe0000027,
+MASK_VSSEG8E8V= 0xfdf0707f, MATCH_VLSEG2E16V=0x20005007, MASK_VLSEG2E16V= 0xfdf0707f,
+MATCH_VSSEG2E16V=0x20005027, MASK_VSSEG2E16V= 0xfdf0707f, MATCH_VLSEG3E16V=0x40005007,
+MASK_VLSEG3E16V= 0xfdf0707f, MATCH_VSSEG3E16V=0x40005027, MASK_VSSEG3E16V= 0xfdf0707f,
+MATCH_VLSEG4E16V=0x60005007, MASK_VLSEG4E16V= 0xfdf0707f, MATCH_VSSEG4E16V=0x60005027,
+MASK_VSSEG4E16V= 0xfdf0707f, MATCH_VLSEG5E16V=0x80005007, MASK_VLSEG5E16V= 0xfdf0707f,
+MATCH_VSSEG5E16V=0x80005027, MASK_VSSEG5E16V= 0xfdf0707f, MATCH_VLSEG6E16V=0xa0005007,
+MASK_VLSEG6E16V= 0xfdf0707f, MATCH_VSSEG6E16V=0xa0005027, MASK_VSSEG6E16V= 0xfdf0707f,
+MATCH_VLSEG7E16V=0xc0005007, MASK_VLSEG7E16V= 0xfdf0707f, MATCH_VSSEG7E16V=0xc0005027,
+MASK_VSSEG7E16V= 0xfdf0707f, MATCH_VLSEG8E16V=0xe0005007, MASK_VLSEG8E16V= 0xfdf0707f,
+MATCH_VSSEG8E16V=0xe0005027, MASK_VSSEG8E16V= 0xfdf0707f, MATCH_VLSEG2E32V=0x20006007,
+MASK_VLSEG2E32V= 0xfdf0707f, MATCH_VSSEG2E32V=0x20006027, MASK_VSSEG2E32V= 0xfdf0707f,
+MATCH_VLSEG3E32V=0x40006007, MASK_VLSEG3E32V= 0xfdf0707f, MATCH_VSSEG3E32V=0x40006027,
+MASK_VSSEG3E32V= 0xfdf0707f, MATCH_VLSEG4E32V=0x60006007, MASK_VLSEG4E32V= 0xfdf0707f,
+MATCH_VSSEG4E32V=0x60006027, MASK_VSSEG4E32V= 0xfdf0707f, MATCH_VLSEG5E32V=0x80006007,
+MASK_VLSEG5E32V= 0xfdf0707f, MATCH_VSSEG5E32V=0x80006027, MASK_VSSEG5E32V= 0xfdf0707f,
+MATCH_VLSEG6E32V=0xa0006007, MASK_VLSEG6E32V= 0xfdf0707f, MATCH_VSSEG6E32V=0xa0006027,
+MASK_VSSEG6E32V= 0xfdf0707f, MATCH_VLSEG7E32V=0xc0006007, MASK_VLSEG7E32V= 0xfdf0707f,
+MATCH_VSSEG7E32V=0xc0006027, MASK_VSSEG7E32V= 0xfdf0707f, MATCH_VLSEG8E32V=0xe0006007,
+MASK_VLSEG8E32V= 0xfdf0707f, MATCH_VSSEG8E32V=0xe0006027, MASK_VSSEG8E32V= 0xfdf0707f,
+MATCH_VLSEG2E64V=0x20007007, MASK_VLSEG2E64V= 0xfdf0707f, MATCH_VSSEG2E64V=0x20007027,
+MASK_VSSEG2E64V= 0xfdf0707f, MATCH_VLSEG3E64V=0x40007007, MASK_VLSEG3E64V= 0xfdf0707f,
+MATCH_VSSEG3E64V=0x40007027, MASK_VSSEG3E64V= 0xfdf0707f, MATCH_VLSEG4E64V=0x60007007,
+MASK_VLSEG4E64V= 0xfdf0707f, MATCH_VSSEG4E64V=0x60007027, MASK_VSSEG4E64V= 0xfdf0707f,
+MATCH_VLSEG5E64V=0x80007007, MASK_VLSEG5E64V= 0xfdf0707f, MATCH_VSSEG5E64V=0x80007027,
+MASK_VSSEG5E64V= 0xfdf0707f, MATCH_VLSEG6E64V=0xa0007007, MASK_VLSEG6E64V= 0xfdf0707f,
+MATCH_VSSEG6E64V=0xa0007027, MASK_VSSEG6E64V= 0xfdf0707f, MATCH_VLSEG7E64V=0xc0007007,
+MASK_VLSEG7E64V= 0xfdf0707f, MATCH_VSSEG7E64V=0xc0007027, MASK_VSSEG7E64V= 0xfdf0707f,
+MATCH_VLSEG8E64V=0xe0007007, MASK_VLSEG8E64V= 0xfdf0707f, MATCH_VSSEG8E64V=0xe0007027,
+MASK_VSSEG8E64V= 0xfdf0707f, MATCH_VLSSEG2E8V=0x28000007, MASK_VLSSEG2E8V= 0xfc00707f,
+MATCH_VSSSEG2E8V=0x28000027, MASK_VSSSEG2E8V= 0xfc00707f, MATCH_VLSSEG3E8V=0x48000007,
+MASK_VLSSEG3E8V= 0xfc00707f, MATCH_VSSSEG3E8V=0x48000027, MASK_VSSSEG3E8V= 0xfc00707f,
+MATCH_VLSSEG4E8V=0x68000007, MASK_VLSSEG4E8V= 0xfc00707f, MATCH_VSSSEG4E8V=0x68000027,
+MASK_VSSSEG4E8V= 0xfc00707f, MATCH_VLSSEG5E8V=0x88000007, MASK_VLSSEG5E8V= 0xfc00707f,
+MATCH_VSSSEG5E8V=0x88000027, MASK_VSSSEG5E8V= 0xfc00707f, MATCH_VLSSEG6E8V=0xa8000007,
+MASK_VLSSEG6E8V= 0xfc00707f, MATCH_VSSSEG6E8V=0xa8000027, MASK_VSSSEG6E8V= 0xfc00707f,
+MATCH_VLSSEG7E8V=0xc8000007, MASK_VLSSEG7E8V= 0xfc00707f, MATCH_VSSSEG7E8V=0xc8000027,
+MASK_VSSSEG7E8V= 0xfc00707f, MATCH_VLSSEG8E8V=0xe8000007, MASK_VLSSEG8E8V= 0xfc00707f,
+MATCH_VSSSEG8E8V=0xe8000027, MASK_VSSSEG8E8V= 0xfc00707f, MATCH_VLSSEG2E16V=0x28005007,
+MASK_VLSSEG2E16V=0xfc00707f, MATCH_VSSSEG2E16V=0x28005027, MASK_VSSSEG2E16V=0xfc00707f,
+MATCH_VLSSEG3E16V=0x48005007, MASK_VLSSEG3E16V=0xfc00707f, MATCH_VSSSEG3E16V=0x48005027,
+MASK_VSSSEG3E16V=0xfc00707f, MATCH_VLSSEG4E16V=0x68005007, MASK_VLSSEG4E16V=0xfc00707f,
+MATCH_VSSSEG4E16V=0x68005027, MASK_VSSSEG4E16V=0xfc00707f, MATCH_VLSSEG5E16V=0x88005007,
+MASK_VLSSEG5E16V=0xfc00707f, MATCH_VSSSEG5E16V=0x88005027, MASK_VSSSEG5E16V=0xfc00707f,
+MATCH_VLSSEG6E16V=0xa8005007, MASK_VLSSEG6E16V=0xfc00707f, MATCH_VSSSEG6E16V=0xa8005027,
+MASK_VSSSEG6E16V=0xfc00707f, MATCH_VLSSEG7E16V=0xc8005007, MASK_VLSSEG7E16V=0xfc00707f,
+MATCH_VSSSEG7E16V=0xc8005027, MASK_VSSSEG7E16V=0xfc00707f, MATCH_VLSSEG8E16V=0xe8005007,
+MASK_VLSSEG8E16V=0xfc00707f, MATCH_VSSSEG8E16V=0xe8005027, MASK_VSSSEG8E16V=0xfc00707f,
+MATCH_VLSSEG2E32V=0x28006007, MASK_VLSSEG2E32V=0xfc00707f, MATCH_VSSSEG2E32V=0x28006027,
+MASK_VSSSEG2E32V=0xfc00707f, MATCH_VLSSEG3E32V=0x48006007, MASK_VLSSEG3E32V=0xfc00707f,
+MATCH_VSSSEG3E32V=0x48006027, MASK_VSSSEG3E32V=0xfc00707f, MATCH_VLSSEG4E32V=0x68006007,
+MASK_VLSSEG4E32V=0xfc00707f, MATCH_VSSSEG4E32V=0x68006027, MASK_VSSSEG4E32V=0xfc00707f,
+MATCH_VLSSEG5E32V=0x88006007, MASK_VLSSEG5E32V=0xfc00707f, MATCH_VSSSEG5E32V=0x88006027,
+MASK_VSSSEG5E32V=0xfc00707f, MATCH_VLSSEG6E32V=0xa8006007, MASK_VLSSEG6E32V=0xfc00707f,
+MATCH_VSSSEG6E32V=0xa8006027, MASK_VSSSEG6E32V=0xfc00707f, MATCH_VLSSEG7E32V=0xc8006007,
+MASK_VLSSEG7E32V=0xfc00707f, MATCH_VSSSEG7E32V=0xc8006027, MASK_VSSSEG7E32V=0xfc00707f,
+MATCH_VLSSEG8E32V=0xe8006007, MASK_VLSSEG8E32V=0xfc00707f, MATCH_VSSSEG8E32V=0xe8006027,
+MASK_VSSSEG8E32V=0xfc00707f, MATCH_VLSSEG2E64V=0x28007007, MASK_VLSSEG2E64V=0xfc00707f,
+MATCH_VSSSEG2E64V=0x28007027, MASK_VSSSEG2E64V=0xfc00707f, MATCH_VLSSEG3E64V=0x48007007,
+MASK_VLSSEG3E64V=0xfc00707f, MATCH_VSSSEG3E64V=0x48007027, MASK_VSSSEG3E64V=0xfc00707f,
+MATCH_VLSSEG4E64V=0x68007007, MASK_VLSSEG4E64V=0xfc00707f, MATCH_VSSSEG4E64V=0x68007027,
+MASK_VSSSEG4E64V=0xfc00707f, MATCH_VLSSEG5E64V=0x88007007, MASK_VLSSEG5E64V=0xfc00707f,
+MATCH_VSSSEG5E64V=0x88007027, MASK_VSSSEG5E64V=0xfc00707f, MATCH_VLSSEG6E64V=0xa8007007,
+MASK_VLSSEG6E64V=0xfc00707f, MATCH_VSSSEG6E64V=0xa8007027, MASK_VSSSEG6E64V=0xfc00707f,
+MATCH_VLSSEG7E64V=0xc8007007, MASK_VLSSEG7E64V=0xfc00707f, MATCH_VSSSEG7E64V=0xc8007027,
+MASK_VSSSEG7E64V=0xfc00707f, MATCH_VLSSEG8E64V=0xe8007007, MASK_VLSSEG8E64V=0xfc00707f,
+MATCH_VSSSEG8E64V=0xe8007027, MASK_VSSSEG8E64V=0xfc00707f, MATCH_VLOXSEG2EI8V=0x2c000007,
+MASK_VLOXSEG2EI8V=0xfc00707f, MATCH_VSOXSEG2EI8V=0x2c000027, MASK_VSOXSEG2EI8V=0xfc00707f,
+MATCH_VLOXSEG3EI8V=0x4c000007, MASK_VLOXSEG3EI8V=0xfc00707f, MATCH_VSOXSEG3EI8V=0x4c000027,
+MASK_VSOXSEG3EI8V=0xfc00707f, MATCH_VLOXSEG4EI8V=0x6c000007, MASK_VLOXSEG4EI8V=0xfc00707f,
+MATCH_VSOXSEG4EI8V=0x6c000027, MASK_VSOXSEG4EI8V=0xfc00707f, MATCH_VLOXSEG5EI8V=0x8c000007,
+MASK_VLOXSEG5EI8V=0xfc00707f, MATCH_VSOXSEG5EI8V=0x8c000027, MASK_VSOXSEG5EI8V=0xfc00707f,
+MATCH_VLOXSEG6EI8V=0xac000007, MASK_VLOXSEG6EI8V=0xfc00707f, MATCH_VSOXSEG6EI8V=0xac000027,
+MASK_VSOXSEG6EI8V=0xfc00707f, MATCH_VLOXSEG7EI8V=0xcc000007, MASK_VLOXSEG7EI8V=0xfc00707f,
+MATCH_VSOXSEG7EI8V=0xcc000027, MASK_VSOXSEG7EI8V=0xfc00707f, MATCH_VLOXSEG8EI8V=0xec000007,
+MASK_VLOXSEG8EI8V=0xfc00707f, MATCH_VSOXSEG8EI8V=0xec000027, MASK_VSOXSEG8EI8V=0xfc00707f,
+MATCH_VLUXSEG2EI8V=0x24000007, MASK_VLUXSEG2EI8V=0xfc00707f, MATCH_VSUXSEG2EI8V=0x24000027,
+MASK_VSUXSEG2EI8V=0xfc00707f, MATCH_VLUXSEG3EI8V=0x44000007, MASK_VLUXSEG3EI8V=0xfc00707f,
+MATCH_VSUXSEG3EI8V=0x44000027, MASK_VSUXSEG3EI8V=0xfc00707f, MATCH_VLUXSEG4EI8V=0x64000007,
+MASK_VLUXSEG4EI8V=0xfc00707f, MATCH_VSUXSEG4EI8V=0x64000027, MASK_VSUXSEG4EI8V=0xfc00707f,
+MATCH_VLUXSEG5EI8V=0x84000007, MASK_VLUXSEG5EI8V=0xfc00707f, MATCH_VSUXSEG5EI8V=0x84000027,
+MASK_VSUXSEG5EI8V=0xfc00707f, MATCH_VLUXSEG6EI8V=0xa4000007, MASK_VLUXSEG6EI8V=0xfc00707f,
+MATCH_VSUXSEG6EI8V=0xa4000027, MASK_VSUXSEG6EI8V=0xfc00707f, MATCH_VLUXSEG7EI8V=0xc4000007,
+MASK_VLUXSEG7EI8V=0xfc00707f, MATCH_VSUXSEG7EI8V=0xc4000027, MASK_VSUXSEG7EI8V=0xfc00707f,
+MATCH_VLUXSEG8EI8V=0xe4000007, MASK_VLUXSEG8EI8V=0xfc00707f, MATCH_VSUXSEG8EI8V=0xe4000027,
+MASK_VSUXSEG8EI8V=0xfc00707f, MATCH_VLOXSEG2EI16V=0x2c005007, MASK_VLOXSEG2EI16V=0xfc00707f,
+MATCH_VSOXSEG2EI16V=0x2c005027, MASK_VSOXSEG2EI16V=0xfc00707f, MATCH_VLOXSEG3EI16V=0x4c005007,
+MASK_VLOXSEG3EI16V=0xfc00707f, MATCH_VSOXSEG3EI16V=0x4c005027, MASK_VSOXSEG3EI16V=0xfc00707f,
+MATCH_VLOXSEG4EI16V=0x6c005007, MASK_VLOXSEG4EI16V=0xfc00707f, MATCH_VSOXSEG4EI16V=0x6c005027,
+MASK_VSOXSEG4EI16V=0xfc00707f, MATCH_VLOXSEG5EI16V=0x8c005007, MASK_VLOXSEG5EI16V=0xfc00707f,
+MATCH_VSOXSEG5EI16V=0x8c005027, MASK_VSOXSEG5EI16V=0xfc00707f, MATCH_VLOXSEG6EI16V=0xac005007,
+MASK_VLOXSEG6EI16V=0xfc00707f, MATCH_VSOXSEG6EI16V=0xac005027, MASK_VSOXSEG6EI16V=0xfc00707f,
+MATCH_VLOXSEG7EI16V=0xcc005007, MASK_VLOXSEG7EI16V=0xfc00707f, MATCH_VSOXSEG7EI16V=0xcc005027,
+MASK_VSOXSEG7EI16V=0xfc00707f, MATCH_VLOXSEG8EI16V=0xec005007, MASK_VLOXSEG8EI16V=0xfc00707f,
+MATCH_VSOXSEG8EI16V=0xec005027, MASK_VSOXSEG8EI16V=0xfc00707f, MATCH_VLUXSEG2EI16V=0x24005007,
+MASK_VLUXSEG2EI16V=0xfc00707f, MATCH_VSUXSEG2EI16V=0x24005027, MASK_VSUXSEG2EI16V=0xfc00707f,
+MATCH_VLUXSEG3EI16V=0x44005007, MASK_VLUXSEG3EI16V=0xfc00707f, MATCH_VSUXSEG3EI16V=0x44005027,
+MASK_VSUXSEG3EI16V=0xfc00707f, MATCH_VLUXSEG4EI16V=0x64005007, MASK_VLUXSEG4EI16V=0xfc00707f,
+MATCH_VSUXSEG4EI16V=0x64005027, MASK_VSUXSEG4EI16V=0xfc00707f, MATCH_VLUXSEG5EI16V=0x84005007,
+MASK_VLUXSEG5EI16V=0xfc00707f, MATCH_VSUXSEG5EI16V=0x84005027, MASK_VSUXSEG5EI16V=0xfc00707f,
+MATCH_VLUXSEG6EI16V=0xa4005007, MASK_VLUXSEG6EI16V=0xfc00707f, MATCH_VSUXSEG6EI16V=0xa4005027,
+MASK_VSUXSEG6EI16V=0xfc00707f, MATCH_VLUXSEG7EI16V=0xc4005007, MASK_VLUXSEG7EI16V=0xfc00707f,
+MATCH_VSUXSEG7EI16V=0xc4005027, MASK_VSUXSEG7EI16V=0xfc00707f, MATCH_VLUXSEG8EI16V=0xe4005007,
+MASK_VLUXSEG8EI16V=0xfc00707f, MATCH_VSUXSEG8EI16V=0xe4005027, MASK_VSUXSEG8EI16V=0xfc00707f,
+MATCH_VLOXSEG2EI32V=0x2c006007, MASK_VLOXSEG2EI32V=0xfc00707f, MATCH_VSOXSEG2EI32V=0x2c006027,
+MASK_VSOXSEG2EI32V=0xfc00707f, MATCH_VLOXSEG3EI32V=0x4c006007, MASK_VLOXSEG3EI32V=0xfc00707f,
+MATCH_VSOXSEG3EI32V=0x4c006027, MASK_VSOXSEG3EI32V=0xfc00707f, MATCH_VLOXSEG4EI32V=0x6c006007,
+MASK_VLOXSEG4EI32V=0xfc00707f, MATCH_VSOXSEG4EI32V=0x6c006027, MASK_VSOXSEG4EI32V=0xfc00707f,
+MATCH_VLOXSEG5EI32V=0x8c006007, MASK_VLOXSEG5EI32V=0xfc00707f, MATCH_VSOXSEG5EI32V=0x8c006027,
+MASK_VSOXSEG5EI32V=0xfc00707f, MATCH_VLOXSEG6EI32V=0xac006007, MASK_VLOXSEG6EI32V=0xfc00707f,
+MATCH_VSOXSEG6EI32V=0xac006027, MASK_VSOXSEG6EI32V=0xfc00707f, MATCH_VLOXSEG7EI32V=0xcc006007,
+MASK_VLOXSEG7EI32V=0xfc00707f, MATCH_VSOXSEG7EI32V=0xcc006027, MASK_VSOXSEG7EI32V=0xfc00707f,
+MATCH_VLOXSEG8EI32V=0xec006007, MASK_VLOXSEG8EI32V=0xfc00707f, MATCH_VSOXSEG8EI32V=0xec006027,
+MASK_VSOXSEG8EI32V=0xfc00707f, MATCH_VLUXSEG2EI32V=0x24006007, MASK_VLUXSEG2EI32V=0xfc00707f,
+MATCH_VSUXSEG2EI32V=0x24006027, MASK_VSUXSEG2EI32V=0xfc00707f, MATCH_VLUXSEG3EI32V=0x44006007,
+MASK_VLUXSEG3EI32V=0xfc00707f, MATCH_VSUXSEG3EI32V=0x44006027, MASK_VSUXSEG3EI32V=0xfc00707f,
+MATCH_VLUXSEG4EI32V=0x64006007, MASK_VLUXSEG4EI32V=0xfc00707f, MATCH_VSUXSEG4EI32V=0x64006027,
+MASK_VSUXSEG4EI32V=0xfc00707f, MATCH_VLUXSEG5EI32V=0x84006007, MASK_VLUXSEG5EI32V=0xfc00707f,
+MATCH_VSUXSEG5EI32V=0x84006027, MASK_VSUXSEG5EI32V=0xfc00707f, MATCH_VLUXSEG6EI32V=0xa4006007,
+MASK_VLUXSEG6EI32V=0xfc00707f, MATCH_VSUXSEG6EI32V=0xa4006027, MASK_VSUXSEG6EI32V=0xfc00707f,
+MATCH_VLUXSEG7EI32V=0xc4006007, MASK_VLUXSEG7EI32V=0xfc00707f, MATCH_VSUXSEG7EI32V=0xc4006027,
+MASK_VSUXSEG7EI32V=0xfc00707f, MATCH_VLUXSEG8EI32V=0xe4006007, MASK_VLUXSEG8EI32V=0xfc00707f,
+MATCH_VSUXSEG8EI32V=0xe4006027, MASK_VSUXSEG8EI32V=0xfc00707f, MATCH_VLOXSEG2EI64V=0x2c007007,
+MASK_VLOXSEG2EI64V=0xfc00707f, MATCH_VSOXSEG2EI64V=0x2c007027, MASK_VSOXSEG2EI64V=0xfc00707f,
+MATCH_VLOXSEG3EI64V=0x4c007007, MASK_VLOXSEG3EI64V=0xfc00707f, MATCH_VSOXSEG3EI64V=0x4c007027,
+MASK_VSOXSEG3EI64V=0xfc00707f, MATCH_VLOXSEG4EI64V=0x6c007007, MASK_VLOXSEG4EI64V=0xfc00707f,
+MATCH_VSOXSEG4EI64V=0x6c007027, MASK_VSOXSEG4EI64V=0xfc00707f, MATCH_VLOXSEG5EI64V=0x8c007007,
+MASK_VLOXSEG5EI64V=0xfc00707f, MATCH_VSOXSEG5EI64V=0x8c007027, MASK_VSOXSEG5EI64V=0xfc00707f,
+MATCH_VLOXSEG6EI64V=0xac007007, MASK_VLOXSEG6EI64V=0xfc00707f, MATCH_VSOXSEG6EI64V=0xac007027,
+MASK_VSOXSEG6EI64V=0xfc00707f, MATCH_VLOXSEG7EI64V=0xcc007007, MASK_VLOXSEG7EI64V=0xfc00707f,
+MATCH_VSOXSEG7EI64V=0xcc007027, MASK_VSOXSEG7EI64V=0xfc00707f, MATCH_VLOXSEG8EI64V=0xec007007,
+MASK_VLOXSEG8EI64V=0xfc00707f, MATCH_VSOXSEG8EI64V=0xec007027, MASK_VSOXSEG8EI64V=0xfc00707f,
+MATCH_VLUXSEG2EI64V=0x24007007, MASK_VLUXSEG2EI64V=0xfc00707f, MATCH_VSUXSEG2EI64V=0x24007027,
+MASK_VSUXSEG2EI64V=0xfc00707f, MATCH_VLUXSEG3EI64V=0x44007007, MASK_VLUXSEG3EI64V=0xfc00707f,
+MATCH_VSUXSEG3EI64V=0x44007027, MASK_VSUXSEG3EI64V=0xfc00707f, MATCH_VLUXSEG4EI64V=0x64007007,
+MASK_VLUXSEG4EI64V=0xfc00707f, MATCH_VSUXSEG4EI64V=0x64007027, MASK_VSUXSEG4EI64V=0xfc00707f,
+MATCH_VLUXSEG5EI64V=0x84007007, MASK_VLUXSEG5EI64V=0xfc00707f, MATCH_VSUXSEG5EI64V=0x84007027,
+MASK_VSUXSEG5EI64V=0xfc00707f, MATCH_VLUXSEG6EI64V=0xa4007007, MASK_VLUXSEG6EI64V=0xfc00707f,
+MATCH_VSUXSEG6EI64V=0xa4007027, MASK_VSUXSEG6EI64V=0xfc00707f, MATCH_VLUXSEG7EI64V=0xc4007007,
+MASK_VLUXSEG7EI64V=0xfc00707f, MATCH_VSUXSEG7EI64V=0xc4007027, MASK_VSUXSEG7EI64V=0xfc00707f,
+MATCH_VLUXSEG8EI64V=0xe4007007, MASK_VLUXSEG8EI64V=0xfc00707f, MATCH_VSUXSEG8EI64V=0xe4007027,
+MASK_VSUXSEG8EI64V=0xfc00707f, MATCH_VLSEG2E8FFV=0x21000007, MASK_VLSEG2E8FFV=0xfdf0707f,
+MATCH_VLSEG3E8FFV=0x41000007, MASK_VLSEG3E8FFV=0xfdf0707f, MATCH_VLSEG4E8FFV=0x61000007,
+MASK_VLSEG4E8FFV=0xfdf0707f, MATCH_VLSEG5E8FFV=0x81000007, MASK_VLSEG5E8FFV=0xfdf0707f,
+MATCH_VLSEG6E8FFV=0xa1000007, MASK_VLSEG6E8FFV=0xfdf0707f, MATCH_VLSEG7E8FFV=0xc1000007,
+MASK_VLSEG7E8FFV=0xfdf0707f, MATCH_VLSEG8E8FFV=0xe1000007, MASK_VLSEG8E8FFV=0xfdf0707f,
+MATCH_VLSEG2E16FFV=0x21005007, MASK_VLSEG2E16FFV=0xfdf0707f, MATCH_VLSEG3E16FFV=0x41005007,
+MASK_VLSEG3E16FFV=0xfdf0707f, MATCH_VLSEG4E16FFV=0x61005007, MASK_VLSEG4E16FFV=0xfdf0707f,
+MATCH_VLSEG5E16FFV=0x81005007, MASK_VLSEG5E16FFV=0xfdf0707f, MATCH_VLSEG6E16FFV=0xa1005007,
+MASK_VLSEG6E16FFV=0xfdf0707f, MATCH_VLSEG7E16FFV=0xc1005007, MASK_VLSEG7E16FFV=0xfdf0707f,
+MATCH_VLSEG8E16FFV=0xe1005007, MASK_VLSEG8E16FFV=0xfdf0707f, MATCH_VLSEG2E32FFV=0x21006007,
+MASK_VLSEG2E32FFV=0xfdf0707f, MATCH_VLSEG3E32FFV=0x41006007, MASK_VLSEG3E32FFV=0xfdf0707f,
+MATCH_VLSEG4E32FFV=0x61006007, MASK_VLSEG4E32FFV=0xfdf0707f, MATCH_VLSEG5E32FFV=0x81006007,
+MASK_VLSEG5E32FFV=0xfdf0707f, MATCH_VLSEG6E32FFV=0xa1006007, MASK_VLSEG6E32FFV=0xfdf0707f,
+MATCH_VLSEG7E32FFV=0xc1006007, MASK_VLSEG7E32FFV=0xfdf0707f, MATCH_VLSEG8E32FFV=0xe1006007,
+MASK_VLSEG8E32FFV=0xfdf0707f, MATCH_VLSEG2E64FFV=0x21007007, MASK_VLSEG2E64FFV=0xfdf0707f,
+MATCH_VLSEG3E64FFV=0x41007007, MASK_VLSEG3E64FFV=0xfdf0707f, MATCH_VLSEG4E64FFV=0x61007007,
+MASK_VLSEG4E64FFV=0xfdf0707f, MATCH_VLSEG5E64FFV=0x81007007, MASK_VLSEG5E64FFV=0xfdf0707f,
+MATCH_VLSEG6E64FFV=0xa1007007, MASK_VLSEG6E64FFV=0xfdf0707f, MATCH_VLSEG7E64FFV=0xc1007007,
+MASK_VLSEG7E64FFV=0xfdf0707f, MATCH_VLSEG8E64FFV=0xe1007007, MASK_VLSEG8E64FFV=0xfdf0707f,
+MATCH_VL1RE8V= 0x02800007, MASK_VL1RE8V= 0xfff0707f, MATCH_VL1RE16V= 0x02805007,
+MASK_VL1RE16V= 0xfff0707f, MATCH_VL1RE32V= 0x02806007, MASK_VL1RE32V= 0xfff0707f,
+MATCH_VL1RE64V= 0x02807007, MASK_VL1RE64V= 0xfff0707f, MATCH_VL2RE8V= 0x22800007,
+MASK_VL2RE8V= 0xfff0707f, MATCH_VL2RE16V= 0x22805007, MASK_VL2RE16V= 0xfff0707f,
+MATCH_VL2RE32V= 0x22806007, MASK_VL2RE32V= 0xfff0707f, MATCH_VL2RE64V= 0x22807007,
+MASK_VL2RE64V= 0xfff0707f, MATCH_VL4RE8V= 0x62800007, MASK_VL4RE8V= 0xfff0707f,
+MATCH_VL4RE16V= 0x62805007, MASK_VL4RE16V= 0xfff0707f, MATCH_VL4RE32V= 0x62806007,
+MASK_VL4RE32V= 0xfff0707f, MATCH_VL4RE64V= 0x62807007, MASK_VL4RE64V= 0xfff0707f,
+MATCH_VL8RE8V= 0xe2800007, MASK_VL8RE8V= 0xfff0707f, MATCH_VL8RE16V= 0xe2805007,
+MASK_VL8RE16V= 0xfff0707f, MATCH_VL8RE32V= 0xe2806007, MASK_VL8RE32V= 0xfff0707f,
+MATCH_VL8RE64V= 0xe2807007, MASK_VL8RE64V= 0xfff0707f, MATCH_VS1RV= 0x02800027,
+MASK_VS1RV= 0xfff0707f, MATCH_VS2RV= 0x22800027, MASK_VS2RV= 0xfff0707f,
+MATCH_VS4RV= 0x62800027, MASK_VS4RV= 0xfff0707f, MATCH_VS8RV= 0xe2800027,
+MASK_VS8RV= 0xfff0707f, MATCH_VADDVV= 0x00000057, MASK_VADDVV= 0xfc00707f,
+MATCH_VADDVX= 0x00004057, MASK_VADDVX= 0xfc00707f, MATCH_VADDVI= 0x00003057,
+MASK_VADDVI= 0xfc00707f, MATCH_VSUBVV= 0x08000057, MASK_VSUBVV= 0xfc00707f,
+MATCH_VSUBVX= 0x08004057, MASK_VSUBVX= 0xfc00707f, MATCH_VRSUBVX= 0x0c004057,
+MASK_VRSUBVX= 0xfc00707f, MATCH_VRSUBVI= 0x0c003057, MASK_VRSUBVI= 0xfc00707f,
+MATCH_VWCVTXXV= 0xc4006057, MASK_VWCVTXXV= 0xfc0ff07f, MATCH_VWCVTUXXV= 0xc0006057,
+MASK_VWCVTUXXV= 0xfc0ff07f, MATCH_VWADDVV= 0xc4002057, MASK_VWADDVV= 0xfc00707f,
+MATCH_VWADDVX= 0xc4006057, MASK_VWADDVX= 0xfc00707f, MATCH_VWSUBVV= 0xcc002057,
+MASK_VWSUBVV= 0xfc00707f, MATCH_VWSUBVX= 0xcc006057, MASK_VWSUBVX= 0xfc00707f,
+MATCH_VWADDWV= 0xd4002057, MASK_VWADDWV= 0xfc00707f, MATCH_VWADDWX= 0xd4006057,
+MASK_VWADDWX= 0xfc00707f, MATCH_VWSUBWV= 0xdc002057, MASK_VWSUBWV= 0xfc00707f,
+MATCH_VWSUBWX= 0xdc006057, MASK_VWSUBWX= 0xfc00707f, MATCH_VWADDUVV= 0xc0002057,
+MASK_VWADDUVV= 0xfc00707f, MATCH_VWADDUVX= 0xc0006057, MASK_VWADDUVX= 0xfc00707f,
+MATCH_VWSUBUVV= 0xc8002057, MASK_VWSUBUVV= 0xfc00707f, MATCH_VWSUBUVX= 0xc8006057,
+MASK_VWSUBUVX= 0xfc00707f, MATCH_VWADDUWV= 0xd0002057, MASK_VWADDUWV= 0xfc00707f,
+MATCH_VWADDUWX= 0xd0006057, MASK_VWADDUWX= 0xfc00707f, MATCH_VWSUBUWV= 0xd8002057,
+MASK_VWSUBUWV= 0xfc00707f, MATCH_VWSUBUWX= 0xd8006057, MASK_VWSUBUWX= 0xfc00707f,
+MATCH_VZEXT_VF8= 0x48012057, MASK_VZEXT_VF8= 0xfc0ff07f, MATCH_VSEXT_VF8= 0x4801a057,
+MASK_VSEXT_VF8= 0xfc0ff07f, MATCH_VZEXT_VF4= 0x48022057, MASK_VZEXT_VF4= 0xfc0ff07f,
+MATCH_VSEXT_VF4= 0x4802a057, MASK_VSEXT_VF4= 0xfc0ff07f, MATCH_VZEXT_VF2= 0x48032057,
+MASK_VZEXT_VF2= 0xfc0ff07f, MATCH_VSEXT_VF2= 0x4803a057, MASK_VSEXT_VF2= 0xfc0ff07f,
+MATCH_VADCVVM= 0x40000057, MASK_VADCVVM= 0xfe00707f, MATCH_VADCVXM= 0x40004057,
+MASK_VADCVXM= 0xfe00707f, MATCH_VADCVIM= 0x40003057, MASK_VADCVIM= 0xfe00707f,
+MATCH_VMADCVVM= 0x44000057, MASK_VMADCVVM= 0xfe00707f, MATCH_VMADCVXM= 0x44004057,
+MASK_VMADCVXM= 0xfe00707f, MATCH_VMADCVIM= 0x44003057, MASK_VMADCVIM= 0xfe00707f,
+MATCH_VMADCVV= 0x46000057, MASK_VMADCVV= 0xfe00707f, MATCH_VMADCVX= 0x46004057,
+MASK_VMADCVX= 0xfe00707f, MATCH_VMADCVI= 0x46003057, MASK_VMADCVI= 0xfe00707f,
+MATCH_VSBCVVM= 0x48000057, MASK_VSBCVVM= 0xfe00707f, MATCH_VSBCVXM= 0x48004057,
+MASK_VSBCVXM= 0xfe00707f, MATCH_VMSBCVVM= 0x4c000057, MASK_VMSBCVVM= 0xfe00707f,
+MATCH_VMSBCVXM= 0x4c004057, MASK_VMSBCVXM= 0xfe00707f, MATCH_VMSBCVV= 0x4e000057,
+MASK_VMSBCVV= 0xfe00707f, MATCH_VMSBCVX= 0x4e004057, MASK_VMSBCVX= 0xfe00707f,
+MATCH_VNOTV= 0x2c0fb057, MASK_VNOTV= 0xfc0ff07f, MATCH_VANDVV= 0x24000057,
+MASK_VANDVV= 0xfc00707f, MATCH_VANDVX= 0x24004057, MASK_VANDVX= 0xfc00707f,
+MATCH_VANDVI= 0x24003057, MASK_VANDVI= 0xfc00707f, MATCH_VORVV= 0x28000057,
+MASK_VORVV= 0xfc00707f, MATCH_VORVX= 0x28004057, MASK_VORVX= 0xfc00707f,
+MATCH_VORVI= 0x28003057, MASK_VORVI= 0xfc00707f, MATCH_VXORVV= 0x2c000057,
+MASK_VXORVV= 0xfc00707f, MATCH_VXORVX= 0x2c004057, MASK_VXORVX= 0xfc00707f,
+MATCH_VXORVI= 0x2c003057, MASK_VXORVI= 0xfc00707f, MATCH_VSLLVV= 0x94000057,
+MASK_VSLLVV= 0xfc00707f, MATCH_VSLLVX= 0x94004057, MASK_VSLLVX= 0xfc00707f,
+MATCH_VSLLVI= 0x94003057, MASK_VSLLVI= 0xfc00707f, MATCH_VSRLVV= 0xa0000057,
+MASK_VSRLVV= 0xfc00707f, MATCH_VSRLVX= 0xa0004057, MASK_VSRLVX= 0xfc00707f,
+MATCH_VSRLVI= 0xa0003057, MASK_VSRLVI= 0xfc00707f, MATCH_VSRAVV= 0xa4000057,
+MASK_VSRAVV= 0xfc00707f, MATCH_VSRAVX= 0xa4004057, MASK_VSRAVX= 0xfc00707f,
+MATCH_VSRAVI= 0xa4003057, MASK_VSRAVI= 0xfc00707f, MATCH_VNCVTXXW= 0xb0004057,
+MASK_VNCVTXXW= 0xfc0ff07f, MATCH_VNSRLWV= 0xb0000057, MASK_VNSRLWV= 0xfc00707f,
+MATCH_VNSRLWX= 0xb0004057, MASK_VNSRLWX= 0xfc00707f, MATCH_VNSRLWI= 0xb0003057,
+MASK_VNSRLWI= 0xfc00707f, MATCH_VNSRAWV= 0xb4000057, MASK_VNSRAWV= 0xfc00707f,
+MATCH_VNSRAWX= 0xb4004057, MASK_VNSRAWX= 0xfc00707f, MATCH_VNSRAWI= 0xb4003057,
+MASK_VNSRAWI= 0xfc00707f, MATCH_VMSEQVV= 0x60000057, MASK_VMSEQVV= 0xfc00707f,
+MATCH_VMSEQVX= 0x60004057, MASK_VMSEQVX= 0xfc00707f, MATCH_VMSEQVI= 0x60003057,
+MASK_VMSEQVI= 0xfc00707f, MATCH_VMSNEVV= 0x64000057, MASK_VMSNEVV= 0xfc00707f,
+MATCH_VMSNEVX= 0x64004057, MASK_VMSNEVX= 0xfc00707f, MATCH_VMSNEVI= 0x64003057,
+MASK_VMSNEVI= 0xfc00707f, MATCH_VMSLTVV= 0x6c000057, MASK_VMSLTVV= 0xfc00707f,
+MATCH_VMSLTVX= 0x6c004057, MASK_VMSLTVX= 0xfc00707f, MATCH_VMSLTUVV= 0x68000057,
+MASK_VMSLTUVV= 0xfc00707f, MATCH_VMSLTUVX= 0x68004057, MASK_VMSLTUVX= 0xfc00707f,
+MATCH_VMSLEVV= 0x74000057, MASK_VMSLEVV= 0xfc00707f, MATCH_VMSLEVX= 0x74004057,
+MASK_VMSLEVX= 0xfc00707f, MATCH_VMSLEVI= 0x74003057, MASK_VMSLEVI= 0xfc00707f,
+MATCH_VMSLEUVV= 0x70000057, MASK_VMSLEUVV= 0xfc00707f, MATCH_VMSLEUVX= 0x70004057,
+MASK_VMSLEUVX= 0xfc00707f, MATCH_VMSLEUVI= 0x70003057, MASK_VMSLEUVI= 0xfc00707f,
+MATCH_VMSGTVX= 0x7c004057, MASK_VMSGTVX= 0xfc00707f, MATCH_VMSGTVI= 0x7c003057,
+MASK_VMSGTVI= 0xfc00707f, MATCH_VMSGTUVX= 0x78004057, MASK_VMSGTUVX= 0xfc00707f,
+MATCH_VMSGTUVI= 0x78003057, MASK_VMSGTUVI= 0xfc00707f, MATCH_VMINVV= 0x14000057,
+MASK_VMINVV= 0xfc00707f, MATCH_VMINVX= 0x14004057, MASK_VMINVX= 0xfc00707f,
+MATCH_VMAXVV= 0x1c000057, MASK_VMAXVV= 0xfc00707f, MATCH_VMAXVX= 0x1c004057,
+MASK_VMAXVX= 0xfc00707f, MATCH_VMINUVV= 0x10000057, MASK_VMINUVV= 0xfc00707f,
+MATCH_VMINUVX= 0x10004057, MASK_VMINUVX= 0xfc00707f, MATCH_VMAXUVV= 0x18000057,
+MASK_VMAXUVV= 0xfc00707f, MATCH_VMAXUVX= 0x18004057, MASK_VMAXUVX= 0xfc00707f,
+MATCH_VMULVV= 0x94002057, MASK_VMULVV= 0xfc00707f, MATCH_VMULVX= 0x94006057,
+MASK_VMULVX= 0xfc00707f, MATCH_VMULHVV= 0x9c002057, MASK_VMULHVV= 0xfc00707f,
+MATCH_VMULHVX= 0x9c006057, MASK_VMULHVX= 0xfc00707f, MATCH_VMULHUVV= 0x90002057,
+MASK_VMULHUVV= 0xfc00707f, MATCH_VMULHUVX= 0x90006057, MASK_VMULHUVX= 0xfc00707f,
+MATCH_VMULHSUVV= 0x98002057, MASK_VMULHSUVV= 0xfc00707f, MATCH_VMULHSUVX= 0x98006057,
+MASK_VMULHSUVX= 0xfc00707f, MATCH_VWMULVV= 0xec002057, MASK_VWMULVV= 0xfc00707f,
+MATCH_VWMULVX= 0xec006057, MASK_VWMULVX= 0xfc00707f, MATCH_VWMULUVV= 0xe0002057,
+MASK_VWMULUVV= 0xfc00707f, MATCH_VWMULUVX= 0xe0006057, MASK_VWMULUVX= 0xfc00707f,
+MATCH_VWMULSUVV= 0xe8002057, MASK_VWMULSUVV= 0xfc00707f, MATCH_VWMULSUVX= 0xe8006057,
+MASK_VWMULSUVX= 0xfc00707f, MATCH_VMACCVV= 0xb4002057, MASK_VMACCVV= 0xfc00707f,
+MATCH_VMACCVX= 0xb4006057, MASK_VMACCVX= 0xfc00707f, MATCH_VNMSACVV= 0xbc002057,
+MASK_VNMSACVV= 0xfc00707f, MATCH_VNMSACVX= 0xbc006057, MASK_VNMSACVX= 0xfc00707f,
+MATCH_VMADDVV= 0xa4002057, MASK_VMADDVV= 0xfc00707f, MATCH_VMADDVX= 0xa4006057,
+MASK_VMADDVX= 0xfc00707f, MATCH_VNMSUBVV= 0xac002057, MASK_VNMSUBVV= 0xfc00707f,
+MATCH_VNMSUBVX= 0xac006057, MASK_VNMSUBVX= 0xfc00707f, MATCH_VWMACCUVV= 0xf0002057,
+MASK_VWMACCUVV= 0xfc00707f, MATCH_VWMACCUVX= 0xf0006057, MASK_VWMACCUVX= 0xfc00707f,
+MATCH_VWMACCVV= 0xf4002057, MASK_VWMACCVV= 0xfc00707f, MATCH_VWMACCVX= 0xf4006057,
+MASK_VWMACCVX= 0xfc00707f, MATCH_VWMACCSUVV=0xfc002057, MASK_VWMACCSUVV= 0xfc00707f,
+MATCH_VWMACCSUVX=0xfc006057, MASK_VWMACCSUVX= 0xfc00707f, MATCH_VWMACCUSVX=0xf8006057,
+MASK_VWMACCUSVX= 0xfc00707f, MATCH_VQMACCUVV= 0xf0000057, MASK_VQMACCUVV= 0xfc00707f,
+MATCH_VQMACCUVX= 0xf0004057, MASK_VQMACCUVX= 0xfc00707f, MATCH_VQMACCVV= 0xf4000057,
+MASK_VQMACCVV= 0xfc00707f, MATCH_VQMACCVX= 0xf4004057, MASK_VQMACCVX= 0xfc00707f,
+MATCH_VQMACCSUVV=0xfc000057, MASK_VQMACCSUVV= 0xfc00707f, MATCH_VQMACCSUVX=0xfc004057,
+MASK_VQMACCSUVX= 0xfc00707f, MATCH_VQMACCUSVX=0xf8004057, MASK_VQMACCUSVX= 0xfc00707f,
+MATCH_VDIVVV= 0x84002057, MASK_VDIVVV= 0xfc00707f, MATCH_VDIVVX= 0x84006057,
+MASK_VDIVVX= 0xfc00707f, MATCH_VDIVUVV= 0x80002057, MASK_VDIVUVV= 0xfc00707f,
+MATCH_VDIVUVX= 0x80006057, MASK_VDIVUVX= 0xfc00707f, MATCH_VREMVV= 0x8c002057,
+MASK_VREMVV= 0xfc00707f, MATCH_VREMVX= 0x8c006057, MASK_VREMVX= 0xfc00707f,
+MATCH_VREMUVV= 0x88002057, MASK_VREMUVV= 0xfc00707f, MATCH_VREMUVX= 0x88006057,
+MASK_VREMUVX= 0xfc00707f, MATCH_VMERGEVVM= 0x5c000057, MASK_VMERGEVVM= 0xfe00707f,
+MATCH_VMERGEVXM= 0x5c004057, MASK_VMERGEVXM= 0xfe00707f, MATCH_VMERGEVIM= 0x5c003057,
+MASK_VMERGEVIM= 0xfe00707f, MATCH_VMVVV= 0x5e000057, MASK_VMVVV= 0xfff0707f,
+MATCH_VMVVX= 0x5e004057, MASK_VMVVX= 0xfff0707f, MATCH_VMVVI= 0x5e003057,
+MASK_VMVVI= 0xfff0707f, MATCH_VSADDUVV= 0x80000057, MASK_VSADDUVV= 0xfc00707f,
+MATCH_VSADDUVX= 0x80004057, MASK_VSADDUVX= 0xfc00707f, MATCH_VSADDUVI= 0x80003057,
+MASK_VSADDUVI= 0xfc00707f, MATCH_VSADDVV= 0x84000057, MASK_VSADDVV= 0xfc00707f,
+MATCH_VSADDVX= 0x84004057, MASK_VSADDVX= 0xfc00707f, MATCH_VSADDVI= 0x84003057,
+MASK_VSADDVI= 0xfc00707f, MATCH_VSSUBUVV= 0x88000057, MASK_VSSUBUVV= 0xfc00707f,
+MATCH_VSSUBUVX= 0x88004057, MASK_VSSUBUVX= 0xfc00707f, MATCH_VSSUBVV= 0x8c000057,
+MASK_VSSUBVV= 0xfc00707f, MATCH_VSSUBVX= 0x8c004057, MASK_VSSUBVX= 0xfc00707f,
+MATCH_VAADDUVV= 0x20002057, MASK_VAADDUVV= 0xfc00707f, MATCH_VAADDUVX= 0x20006057,
+MASK_VAADDUVX= 0xfc00707f, MATCH_VAADDVV= 0x24002057, MASK_VAADDVV= 0xfc00707f,
+MATCH_VAADDVX= 0x24006057, MASK_VAADDVX= 0xfc00707f, MATCH_VASUBUVV= 0x28002057,
+MASK_VASUBUVV= 0xfc00707f, MATCH_VASUBUVX= 0x28006057, MASK_VASUBUVX= 0xfc00707f,
+MATCH_VASUBVV= 0x2c002057, MASK_VASUBVV= 0xfc00707f, MATCH_VASUBVX= 0x2c006057,
+MASK_VASUBVX= 0xfc00707f, MATCH_VSMULVV= 0x9c000057, MASK_VSMULVV= 0xfc00707f,
+MATCH_VSMULVX= 0x9c004057, MASK_VSMULVX= 0xfc00707f, MATCH_VSSRLVV= 0xa8000057,
+MASK_VSSRLVV= 0xfc00707f, MATCH_VSSRLVX= 0xa8004057, MASK_VSSRLVX= 0xfc00707f,
+MATCH_VSSRLVI= 0xa8003057, MASK_VSSRLVI= 0xfc00707f, MATCH_VSSRAVV= 0xac000057,
+MASK_VSSRAVV= 0xfc00707f, MATCH_VSSRAVX= 0xac004057, MASK_VSSRAVX= 0xfc00707f,
+MATCH_VSSRAVI= 0xac003057, MASK_VSSRAVI= 0xfc00707f, MATCH_VNCLIPUWV= 0xb8000057,
+MASK_VNCLIPUWV= 0xfc00707f, MATCH_VNCLIPUWX= 0xb8004057, MASK_VNCLIPUWX= 0xfc00707f,
+MATCH_VNCLIPUWI= 0xb8003057, MASK_VNCLIPUWI= 0xfc00707f, MATCH_VNCLIPWV= 0xbc000057,
+MASK_VNCLIPWV= 0xfc00707f, MATCH_VNCLIPWX= 0xbc004057, MASK_VNCLIPWX= 0xfc00707f,
+MATCH_VNCLIPWI= 0xbc003057, MASK_VNCLIPWI= 0xfc00707f, MATCH_VFADDVV= 0x00001057,
+MASK_VFADDVV= 0xfc00707f, MATCH_VFADDVF= 0x00005057, MASK_VFADDVF= 0xfc00707f,
+MATCH_VFSUBVV= 0x08001057, MASK_VFSUBVV= 0xfc00707f, MATCH_VFSUBVF= 0x08005057,
+MASK_VFSUBVF= 0xfc00707f, MATCH_VFRSUBVF= 0x9c005057, MASK_VFRSUBVF= 0xfc00707f,
+MATCH_VFWADDVV= 0xc0001057, MASK_VFWADDVV= 0xfc00707f, MATCH_VFWADDVF= 0xc0005057,
+MASK_VFWADDVF= 0xfc00707f, MATCH_VFWSUBVV= 0xc8001057, MASK_VFWSUBVV= 0xfc00707f,
+MATCH_VFWSUBVF= 0xc8005057, MASK_VFWSUBVF= 0xfc00707f, MATCH_VFWADDWV= 0xd0001057,
+MASK_VFWADDWV= 0xfc00707f, MATCH_VFWADDWF= 0xd0005057, MASK_VFWADDWF= 0xfc00707f,
+MATCH_VFWSUBWV= 0xd8001057, MASK_VFWSUBWV= 0xfc00707f, MATCH_VFWSUBWF= 0xd8005057,
+MASK_VFWSUBWF= 0xfc00707f, MATCH_VFMULVV= 0x90001057, MASK_VFMULVV= 0xfc00707f,
+MATCH_VFMULVF= 0x90005057, MASK_VFMULVF= 0xfc00707f, MATCH_VFDIVVV= 0x80001057,
+MASK_VFDIVVV= 0xfc00707f, MATCH_VFDIVVF= 0x80005057, MASK_VFDIVVF= 0xfc00707f,
+MATCH_VFRDIVVF= 0x84005057, MASK_VFRDIVVF= 0xfc00707f, MATCH_VFWMULVV= 0xe0001057,
+MASK_VFWMULVV= 0xfc00707f, MATCH_VFWMULVF= 0xe0005057, MASK_VFWMULVF= 0xfc00707f,
+MATCH_VFMADDVV= 0xa0001057, MASK_VFMADDVV= 0xfc00707f, MATCH_VFMADDVF= 0xa0005057,
+MASK_VFMADDVF= 0xfc00707f, MATCH_VFNMADDVV= 0xa4001057, MASK_VFNMADDVV= 0xfc00707f,
+MATCH_VFNMADDVF= 0xa4005057, MASK_VFNMADDVF= 0xfc00707f, MATCH_VFMSUBVV= 0xa8001057,
+MASK_VFMSUBVV= 0xfc00707f, MATCH_VFMSUBVF= 0xa8005057, MASK_VFMSUBVF= 0xfc00707f,
+MATCH_VFNMSUBVV= 0xac001057, MASK_VFNMSUBVV= 0xfc00707f, MATCH_VFNMSUBVF= 0xac005057,
+MASK_VFNMSUBVF= 0xfc00707f, MATCH_VFMACCVV= 0xb0001057, MASK_VFMACCVV= 0xfc00707f,
+MATCH_VFMACCVF= 0xb0005057, MASK_VFMACCVF= 0xfc00707f, MATCH_VFNMACCVV= 0xb4001057,
+MASK_VFNMACCVV= 0xfc00707f, MATCH_VFNMACCVF= 0xb4005057, MASK_VFNMACCVF= 0xfc00707f,
+MATCH_VFMSACVV= 0xb8001057, MASK_VFMSACVV= 0xfc00707f, MATCH_VFMSACVF= 0xb8005057,
+MASK_VFMSACVF= 0xfc00707f, MATCH_VFNMSACVV= 0xbc001057, MASK_VFNMSACVV= 0xfc00707f,
+MATCH_VFNMSACVF= 0xbc005057, MASK_VFNMSACVF= 0xfc00707f, MATCH_VFWMACCVV= 0xf0001057,
+MASK_VFWMACCVV= 0xfc00707f, MATCH_VFWMACCVF= 0xf0005057, MASK_VFWMACCVF= 0xfc00707f,
+MATCH_VFWNMACCVV=0xf4001057, MASK_VFWNMACCVV= 0xfc00707f, MATCH_VFWNMACCVF=0xf4005057,
+MASK_VFWNMACCVF= 0xfc00707f, MATCH_VFWMSACVV= 0xf8001057, MASK_VFWMSACVV= 0xfc00707f,
+MATCH_VFWMSACVF= 0xf8005057, MASK_VFWMSACVF= 0xfc00707f, MATCH_VFWNMSACVV=0xfc001057,
+MASK_VFWNMSACVV= 0xfc00707f, MATCH_VFWNMSACVF=0xfc005057, MASK_VFWNMSACVF= 0xfc00707f,
+MATCH_VFSQRTV= 0x4c001057, MASK_VFSQRTV= 0xfc0ff07f, MATCH_VFRSQRT7V= 0x4c021057,
+MASK_VFRSQRT7V= 0xfc0ff07f, MATCH_VFREC7V= 0x4c029057, MASK_VFREC7V= 0xfc0ff07f,
+MATCH_VFCLASSV= 0x4c081057, MASK_VFCLASSV= 0xfc0ff07f, MATCH_VFMINVV= 0x10001057,
+MASK_VFMINVV= 0xfc00707f, MATCH_VFMINVF= 0x10005057, MASK_VFMINVF= 0xfc00707f,
+MATCH_VFMAXVV= 0x18001057, MASK_VFMAXVV= 0xfc00707f, MATCH_VFMAXVF= 0x18005057,
+MASK_VFMAXVF= 0xfc00707f, MATCH_VFSGNJVV= 0x20001057, MASK_VFSGNJVV= 0xfc00707f,
+MATCH_VFSGNJVF= 0x20005057, MASK_VFSGNJVF= 0xfc00707f, MATCH_VFSGNJNVV= 0x24001057,
+MASK_VFSGNJNVV= 0xfc00707f, MATCH_VFSGNJNVF= 0x24005057, MASK_VFSGNJNVF= 0xfc00707f,
+MATCH_VFSGNJXVV= 0x28001057, MASK_VFSGNJXVV= 0xfc00707f, MATCH_VFSGNJXVF= 0x28005057,
+MASK_VFSGNJXVF= 0xfc00707f, MATCH_VMFEQVV= 0x60001057, MASK_VMFEQVV= 0xfc00707f,
+MATCH_VMFEQVF= 0x60005057, MASK_VMFEQVF= 0xfc00707f, MATCH_VMFNEVV= 0x70001057,
+MASK_VMFNEVV= 0xfc00707f, MATCH_VMFNEVF= 0x70005057, MASK_VMFNEVF= 0xfc00707f,
+MATCH_VMFLTVV= 0x6c001057, MASK_VMFLTVV= 0xfc00707f, MATCH_VMFLTVF= 0x6c005057,
+MASK_VMFLTVF= 0xfc00707f, MATCH_VMFLEVV= 0x64001057, MASK_VMFLEVV= 0xfc00707f,
+MATCH_VMFLEVF= 0x64005057, MASK_VMFLEVF= 0xfc00707f, MATCH_VMFGTVF= 0x74005057,
+MASK_VMFGTVF= 0xfc00707f, MATCH_VMFGEVF= 0x7c005057, MASK_VMFGEVF= 0xfc00707f,
+MATCH_VFMERGEVFM=0x5c005057, MASK_VFMERGEVFM= 0xfe00707f, MATCH_VFMVVF= 0x5e005057,
+MASK_VFMVVF= 0xfff0707f, MATCH_VFCVTXUFV= 0x48001057, MASK_VFCVTXUFV= 0xfc0ff07f,
+MATCH_VFCVTXFV= 0x48009057, MASK_VFCVTXFV= 0xfc0ff07f, MATCH_VFCVTFXUV= 0x48011057,
+MASK_VFCVTFXUV= 0xfc0ff07f, MATCH_VFCVTFXV= 0x48019057, MASK_VFCVTFXV= 0xfc0ff07f,
+MATCH_VFCVTRTZXUFV=0x48031057, MASK_VFCVTRTZXUFV=0xfc0ff07f, MATCH_VFCVTRTZXFV=0x48039057,
+MASK_VFCVTRTZXFV=0xfc0ff07f, MATCH_VFWCVTXUFV=0x48041057, MASK_VFWCVTXUFV= 0xfc0ff07f,
+MATCH_VFWCVTXFV= 0x48049057, MASK_VFWCVTXFV= 0xfc0ff07f, MATCH_VFWCVTFXUV=0x48051057,
+MASK_VFWCVTFXUV= 0xfc0ff07f, MATCH_VFWCVTFXV= 0x48059057, MASK_VFWCVTFXV= 0xfc0ff07f,
+MATCH_VFWCVTFFV= 0x48061057, MASK_VFWCVTFFV= 0xfc0ff07f, MATCH_VFWCVTRTZXUFV=0x48071057,
+MASK_VFWCVTRTZXUFV=0xfc0ff07f, MATCH_VFWCVTRTZXFV=0x48079057, MASK_VFWCVTRTZXFV=0xfc0ff07f,
+MATCH_VFNCVTXUFW=0x48081057, MASK_VFNCVTXUFW= 0xfc0ff07f, MATCH_VFNCVTXFW= 0x48089057,
+MASK_VFNCVTXFW= 0xfc0ff07f, MATCH_VFNCVTFXUW=0x48091057, MASK_VFNCVTFXUW= 0xfc0ff07f,
+MATCH_VFNCVTFXW= 0x48099057, MASK_VFNCVTFXW= 0xfc0ff07f, MATCH_VFNCVTFFW= 0x480a1057,
+MASK_VFNCVTFFW= 0xfc0ff07f, MATCH_VFNCVTRODFFW=0x480a9057, MASK_VFNCVTRODFFW=0xfc0ff07f,
+MATCH_VFNCVTRTZXUFW=0x480b1057, MASK_VFNCVTRTZXUFW=0xfc0ff07f, MATCH_VFNCVTRTZXFW=0x480b9057,
+MASK_VFNCVTRTZXFW=0xfc0ff07f, MATCH_VREDSUMVS= 0x00002057, MASK_VREDSUMVS= 0xfc00707f,
+MATCH_VREDMAXVS= 0x1c002057, MASK_VREDMAXVS= 0xfc00707f, MATCH_VREDMAXUVS=0x18002057,
+MASK_VREDMAXUVS= 0xfc00707f, MATCH_VREDMINVS= 0x14002057, MASK_VREDMINVS= 0xfc00707f,
+MATCH_VREDMINUVS=0x10002057, MASK_VREDMINUVS= 0xfc00707f, MATCH_VREDANDVS= 0x04002057,
+MASK_VREDANDVS= 0xfc00707f, MATCH_VREDORVS= 0x08002057, MASK_VREDORVS= 0xfc00707f,
+MATCH_VREDXORVS= 0x0c002057, MASK_VREDXORVS= 0xfc00707f, MATCH_VWREDSUMUVS=0xc0000057,
+MASK_VWREDSUMUVS=0xfc00707f, MATCH_VWREDSUMVS=0xc4000057, MASK_VWREDSUMVS= 0xfc00707f,
+MATCH_VFREDOSUMVS=0x0c001057, MASK_VFREDOSUMVS=0xfc00707f, MATCH_VFREDUSUMVS=0x04001057,
+MASK_VFREDUSUMVS=0xfc00707f, MATCH_VFREDMAXVS=0x1c001057, MASK_VFREDMAXVS= 0xfc00707f,
+MATCH_VFREDMINVS=0x14001057, MASK_VFREDMINVS= 0xfc00707f, MATCH_VFWREDOSUMVS=0xcc001057,
+MASK_VFWREDOSUMVS=0xfc00707f, MATCH_VFWREDUSUMVS=0xc4001057, MASK_VFWREDUSUMVS=0xfc00707f,
+MATCH_VMANDMM= 0x66002057, MASK_VMANDMM= 0xfe00707f, MATCH_VMNANDMM= 0x76002057,
+MASK_VMNANDMM= 0xfe00707f, MATCH_VMANDNMM=0x62002057, MASK_VMANDNMM= 0xfe00707f,
+MATCH_VMXORMM= 0x6e002057, MASK_VMXORMM= 0xfe00707f, MATCH_VMORMM= 0x6a002057,
+MASK_VMORMM= 0xfe00707f, MATCH_VMNORMM= 0x7a002057, MASK_VMNORMM= 0xfe00707f,
+MATCH_VMORNMM= 0x72002057, MASK_VMORNMM= 0xfe00707f, MATCH_VMXNORMM= 0x7e002057,
+MASK_VMXNORMM= 0xfe00707f, MATCH_VCPOPM= 0x40082057, MASK_VCPOPM= 0xfc0ff07f,
+MATCH_VFIRSTM= 0x4008a057, MASK_VFIRSTM= 0xfc0ff07f, MATCH_VMSBFM= 0x5000a057,
+MASK_VMSBFM= 0xfc0ff07f, MATCH_VMSIFM= 0x5001a057, MASK_VMSIFM= 0xfc0ff07f,
+MATCH_VMSOFM= 0x50012057, MASK_VMSOFM= 0xfc0ff07f, MATCH_VIOTAM= 0x50082057,
+MASK_VIOTAM= 0xfc0ff07f, MATCH_VIDV= 0x5008a057, MASK_VIDV= 0xfdfff07f,
+MATCH_VMVXS= 0x42002057, MASK_VMVXS= 0xfe0ff07f, MATCH_VMVSX= 0x42006057,
+MASK_VMVSX= 0xfff0707f, MATCH_VFMVFS= 0x42001057, MASK_VFMVFS= 0xfe0ff07f,
+MATCH_VFMVSF= 0x42005057, MASK_VFMVSF= 0xfff0707f, MATCH_VSLIDEUPVX=0x38004057,
+MASK_VSLIDEUPVX= 0xfc00707f, MATCH_VSLIDEUPVI=0x38003057, MASK_VSLIDEUPVI= 0xfc00707f,
+MATCH_VSLIDEDOWNVX=0x3c004057, MASK_VSLIDEDOWNVX=0xfc00707f, MATCH_VSLIDEDOWNVI=0x3c003057,
+MASK_VSLIDEDOWNVI=0xfc00707f, MATCH_VSLIDE1UPVX=0x38006057, MASK_VSLIDE1UPVX=0xfc00707f,
+MATCH_VSLIDE1DOWNVX=0x3c006057, MASK_VSLIDE1DOWNVX=0xfc00707f, MATCH_VFSLIDE1UPVF=0x38005057,
+MASK_VFSLIDE1UPVF=0xfc00707f, MATCH_VFSLIDE1DOWNVF=0x3c005057, MASK_VFSLIDE1DOWNVF=0xfc00707f,
+MATCH_VRGATHERVV=0x30000057, MASK_VRGATHERVV= 0xfc00707f, MATCH_VRGATHERVX=0x30004057,
+MASK_VRGATHERVX= 0xfc00707f, MATCH_VRGATHERVI=0x30003057, MASK_VRGATHERVI= 0xfc00707f,
+MATCH_VRGATHEREI16VV=0x38000057, MASK_VRGATHEREI16VV=0xfc00707f, MATCH_VCOMPRESSVM=0x5e002057,
+MASK_VCOMPRESSVM=0xfe00707f, MATCH_VMV1RV= 0x9e003057, MASK_VMV1RV= 0xfe0ff07f,
+MATCH_VMV2RV= 0x9e00b057, MASK_VMV2RV= 0xfe0ff07f, MATCH_VMV4RV= 0x9e01b057,
+MASK_VMV4RV= 0xfe0ff07f, MATCH_VMV8RV= 0x9e03b057, MASK_VMV8RV= 0xfe0ff07f,
+MATCH_VDOTVV= 0xe4000057, MASK_VDOTVV= 0xfc00707f, MATCH_VDOTUVV= 0xe0000057,
+MASK_VDOTUVV= 0xfc00707f, MATCH_VFDOTVV= 0xe4001057, MASK_VFDOTVV= 0xfc00707f,
 /* Svinval instruction.  */
-#define MATCH_SINVAL_VMA 0x16000073
-#define MASK_SINVAL_VMA 0xfe007fff
-#define MATCH_SFENCE_W_INVAL 0x18000073
-#define MASK_SFENCE_W_INVAL 0xffffffff
-#define MATCH_SFENCE_INVAL_IR 0x18100073
-#define MASK_SFENCE_INVAL_IR 0xffffffff
-#define MATCH_HINVAL_VVMA 0x26000073
-#define MASK_HINVAL_VVMA 0xfe007fff
-#define MATCH_HINVAL_GVMA 0x66000073
-#define MASK_HINVAL_GVMA 0xfe007fff
+MATCH_SINVAL_VMA=0x16000073, MASK_SINVAL_VMA=0xfe007fff, MATCH_SFENCE_W_INVAL=0x18000073,
+MASK_SFENCE_W_INVAL=0xffffffff, MATCH_SFENCE_INVAL_IR=0x18100073, MASK_SFENCE_INVAL_IR=0xffffffff,
+MATCH_HINVAL_VVMA=0x26000073, MASK_HINVAL_VVMA=0xfe007fff, MATCH_HINVAL_GVMA=0x66000073,
+MASK_HINVAL_GVMA=0xfe007fff,
 /* Hypervisor instruction.  */
-#define MATCH_HFENCE_VVMA 0x22000073
-#define MASK_HFENCE_VVMA 0xfe007fff
-#define MATCH_HFENCE_GVMA 0x62000073
-#define MASK_HFENCE_GVMA 0xfe007fff
-#define MATCH_HLV_B 0x60004073
-#define MASK_HLV_B 0xfff0707f
-#define MATCH_HLV_H 0x64004073
-#define MASK_HLV_H 0xfff0707f
-#define MATCH_HLV_W 0x68004073
-#define MASK_HLV_W 0xfff0707f
-#define MATCH_HLV_D 0x6c004073
-#define MASK_HLV_D 0xfff0707f
-#define MATCH_HLV_BU 0x60104073
-#define MASK_HLV_BU 0xfff0707f
-#define MATCH_HLV_HU 0x64104073
-#define MASK_HLV_HU 0xfff0707f
-#define MATCH_HLV_WU 0x68104073
-#define MASK_HLV_WU 0xfff0707f
-#define MATCH_HLVX_HU 0x64304073
-#define MASK_HLVX_HU 0xfff0707f
-#define MATCH_HLVX_WU 0x68304073
-#define MASK_HLVX_WU 0xfff0707f
-#define MATCH_HSV_B 0x62004073
-#define MASK_HSV_B 0xfe007fff
-#define MATCH_HSV_H 0x66004073
-#define MASK_HSV_H 0xfe007fff
-#define MATCH_HSV_W 0x6a004073
-#define MASK_HSV_W 0xfe007fff
-#define MATCH_HSV_D 0x6e004073
-#define MASK_HSV_D 0xfe007fff
+MATCH_HFENCE_VVMA=0x22000073, MASK_HFENCE_VVMA=0xfe007fff, MATCH_HFENCE_GVMA=0x62000073,
+MASK_HFENCE_GVMA=0xfe007fff, MATCH_HLV_B=0x60004073, MASK_HLV_B=0xfff0707f,
+MATCH_HLV_H=0x64004073, MASK_HLV_H=0xfff0707f, MATCH_HLV_W=0x68004073,
+MASK_HLV_W=0xfff0707f, MATCH_HLV_D=0x6c004073, MASK_HLV_D=0xfff0707f,
+MATCH_HLV_BU=0x60104073, MASK_HLV_BU=0xfff0707f, MATCH_HLV_HU=0x64104073,
+MASK_HLV_HU=0xfff0707f, MATCH_HLV_WU=0x68104073, MASK_HLV_WU=0xfff0707f,
+MATCH_HLVX_HU=0x64304073, MASK_HLVX_HU=0xfff0707f, MATCH_HLVX_WU=0x68304073,
+MASK_HLVX_WU=0xfff0707f, MATCH_HSV_B=0x62004073, MASK_HSV_B=0xfe007fff,
+MATCH_HSV_H=0x66004073, MASK_HSV_H=0xfe007fff, MATCH_HSV_W=0x6a004073,
+MASK_HSV_W=0xfe007fff, MATCH_HSV_D=0x6e004073, MASK_HSV_D=0xfe007fff,
 /* Zicbop hint instructions. */
-#define MATCH_PREFETCH_I 0x6013
-#define MASK_PREFETCH_I 0x1f07fff
-#define MATCH_PREFETCH_R 0x106013
-#define MASK_PREFETCH_R 0x1f07fff
-#define MATCH_PREFETCH_W 0x306013
-#define MASK_PREFETCH_W 0x1f07fff
+MATCH_PREFETCH_I=0x6013, MASK_PREFETCH_I=0x1f07fff, MATCH_PREFETCH_R=0x106013,
+MASK_PREFETCH_R=0x1f07fff, MATCH_PREFETCH_W=0x306013, MASK_PREFETCH_W=0x1f07fff,
 /* Zicbom/Zicboz instructions. */
-#define MATCH_CBO_CLEAN 0x10200f
-#define MASK_CBO_CLEAN 0xfff07fff
-#define MATCH_CBO_FLUSH 0x20200f
-#define MASK_CBO_FLUSH 0xfff07fff
-#define MATCH_CBO_INVAL 0x200f
-#define MASK_CBO_INVAL 0xfff07fff
-#define MATCH_CBO_ZERO 0x40200f
-#define MASK_CBO_ZERO 0xfff07fff
+MATCH_CBO_CLEAN=0x10200f, MASK_CBO_CLEAN=0xfff07fff, MATCH_CBO_FLUSH=0x20200f,
+MASK_CBO_FLUSH=0xfff07fff, MATCH_CBO_INVAL=0x200f, MASK_CBO_INVAL=0xfff07fff,
+MATCH_CBO_ZERO=0x40200f, MASK_CBO_ZERO=0xfff07fff,
 /* Zawrs intructions.  */
-#define MATCH_WRS_NTO 0x00d00073
-#define MASK_WRS_NTO 0xffffffff
-#define MATCH_WRS_STO 0x01d00073
-#define MASK_WRS_STO 0xffffffff
+MATCH_WRS_NTO=0x00d00073, MASK_WRS_NTO=0xffffffff, MATCH_WRS_STO=0x01d00073,
+MASK_WRS_STO=0xffffffff,
 /* Vendor-specific (T-Head) XTheadBa instructions.  */
-#define MATCH_TH_ADDSL 0x0000100b
-#define MASK_TH_ADDSL 0xf800707f
+MATCH_TH_ADDSL=0x0000100b, MASK_TH_ADDSL=0xf800707f,
 /* Vendor-specific (T-Head) XTheadBb instructions.  */
-#define MATCH_TH_SRRI 0x1000100b
-#define MASK_TH_SRRI 0xfc00707f
-#define MATCH_TH_SRRIW 0x1400100b
-#define MASK_TH_SRRIW 0xfe00707f
-#define MATCH_TH_EXT 0x0000200b
-#define MASK_TH_EXT 0x0000707f
-#define MATCH_TH_EXTU 0x0000300b
-#define MASK_TH_EXTU 0x0000707f
-#define MATCH_TH_FF0 0x8400100b
-#define MASK_TH_FF0 0xfff0707f
-#define MATCH_TH_FF1 0x8600100b
-#define MASK_TH_FF1 0xfff0707f
-#define MATCH_TH_REV 0x8200100b
-#define MASK_TH_REV 0xfff0707f
-#define MATCH_TH_REVW 0x9000100b
-#define MASK_TH_REVW 0xfff0707f
-#define MATCH_TH_TSTNBZ 0x8000100b
-#define MASK_TH_TSTNBZ 0xfff0707f
+MATCH_TH_SRRI=0x1000100b, MASK_TH_SRRI=0xfc00707f, MATCH_TH_SRRIW=0x1400100b,
+MASK_TH_SRRIW=0xfe00707f, MATCH_TH_EXT=0x0000200b, MASK_TH_EXT=0x0000707f,
+MATCH_TH_EXTU=0x0000300b, MASK_TH_EXTU=0x0000707f, MATCH_TH_FF0=0x8400100b,
+MASK_TH_FF0=0xfff0707f, MATCH_TH_FF1=0x8600100b, MASK_TH_FF1=0xfff0707f,
+MATCH_TH_REV=0x8200100b, MASK_TH_REV=0xfff0707f, MATCH_TH_REVW=0x9000100b,
+MASK_TH_REVW=0xfff0707f, MATCH_TH_TSTNBZ=0x8000100b, MASK_TH_TSTNBZ=0xfff0707f,
 /* Vendor-specific (T-Head) XTheadBs instructions.  */
-#define MATCH_TH_TST 0x8800100b
-#define MASK_TH_TST 0xfc00707f
+MATCH_TH_TST=0x8800100b, MASK_TH_TST=0xfc00707f,
 /* Vendor-specific (T-Head) XTheadCmo instructions.  */
-#define MATCH_TH_DCACHE_CALL 0x0010000b
-#define MASK_TH_DCACHE_CALL 0xffffffff
-#define MATCH_TH_DCACHE_CIALL 0x0030000b
-#define MASK_TH_DCACHE_CIALL 0xffffffff
-#define MATCH_TH_DCACHE_IALL 0x0020000b
-#define MASK_TH_DCACHE_IALL 0xffffffff
-#define MATCH_TH_DCACHE_CPA 0x0290000b
-#define MASK_TH_DCACHE_CPA 0xfff07fff
-#define MATCH_TH_DCACHE_CIPA 0x02b0000b
-#define MASK_TH_DCACHE_CIPA 0xfff07fff
-#define MATCH_TH_DCACHE_IPA 0x02a0000b
-#define MASK_TH_DCACHE_IPA 0xfff07fff
-#define MATCH_TH_DCACHE_CVA 0x0250000b
-#define MASK_TH_DCACHE_CVA 0xfff07fff
-#define MATCH_TH_DCACHE_CIVA 0x0270000b
-#define MASK_TH_DCACHE_CIVA 0xfff07fff
-#define MATCH_TH_DCACHE_IVA 0x0260000b
-#define MASK_TH_DCACHE_IVA 0xfff07fff
-#define MATCH_TH_DCACHE_CSW 0x0210000b
-#define MASK_TH_DCACHE_CSW 0xfff07fff
-#define MATCH_TH_DCACHE_CISW 0x0230000b
-#define MASK_TH_DCACHE_CISW 0xfff07fff
-#define MATCH_TH_DCACHE_ISW 0x0220000b
-#define MASK_TH_DCACHE_ISW 0xfff07fff
-#define MATCH_TH_DCACHE_CPAL1 0x0280000b
-#define MASK_TH_DCACHE_CPAL1 0xfff07fff
-#define MATCH_TH_DCACHE_CVAL1 0x0240000b
-#define MASK_TH_DCACHE_CVAL1 0xfff07fff
-#define MATCH_TH_ICACHE_IALL 0x0100000b
-#define MASK_TH_ICACHE_IALL 0xffffffff
-#define MATCH_TH_ICACHE_IALLS 0x0110000b
-#define MASK_TH_ICACHE_IALLS 0xffffffff
-#define MATCH_TH_ICACHE_IPA 0x0380000b
-#define MASK_TH_ICACHE_IPA 0xfff07fff
-#define MATCH_TH_ICACHE_IVA 0x0300000b
-#define MASK_TH_ICACHE_IVA 0xfff07fff
-#define MATCH_TH_L2CACHE_CALL 0x0150000b
-#define MASK_TH_L2CACHE_CALL 0xffffffff
-#define MATCH_TH_L2CACHE_CIALL 0x0170000b
-#define MASK_TH_L2CACHE_CIALL 0xffffffff
-#define MATCH_TH_L2CACHE_IALL 0x0160000b
-#define MASK_TH_L2CACHE_IALL 0xffffffff
+MATCH_TH_DCACHE_CALL=0x0010000b, MASK_TH_DCACHE_CALL=0xffffffff, MATCH_TH_DCACHE_CIALL=0x0030000b,
+MASK_TH_DCACHE_CIALL=0xffffffff, MATCH_TH_DCACHE_IALL=0x0020000b, MASK_TH_DCACHE_IALL=0xffffffff,
+MATCH_TH_DCACHE_CPA=0x0290000b, MASK_TH_DCACHE_CPA=0xfff07fff, MATCH_TH_DCACHE_CIPA=0x02b0000b,
+MASK_TH_DCACHE_CIPA=0xfff07fff, MATCH_TH_DCACHE_IPA=0x02a0000b, MASK_TH_DCACHE_IPA=0xfff07fff,
+MATCH_TH_DCACHE_CVA=0x0250000b, MASK_TH_DCACHE_CVA=0xfff07fff, MATCH_TH_DCACHE_CIVA=0x0270000b,
+MASK_TH_DCACHE_CIVA=0xfff07fff, MATCH_TH_DCACHE_IVA=0x0260000b, MASK_TH_DCACHE_IVA=0xfff07fff,
+MATCH_TH_DCACHE_CSW=0x0210000b, MASK_TH_DCACHE_CSW=0xfff07fff, MATCH_TH_DCACHE_CISW=0x0230000b,
+MASK_TH_DCACHE_CISW=0xfff07fff, MATCH_TH_DCACHE_ISW=0x0220000b, MASK_TH_DCACHE_ISW=0xfff07fff,
+MATCH_TH_DCACHE_CPAL1=0x0280000b, MASK_TH_DCACHE_CPAL1=0xfff07fff, MATCH_TH_DCACHE_CVAL1=0x0240000b,
+MASK_TH_DCACHE_CVAL1=0xfff07fff, MATCH_TH_ICACHE_IALL=0x0100000b, MASK_TH_ICACHE_IALL=0xffffffff,
+MATCH_TH_ICACHE_IALLS=0x0110000b, MASK_TH_ICACHE_IALLS=0xffffffff, MATCH_TH_ICACHE_IPA=0x0380000b,
+MASK_TH_ICACHE_IPA=0xfff07fff, MATCH_TH_ICACHE_IVA=0x0300000b, MASK_TH_ICACHE_IVA=0xfff07fff,
+MATCH_TH_L2CACHE_CALL=0x0150000b, MASK_TH_L2CACHE_CALL=0xffffffff, MATCH_TH_L2CACHE_CIALL=0x0170000b,
+MASK_TH_L2CACHE_CIALL=0xffffffff, MATCH_TH_L2CACHE_IALL=0x0160000b, MASK_TH_L2CACHE_IALL=0xffffffff,
 /* Vendor-specific (T-Head) XTheadCondMov instructions.  */
-#define MATCH_TH_MVEQZ 0x4000100b
-#define MASK_TH_MVEQZ 0xfe00707f
-#define MATCH_TH_MVNEZ 0x4200100b
-#define MASK_TH_MVNEZ 0xfe00707f
+MATCH_TH_MVEQZ=0x4000100b, MASK_TH_MVEQZ=0xfe00707f, MATCH_TH_MVNEZ=0x4200100b,
+MASK_TH_MVNEZ=0xfe00707f,
 /* Vendor-specific (T-Head) XTheadFMemIdx instructions. */
-#define MATCH_TH_FLRD 0x6000600b
-#define MASK_TH_FLRD 0xf800707f
-#define MATCH_TH_FLRW 0x4000600b
-#define MASK_TH_FLRW 0xf800707f
-#define MATCH_TH_FLURD 0x7000600b
-#define MASK_TH_FLURD 0xf800707f
-#define MATCH_TH_FLURW 0x5000600b
-#define MASK_TH_FLURW 0xf800707f
-#define MATCH_TH_FSRD 0x6000700b
-#define MASK_TH_FSRD 0xf800707f
-#define MATCH_TH_FSRW 0x4000700b
-#define MASK_TH_FSRW 0xf800707f
-#define MATCH_TH_FSURD 0x7000700b
-#define MASK_TH_FSURD 0xf800707f
-#define MATCH_TH_FSURW 0x5000700b
-#define MASK_TH_FSURW 0xf800707f
+MATCH_TH_FLRD=0x6000600b, MASK_TH_FLRD=0xf800707f, MATCH_TH_FLRW=0x4000600b,
+MASK_TH_FLRW=0xf800707f, MATCH_TH_FLURD=0x7000600b, MASK_TH_FLURD=0xf800707f,
+MATCH_TH_FLURW=0x5000600b, MASK_TH_FLURW=0xf800707f, MATCH_TH_FSRD=0x6000700b,
+MASK_TH_FSRD=0xf800707f, MATCH_TH_FSRW=0x4000700b, MASK_TH_FSRW=0xf800707f,
+MATCH_TH_FSURD=0x7000700b, MASK_TH_FSURD=0xf800707f, MATCH_TH_FSURW=0x5000700b,
+MASK_TH_FSURW=0xf800707f,
 /* Vendor-specific (T-Head) XTheadFmv instructions. */
-#define MATCH_TH_FMV_HW_X 0x5000100b
-#define MASK_TH_FMV_HW_X 0xfff0707f
-#define MATCH_TH_FMV_X_HW 0x6000100b
-#define MASK_TH_FMV_X_HW 0xfff0707f
+MATCH_TH_FMV_HW_X=0x5000100b, MASK_TH_FMV_HW_X=0xfff0707f, MATCH_TH_FMV_X_HW=0x6000100b,
+MASK_TH_FMV_X_HW=0xfff0707f,
 /* Vendor-specific (T-Head) XTheadInt instructions. */
-#define MATCH_TH_IPOP 0x0050000b
-#define MASK_TH_IPOP 0xffffffff
-#define MATCH_TH_IPUSH 0x0040000b
-#define MASK_TH_IPUSH 0xffffffff
+MATCH_TH_IPOP=0x0050000b, MASK_TH_IPOP=0xffffffff, MATCH_TH_IPUSH=0x0040000b,
+MASK_TH_IPUSH=0xffffffff,
 /* Vendor-specific (T-Head) XTheadMac instructions.  */
-#define MATCH_TH_MULA 0x2000100b
-#define MASK_TH_MULA 0xfe00707f
-#define MATCH_TH_MULAH 0x2800100b
-#define MASK_TH_MULAH 0xfe00707f
-#define MATCH_TH_MULAW 0x2400100b
-#define MASK_TH_MULAW 0xfe00707f
-#define MATCH_TH_MULS 0x2200100b
-#define MASK_TH_MULS 0xfe00707f
-#define MATCH_TH_MULSH 0x2a00100b
-#define MASK_TH_MULSH 0xfe00707f
-#define MATCH_TH_MULSW 0x2600100b
-#define MASK_TH_MULSW 0xfe00707f
+MATCH_TH_MULA=0x2000100b, MASK_TH_MULA=0xfe00707f, MATCH_TH_MULAH=0x2800100b,
+MASK_TH_MULAH=0xfe00707f, MATCH_TH_MULAW=0x2400100b, MASK_TH_MULAW=0xfe00707f,
+MATCH_TH_MULS=0x2200100b, MASK_TH_MULS=0xfe00707f, MATCH_TH_MULSH=0x2a00100b,
+MASK_TH_MULSH=0xfe00707f, MATCH_TH_MULSW=0x2600100b, MASK_TH_MULSW=0xfe00707f,
 /* Vendor-specific (T-Head) XTheadMemPair instructions. */
-#define MATCH_TH_LDD 0xf800400b
-#define MASK_TH_LDD 0xf800707f
-#define MATCH_TH_LWD 0xe000400b
-#define MASK_TH_LWD 0xf800707f
-#define MATCH_TH_LWUD 0xf000400b
-#define MASK_TH_LWUD 0xf800707f
-#define MATCH_TH_SDD 0xf800500b
-#define MASK_TH_SDD 0xf800707f
-#define MATCH_TH_SWD 0xe000500b
-#define MASK_TH_SWD 0xf800707f
+MATCH_TH_LDD=0xf800400b, MASK_TH_LDD=0xf800707f, MATCH_TH_LWD=0xe000400b,
+MASK_TH_LWD=0xf800707f, MATCH_TH_LWUD=0xf000400b, MASK_TH_LWUD=0xf800707f,
+MATCH_TH_SDD=0xf800500b, MASK_TH_SDD=0xf800707f, MATCH_TH_SWD=0xe000500b,
+MASK_TH_SWD=0xf800707f,
 /* Vendor-specific (T-Head) XTheadMemIdx instructions. */
-#define MATCH_TH_LDIA 0x7800400b
-#define MASK_TH_LDIA 0xf800707f
-#define MATCH_TH_LDIB 0x6800400b
-#define MASK_TH_LDIB 0xf800707f
-#define MATCH_TH_LWIA 0x5800400b
-#define MASK_TH_LWIA 0xf800707f
-#define MATCH_TH_LWIB 0x4800400b
-#define MASK_TH_LWIB 0xf800707f
-#define MATCH_TH_LWUIA 0xd800400b
-#define MASK_TH_LWUIA 0xf800707f
-#define MATCH_TH_LWUIB 0xc800400b
-#define MASK_TH_LWUIB 0xf800707f
-#define MATCH_TH_LHIA 0x3800400b
-#define MASK_TH_LHIA 0xf800707f
-#define MATCH_TH_LHIB 0x2800400b
-#define MASK_TH_LHIB 0xf800707f
-#define MATCH_TH_LHUIA 0xb800400b
-#define MASK_TH_LHUIA 0xf800707f
-#define MATCH_TH_LHUIB 0xa800400b
-#define MASK_TH_LHUIB 0xf800707f
-#define MATCH_TH_LBIA 0x1800400b
-#define MASK_TH_LBIA 0xf800707f
-#define MATCH_TH_LBIB 0x0800400b
-#define MASK_TH_LBIB 0xf800707f
-#define MATCH_TH_LBUIA 0x9800400b
-#define MASK_TH_LBUIA 0xf800707f
-#define MATCH_TH_LBUIB 0x8800400b
-#define MASK_TH_LBUIB 0xf800707f
-#define MATCH_TH_SDIA 0x7800500b
-#define MASK_TH_SDIA 0xf800707f
-#define MATCH_TH_SDIB 0x6800500b
-#define MASK_TH_SDIB 0xf800707f
-#define MATCH_TH_SWIA 0x5800500b
-#define MASK_TH_SWIA 0xf800707f
-#define MATCH_TH_SWIB 0x4800500b
-#define MASK_TH_SWIB 0xf800707f
-#define MATCH_TH_SHIA 0x3800500b
-#define MASK_TH_SHIA 0xf800707f
-#define MATCH_TH_SHIB 0x2800500b
-#define MASK_TH_SHIB 0xf800707f
-#define MATCH_TH_SBIA 0x1800500b
-#define MASK_TH_SBIA 0xf800707f
-#define MATCH_TH_SBIB 0x0800500b
-#define MASK_TH_SBIB 0xf800707f
-#define MATCH_TH_LRD 0x6000400b
-#define MASK_TH_LRD 0xf800707f
-#define MATCH_TH_LRW 0x4000400b
-#define MASK_TH_LRW 0xf800707f
-#define MATCH_TH_LRWU 0xc000400b
-#define MASK_TH_LRWU 0xf800707f
-#define MATCH_TH_LRH 0x2000400b
-#define MASK_TH_LRH 0xf800707f
-#define MATCH_TH_LRHU 0xa000400b
-#define MASK_TH_LRHU 0xf800707f
-#define MATCH_TH_LRB 0x0000400b
-#define MASK_TH_LRB 0xf800707f
-#define MATCH_TH_LRBU 0x8000400b
-#define MASK_TH_LRBU 0xf800707f
-#define MATCH_TH_SRD 0x6000500b
-#define MASK_TH_SRD 0xf800707f
-#define MATCH_TH_SRW 0x4000500b
-#define MASK_TH_SRW 0xf800707f
-#define MATCH_TH_SRH 0x2000500b
-#define MASK_TH_SRH 0xf800707f
-#define MATCH_TH_SRB 0x0000500b
-#define MASK_TH_SRB 0xf800707f
-#define MATCH_TH_LURD 0x7000400b
-#define MASK_TH_LURD 0xf800707f
-#define MATCH_TH_LURW 0x5000400b
-#define MASK_TH_LURW 0xf800707f
-#define MATCH_TH_LURWU 0xd000400b
-#define MASK_TH_LURWU 0xf800707f
-#define MATCH_TH_LURH 0x3000400b
-#define MASK_TH_LURH 0xf800707f
-#define MATCH_TH_LURHU 0xb000400b
-#define MASK_TH_LURHU 0xf800707f
-#define MATCH_TH_LURB 0x1000400b
-#define MASK_TH_LURB 0xf800707f
-#define MATCH_TH_LURBU 0x9000400b
-#define MASK_TH_LURBU 0xf800707f
-#define MATCH_TH_SURD 0x7000500b
-#define MASK_TH_SURD 0xf800707f
-#define MATCH_TH_SURW 0x5000500b
-#define MASK_TH_SURW 0xf800707f
-#define MATCH_TH_SURH 0x3000500b
-#define MASK_TH_SURH 0xf800707f
-#define MATCH_TH_SURB 0x1000500b
-#define MASK_TH_SURB 0xf800707f
+MATCH_TH_LDIA=0x7800400b, MASK_TH_LDIA=0xf800707f, MATCH_TH_LDIB=0x6800400b,
+MASK_TH_LDIB=0xf800707f, MATCH_TH_LWIA=0x5800400b, MASK_TH_LWIA=0xf800707f,
+MATCH_TH_LWIB=0x4800400b, MASK_TH_LWIB=0xf800707f, MATCH_TH_LWUIA=0xd800400b,
+MASK_TH_LWUIA=0xf800707f, MATCH_TH_LWUIB=0xc800400b, MASK_TH_LWUIB=0xf800707f,
+MATCH_TH_LHIA=0x3800400b, MASK_TH_LHIA=0xf800707f, MATCH_TH_LHIB=0x2800400b,
+MASK_TH_LHIB=0xf800707f, MATCH_TH_LHUIA=0xb800400b, MASK_TH_LHUIA=0xf800707f,
+MATCH_TH_LHUIB=0xa800400b, MASK_TH_LHUIB=0xf800707f, MATCH_TH_LBIA=0x1800400b,
+MASK_TH_LBIA=0xf800707f, MATCH_TH_LBIB=0x0800400b, MASK_TH_LBIB=0xf800707f,
+MATCH_TH_LBUIA=0x9800400b, MASK_TH_LBUIA=0xf800707f, MATCH_TH_LBUIB=0x8800400b,
+MASK_TH_LBUIB=0xf800707f, MATCH_TH_SDIA=0x7800500b, MASK_TH_SDIA=0xf800707f,
+MATCH_TH_SDIB=0x6800500b, MASK_TH_SDIB=0xf800707f, MATCH_TH_SWIA=0x5800500b,
+MASK_TH_SWIA=0xf800707f, MATCH_TH_SWIB=0x4800500b, MASK_TH_SWIB=0xf800707f,
+MATCH_TH_SHIA=0x3800500b, MASK_TH_SHIA=0xf800707f, MATCH_TH_SHIB=0x2800500b,
+MASK_TH_SHIB=0xf800707f, MATCH_TH_SBIA=0x1800500b, MASK_TH_SBIA=0xf800707f,
+MATCH_TH_SBIB=0x0800500b, MASK_TH_SBIB=0xf800707f, MATCH_TH_LRD=0x6000400b,
+MASK_TH_LRD=0xf800707f, MATCH_TH_LRW=0x4000400b, MASK_TH_LRW=0xf800707f,
+MATCH_TH_LRWU=0xc000400b, MASK_TH_LRWU=0xf800707f, MATCH_TH_LRH=0x2000400b,
+MASK_TH_LRH=0xf800707f, MATCH_TH_LRHU=0xa000400b, MASK_TH_LRHU=0xf800707f,
+MATCH_TH_LRB=0x0000400b, MASK_TH_LRB=0xf800707f, MATCH_TH_LRBU=0x8000400b,
+MASK_TH_LRBU=0xf800707f, MATCH_TH_SRD=0x6000500b, MASK_TH_SRD=0xf800707f,
+MATCH_TH_SRW=0x4000500b, MASK_TH_SRW=0xf800707f, MATCH_TH_SRH=0x2000500b,
+MASK_TH_SRH=0xf800707f, MATCH_TH_SRB=0x0000500b, MASK_TH_SRB=0xf800707f,
+MATCH_TH_LURD=0x7000400b, MASK_TH_LURD=0xf800707f, MATCH_TH_LURW=0x5000400b,
+MASK_TH_LURW=0xf800707f, MATCH_TH_LURWU=0xd000400b, MASK_TH_LURWU=0xf800707f,
+MATCH_TH_LURH=0x3000400b, MASK_TH_LURH=0xf800707f, MATCH_TH_LURHU=0xb000400b,
+MASK_TH_LURHU=0xf800707f, MATCH_TH_LURB=0x1000400b, MASK_TH_LURB=0xf800707f,
+MATCH_TH_LURBU=0x9000400b, MASK_TH_LURBU=0xf800707f, MATCH_TH_SURD=0x7000500b,
+MASK_TH_SURD=0xf800707f, MATCH_TH_SURW=0x5000500b, MASK_TH_SURW=0xf800707f,
+MATCH_TH_SURH=0x3000500b, MASK_TH_SURH=0xf800707f, MATCH_TH_SURB=0x1000500b,
+MASK_TH_SURB=0xf800707f,
 /* Vendor-specific (T-Head) XTheadSync instructions.  */
-#define MATCH_TH_SFENCE_VMAS 0x0400000b
-#define MASK_TH_SFENCE_VMAS 0xfe007fff
-#define MATCH_TH_SYNC 0x0180000b
-#define MASK_TH_SYNC 0xffffffff
-#define MATCH_TH_SYNC_I 0x01a0000b
-#define MASK_TH_SYNC_I 0xffffffff
-#define MATCH_TH_SYNC_IS 0x01b0000b
-#define MASK_TH_SYNC_IS 0xffffffff
-#define MATCH_TH_SYNC_S 0x0190000b
-#define MASK_TH_SYNC_S 0xffffffff
+MATCH_TH_SFENCE_VMAS=0x0400000b, MASK_TH_SFENCE_VMAS=0xfe007fff,
+MATCH_TH_SYNC=0x0180000b, MASK_TH_SYNC=0xffffffff, MATCH_TH_SYNC_I=0x01a0000b,
+MASK_TH_SYNC_I=0xffffffff, MATCH_TH_SYNC_IS=0x01b0000b, MASK_TH_SYNC_IS=0xffffffff,
+MATCH_TH_SYNC_S=0x0190000b, MASK_TH_SYNC_S=0xffffffff,
 /* Vendor-specific (Ventana Microsystems) XVentanaCondOps instructions */
-#define MATCH_VT_MASKC 0x607b
-#define MASK_VT_MASKC 0xfe00707f
-#define MATCH_VT_MASKCN 0x707b
-#define MASK_VT_MASKCN 0xfe00707f
+MATCH_VT_MASKC=0x607b, MASK_VT_MASKC=0xfe00707f, MATCH_VT_MASKCN=0x707b,
+MASK_VT_MASKCN=0xfe00707f,
 /* Unprivileged Counter/Timers CSR addresses.  */
-#define CSR_CYCLE 0xc00
-#define CSR_TIME 0xc01
-#define CSR_INSTRET 0xc02
-#define CSR_HPMCOUNTER3 0xc03
-#define CSR_HPMCOUNTER4 0xc04
-#define CSR_HPMCOUNTER5 0xc05
-#define CSR_HPMCOUNTER6 0xc06
-#define CSR_HPMCOUNTER7 0xc07
-#define CSR_HPMCOUNTER8 0xc08
-#define CSR_HPMCOUNTER9 0xc09
-#define CSR_HPMCOUNTER10 0xc0a
-#define CSR_HPMCOUNTER11 0xc0b
-#define CSR_HPMCOUNTER12 0xc0c
-#define CSR_HPMCOUNTER13 0xc0d
-#define CSR_HPMCOUNTER14 0xc0e
-#define CSR_HPMCOUNTER15 0xc0f
-#define CSR_HPMCOUNTER16 0xc10
-#define CSR_HPMCOUNTER17 0xc11
-#define CSR_HPMCOUNTER18 0xc12
-#define CSR_HPMCOUNTER19 0xc13
-#define CSR_HPMCOUNTER20 0xc14
-#define CSR_HPMCOUNTER21 0xc15
-#define CSR_HPMCOUNTER22 0xc16
-#define CSR_HPMCOUNTER23 0xc17
-#define CSR_HPMCOUNTER24 0xc18
-#define CSR_HPMCOUNTER25 0xc19
-#define CSR_HPMCOUNTER26 0xc1a
-#define CSR_HPMCOUNTER27 0xc1b
-#define CSR_HPMCOUNTER28 0xc1c
-#define CSR_HPMCOUNTER29 0xc1d
-#define CSR_HPMCOUNTER30 0xc1e
-#define CSR_HPMCOUNTER31 0xc1f
-#define CSR_CYCLEH 0xc80
-#define CSR_TIMEH 0xc81
-#define CSR_INSTRETH 0xc82
-#define CSR_HPMCOUNTER3H 0xc83
-#define CSR_HPMCOUNTER4H 0xc84
-#define CSR_HPMCOUNTER5H 0xc85
-#define CSR_HPMCOUNTER6H 0xc86
-#define CSR_HPMCOUNTER7H 0xc87
-#define CSR_HPMCOUNTER8H 0xc88
-#define CSR_HPMCOUNTER9H 0xc89
-#define CSR_HPMCOUNTER10H 0xc8a
-#define CSR_HPMCOUNTER11H 0xc8b
-#define CSR_HPMCOUNTER12H 0xc8c
-#define CSR_HPMCOUNTER13H 0xc8d
-#define CSR_HPMCOUNTER14H 0xc8e
-#define CSR_HPMCOUNTER15H 0xc8f
-#define CSR_HPMCOUNTER16H 0xc90
-#define CSR_HPMCOUNTER17H 0xc91
-#define CSR_HPMCOUNTER18H 0xc92
-#define CSR_HPMCOUNTER19H 0xc93
-#define CSR_HPMCOUNTER20H 0xc94
-#define CSR_HPMCOUNTER21H 0xc95
-#define CSR_HPMCOUNTER22H 0xc96
-#define CSR_HPMCOUNTER23H 0xc97
-#define CSR_HPMCOUNTER24H 0xc98
-#define CSR_HPMCOUNTER25H 0xc99
-#define CSR_HPMCOUNTER26H 0xc9a
-#define CSR_HPMCOUNTER27H 0xc9b
-#define CSR_HPMCOUNTER28H 0xc9c
-#define CSR_HPMCOUNTER29H 0xc9d
-#define CSR_HPMCOUNTER30H 0xc9e
-#define CSR_HPMCOUNTER31H 0xc9f
+CSR_CYCLE=0xc00, CSR_TIME=0xc01, CSR_INSTRET=0xc02, CSR_HPMCOUNTER3=0xc03,
+CSR_HPMCOUNTER4=0xc04, CSR_HPMCOUNTER5=0xc05, CSR_HPMCOUNTER6=0xc06, CSR_HPMCOUNTER7=0xc07,
+CSR_HPMCOUNTER8=0xc08, CSR_HPMCOUNTER9=0xc09, CSR_HPMCOUNTER10=0xc0a, CSR_HPMCOUNTER11=0xc0b,
+CSR_HPMCOUNTER12=0xc0c, CSR_HPMCOUNTER13=0xc0d, CSR_HPMCOUNTER14=0xc0e, CSR_HPMCOUNTER15=0xc0f,
+CSR_HPMCOUNTER16=0xc10, CSR_HPMCOUNTER17=0xc11, CSR_HPMCOUNTER18=0xc12, CSR_HPMCOUNTER19=0xc13,
+CSR_HPMCOUNTER20=0xc14, CSR_HPMCOUNTER21=0xc15, CSR_HPMCOUNTER22=0xc16, CSR_HPMCOUNTER23=0xc17,
+CSR_HPMCOUNTER24=0xc18, CSR_HPMCOUNTER25=0xc19, CSR_HPMCOUNTER26=0xc1a, CSR_HPMCOUNTER27=0xc1b,
+CSR_HPMCOUNTER28=0xc1c, CSR_HPMCOUNTER29=0xc1d, CSR_HPMCOUNTER30=0xc1e, CSR_HPMCOUNTER31=0xc1f,
+CSR_CYCLEH=0xc80, CSR_TIMEH=0xc81, CSR_INSTRETH=0xc82, CSR_HPMCOUNTER3H=0xc83,
+CSR_HPMCOUNTER4H=0xc84, CSR_HPMCOUNTER5H=0xc85, CSR_HPMCOUNTER6H=0xc86, CSR_HPMCOUNTER7H=0xc87,
+CSR_HPMCOUNTER8H=0xc88, CSR_HPMCOUNTER9H=0xc89, CSR_HPMCOUNTER10H=0xc8a, CSR_HPMCOUNTER11H=0xc8b,
+CSR_HPMCOUNTER12H=0xc8c, CSR_HPMCOUNTER13H=0xc8d, CSR_HPMCOUNTER14H=0xc8e, CSR_HPMCOUNTER15H=0xc8f,
+CSR_HPMCOUNTER16H=0xc90, CSR_HPMCOUNTER17H=0xc91, CSR_HPMCOUNTER18H=0xc92, CSR_HPMCOUNTER19H=0xc93,
+CSR_HPMCOUNTER20H=0xc94, CSR_HPMCOUNTER21H=0xc95, CSR_HPMCOUNTER22H=0xc96, CSR_HPMCOUNTER23H=0xc97,
+CSR_HPMCOUNTER24H=0xc98, CSR_HPMCOUNTER25H=0xc99, CSR_HPMCOUNTER26H=0xc9a, CSR_HPMCOUNTER27H=0xc9b,
+CSR_HPMCOUNTER28H=0xc9c, CSR_HPMCOUNTER29H=0xc9d, CSR_HPMCOUNTER30H=0xc9e, CSR_HPMCOUNTER31H=0xc9f,
 /* Privileged Supervisor CSR addresses.  */
-#define CSR_SSTATUS 0x100
-#define CSR_SIE 0x104
-#define CSR_STVEC 0x105
-#define CSR_SCOUNTEREN 0x106
-#define CSR_SENVCFG 0x10a
-#define CSR_SSCRATCH 0x140
-#define CSR_SEPC 0x141
-#define CSR_SCAUSE 0x142
-#define CSR_STVAL 0x143
-#define CSR_SIP 0x144
-#define CSR_SATP 0x180
+CSR_SSTATUS=0x100, CSR_SIE=0x104, CSR_STVEC=0x105, CSR_SCOUNTEREN=0x106, CSR_SENVCFG=0x10a,
+CSR_SSCRATCH=0x140, CSR_SEPC=0x141, CSR_SCAUSE=0x142, CSR_STVAL=0x143, CSR_SIP=0x144,
+CSR_SATP=0x180,
 /* Privileged Machine CSR addresses. */
-#define CSR_MVENDORID 0xf11
-#define CSR_MARCHID 0xf12
-#define CSR_MIMPID 0xf13
-#define CSR_MHARTID 0xf14
-#define CSR_MCONFIGPTR 0xf15
-#define CSR_MSTATUS 0x300
-#define CSR_MISA 0x301
-#define CSR_MEDELEG 0x302
-#define CSR_MIDELEG 0x303
-#define CSR_MIE 0x304
-#define CSR_MTVEC 0x305
-#define CSR_MCOUNTEREN 0x306
-#define CSR_MSTATUSH 0x310
-#define CSR_MSCRATCH 0x340
-#define CSR_MEPC 0x341
-#define CSR_MCAUSE 0x342
-#define CSR_MTVAL 0x343
-#define CSR_MIP 0x344
-#define CSR_MTINST 0x34a
-#define CSR_MTVAL2 0x34b
-#define CSR_MENVCFG 0x30a
-#define CSR_MENVCFGH 0x31a
-#define CSR_MSECCFG 0x747
-#define CSR_MSECCFGH 0x757
-#define CSR_PMPCFG0 0x3a0
-#define CSR_PMPCFG1 0x3a1
-#define CSR_PMPCFG2 0x3a2
-#define CSR_PMPCFG3 0x3a3
-#define CSR_PMPCFG4 0x3a4
-#define CSR_PMPCFG5 0x3a5
-#define CSR_PMPCFG6 0x3a6
-#define CSR_PMPCFG7 0x3a7
-#define CSR_PMPCFG8 0x3a8
-#define CSR_PMPCFG9 0x3a9
-#define CSR_PMPCFG10 0x3aa
-#define CSR_PMPCFG11 0x3ab
-#define CSR_PMPCFG12 0x3ac
-#define CSR_PMPCFG13 0x3ad
-#define CSR_PMPCFG14 0x3ae
-#define CSR_PMPCFG15 0x3af
-#define CSR_PMPADDR0 0x3b0
-#define CSR_PMPADDR1 0x3b1
-#define CSR_PMPADDR2 0x3b2
-#define CSR_PMPADDR3 0x3b3
-#define CSR_PMPADDR4 0x3b4
-#define CSR_PMPADDR5 0x3b5
-#define CSR_PMPADDR6 0x3b6
-#define CSR_PMPADDR7 0x3b7
-#define CSR_PMPADDR8 0x3b8
-#define CSR_PMPADDR9 0x3b9
-#define CSR_PMPADDR10 0x3ba
-#define CSR_PMPADDR11 0x3bb
-#define CSR_PMPADDR12 0x3bc
-#define CSR_PMPADDR13 0x3bd
-#define CSR_PMPADDR14 0x3be
-#define CSR_PMPADDR15 0x3bf
-#define CSR_PMPADDR16 0x3c0
-#define CSR_PMPADDR17 0x3c1
-#define CSR_PMPADDR18 0x3c2
-#define CSR_PMPADDR19 0x3c3
-#define CSR_PMPADDR20 0x3c4
-#define CSR_PMPADDR21 0x3c5
-#define CSR_PMPADDR22 0x3c6
-#define CSR_PMPADDR23 0x3c7
-#define CSR_PMPADDR24 0x3c8
-#define CSR_PMPADDR25 0x3c9
-#define CSR_PMPADDR26 0x3ca
-#define CSR_PMPADDR27 0x3cb
-#define CSR_PMPADDR28 0x3cc
-#define CSR_PMPADDR29 0x3cd
-#define CSR_PMPADDR30 0x3ce
-#define CSR_PMPADDR31 0x3cf
-#define CSR_PMPADDR32 0x3d0
-#define CSR_PMPADDR33 0x3d1
-#define CSR_PMPADDR34 0x3d2
-#define CSR_PMPADDR35 0x3d3
-#define CSR_PMPADDR36 0x3d4
-#define CSR_PMPADDR37 0x3d5
-#define CSR_PMPADDR38 0x3d6
-#define CSR_PMPADDR39 0x3d7
-#define CSR_PMPADDR40 0x3d8
-#define CSR_PMPADDR41 0x3d9
-#define CSR_PMPADDR42 0x3da
-#define CSR_PMPADDR43 0x3db
-#define CSR_PMPADDR44 0x3dc
-#define CSR_PMPADDR45 0x3dd
-#define CSR_PMPADDR46 0x3de
-#define CSR_PMPADDR47 0x3df
-#define CSR_PMPADDR48 0x3e0
-#define CSR_PMPADDR49 0x3e1
-#define CSR_PMPADDR50 0x3e2
-#define CSR_PMPADDR51 0x3e3
-#define CSR_PMPADDR52 0x3e4
-#define CSR_PMPADDR53 0x3e5
-#define CSR_PMPADDR54 0x3e6
-#define CSR_PMPADDR55 0x3e7
-#define CSR_PMPADDR56 0x3e8
-#define CSR_PMPADDR57 0x3e9
-#define CSR_PMPADDR58 0x3ea
-#define CSR_PMPADDR59 0x3eb
-#define CSR_PMPADDR60 0x3ec
-#define CSR_PMPADDR61 0x3ed
-#define CSR_PMPADDR62 0x3ee
-#define CSR_PMPADDR63 0x3ef
-#define CSR_MCYCLE 0xb00
-#define CSR_MINSTRET 0xb02
-#define CSR_MHPMCOUNTER3 0xb03
-#define CSR_MHPMCOUNTER4 0xb04
-#define CSR_MHPMCOUNTER5 0xb05
-#define CSR_MHPMCOUNTER6 0xb06
-#define CSR_MHPMCOUNTER7 0xb07
-#define CSR_MHPMCOUNTER8 0xb08
-#define CSR_MHPMCOUNTER9 0xb09
-#define CSR_MHPMCOUNTER10 0xb0a
-#define CSR_MHPMCOUNTER11 0xb0b
-#define CSR_MHPMCOUNTER12 0xb0c
-#define CSR_MHPMCOUNTER13 0xb0d
-#define CSR_MHPMCOUNTER14 0xb0e
-#define CSR_MHPMCOUNTER15 0xb0f
-#define CSR_MHPMCOUNTER16 0xb10
-#define CSR_MHPMCOUNTER17 0xb11
-#define CSR_MHPMCOUNTER18 0xb12
-#define CSR_MHPMCOUNTER19 0xb13
-#define CSR_MHPMCOUNTER20 0xb14
-#define CSR_MHPMCOUNTER21 0xb15
-#define CSR_MHPMCOUNTER22 0xb16
-#define CSR_MHPMCOUNTER23 0xb17
-#define CSR_MHPMCOUNTER24 0xb18
-#define CSR_MHPMCOUNTER25 0xb19
-#define CSR_MHPMCOUNTER26 0xb1a
-#define CSR_MHPMCOUNTER27 0xb1b
-#define CSR_MHPMCOUNTER28 0xb1c
-#define CSR_MHPMCOUNTER29 0xb1d
-#define CSR_MHPMCOUNTER30 0xb1e
-#define CSR_MHPMCOUNTER31 0xb1f
-#define CSR_MCYCLEH 0xb80
-#define CSR_MINSTRETH 0xb82
-#define CSR_MHPMCOUNTER3H 0xb83
-#define CSR_MHPMCOUNTER4H 0xb84
-#define CSR_MHPMCOUNTER5H 0xb85
-#define CSR_MHPMCOUNTER6H 0xb86
-#define CSR_MHPMCOUNTER7H 0xb87
-#define CSR_MHPMCOUNTER8H 0xb88
-#define CSR_MHPMCOUNTER9H 0xb89
-#define CSR_MHPMCOUNTER10H 0xb8a
-#define CSR_MHPMCOUNTER11H 0xb8b
-#define CSR_MHPMCOUNTER12H 0xb8c
-#define CSR_MHPMCOUNTER13H 0xb8d
-#define CSR_MHPMCOUNTER14H 0xb8e
-#define CSR_MHPMCOUNTER15H 0xb8f
-#define CSR_MHPMCOUNTER16H 0xb90
-#define CSR_MHPMCOUNTER17H 0xb91
-#define CSR_MHPMCOUNTER18H 0xb92
-#define CSR_MHPMCOUNTER19H 0xb93
-#define CSR_MHPMCOUNTER20H 0xb94
-#define CSR_MHPMCOUNTER21H 0xb95
-#define CSR_MHPMCOUNTER22H 0xb96
-#define CSR_MHPMCOUNTER23H 0xb97
-#define CSR_MHPMCOUNTER24H 0xb98
-#define CSR_MHPMCOUNTER25H 0xb99
-#define CSR_MHPMCOUNTER26H 0xb9a
-#define CSR_MHPMCOUNTER27H 0xb9b
-#define CSR_MHPMCOUNTER28H 0xb9c
-#define CSR_MHPMCOUNTER29H 0xb9d
-#define CSR_MHPMCOUNTER30H 0xb9e
-#define CSR_MHPMCOUNTER31H 0xb9f
-#define CSR_MCOUNTINHIBIT 0x320
-#define CSR_MHPMEVENT3 0x323
-#define CSR_MHPMEVENT4 0x324
-#define CSR_MHPMEVENT5 0x325
-#define CSR_MHPMEVENT6 0x326
-#define CSR_MHPMEVENT7 0x327
-#define CSR_MHPMEVENT8 0x328
-#define CSR_MHPMEVENT9 0x329
-#define CSR_MHPMEVENT10 0x32a
-#define CSR_MHPMEVENT11 0x32b
-#define CSR_MHPMEVENT12 0x32c
-#define CSR_MHPMEVENT13 0x32d
-#define CSR_MHPMEVENT14 0x32e
-#define CSR_MHPMEVENT15 0x32f
-#define CSR_MHPMEVENT16 0x330
-#define CSR_MHPMEVENT17 0x331
-#define CSR_MHPMEVENT18 0x332
-#define CSR_MHPMEVENT19 0x333
-#define CSR_MHPMEVENT20 0x334
-#define CSR_MHPMEVENT21 0x335
-#define CSR_MHPMEVENT22 0x336
-#define CSR_MHPMEVENT23 0x337
-#define CSR_MHPMEVENT24 0x338
-#define CSR_MHPMEVENT25 0x339
-#define CSR_MHPMEVENT26 0x33a
-#define CSR_MHPMEVENT27 0x33b
-#define CSR_MHPMEVENT28 0x33c
-#define CSR_MHPMEVENT29 0x33d
-#define CSR_MHPMEVENT30 0x33e
-#define CSR_MHPMEVENT31 0x33f
+CSR_MVENDORID=0xf11, CSR_MARCHID=0xf12, CSR_MIMPID=0xf13, CSR_MHARTID=0xf14, CSR_MCONFIGPTR=0xf15,
+CSR_MSTATUS=0x300, CSR_MISA=0x301, CSR_MEDELEG=0x302, CSR_MIDELEG=0x303, CSR_MIE=0x304,
+CSR_MTVEC=0x305, CSR_MCOUNTEREN=0x306, CSR_MSTATUSH=0x310, CSR_MSCRATCH=0x340, CSR_MEPC=0x341,
+CSR_MCAUSE=0x342, CSR_MTVAL=0x343, CSR_MIP=0x344, CSR_MTINST=0x34a, CSR_MTVAL2=0x34b,
+CSR_MENVCFG=0x30a, CSR_MENVCFGH=0x31a, CSR_MSECCFG=0x747, CSR_MSECCFGH=0x757, CSR_PMPCFG0=0x3a0,
+CSR_PMPCFG1=0x3a1, CSR_PMPCFG2=0x3a2, CSR_PMPCFG3=0x3a3, CSR_PMPCFG4=0x3a4, CSR_PMPCFG5=0x3a5,
+CSR_PMPCFG6=0x3a6, CSR_PMPCFG7=0x3a7, CSR_PMPCFG8=0x3a8, CSR_PMPCFG9=0x3a9, CSR_PMPCFG10=0x3aa,
+CSR_PMPCFG11=0x3ab, CSR_PMPCFG12=0x3ac, CSR_PMPCFG13=0x3ad, CSR_PMPCFG14=0x3ae, CSR_PMPCFG15=0x3af,
+CSR_PMPADDR0=0x3b0, CSR_PMPADDR1=0x3b1, CSR_PMPADDR2=0x3b2, CSR_PMPADDR3=0x3b3, CSR_PMPADDR4=0x3b4,
+CSR_PMPADDR5=0x3b5, CSR_PMPADDR6=0x3b6, CSR_PMPADDR7=0x3b7, CSR_PMPADDR8=0x3b8, CSR_PMPADDR9=0x3b9,
+CSR_PMPADDR10=0x3ba, CSR_PMPADDR11=0x3bb, CSR_PMPADDR12=0x3bc, CSR_PMPADDR13=0x3bd,
+CSR_PMPADDR14=0x3be, CSR_PMPADDR15=0x3bf, CSR_PMPADDR16=0x3c0, CSR_PMPADDR17=0x3c1,
+CSR_PMPADDR18=0x3c2, CSR_PMPADDR19=0x3c3, CSR_PMPADDR20=0x3c4, CSR_PMPADDR21=0x3c5,
+CSR_PMPADDR22=0x3c6, CSR_PMPADDR23=0x3c7, CSR_PMPADDR24=0x3c8, CSR_PMPADDR25=0x3c9,
+CSR_PMPADDR26=0x3ca, CSR_PMPADDR27=0x3cb, CSR_PMPADDR28=0x3cc, CSR_PMPADDR29=0x3cd,
+CSR_PMPADDR30=0x3ce, CSR_PMPADDR31=0x3cf, CSR_PMPADDR32=0x3d0, CSR_PMPADDR33=0x3d1,
+CSR_PMPADDR34=0x3d2, CSR_PMPADDR35=0x3d3, CSR_PMPADDR36=0x3d4, CSR_PMPADDR37=0x3d5,
+CSR_PMPADDR38=0x3d6, CSR_PMPADDR39=0x3d7, CSR_PMPADDR40=0x3d8, CSR_PMPADDR41=0x3d9,
+CSR_PMPADDR42=0x3da, CSR_PMPADDR43=0x3db, CSR_PMPADDR44=0x3dc, CSR_PMPADDR45=0x3dd,
+CSR_PMPADDR46=0x3de, CSR_PMPADDR47=0x3df, CSR_PMPADDR48=0x3e0, CSR_PMPADDR49=0x3e1,
+CSR_PMPADDR50=0x3e2, CSR_PMPADDR51=0x3e3, CSR_PMPADDR52=0x3e4, CSR_PMPADDR53=0x3e5,
+CSR_PMPADDR54=0x3e6, CSR_PMPADDR55=0x3e7, CSR_PMPADDR56=0x3e8, CSR_PMPADDR57=0x3e9,
+CSR_PMPADDR58=0x3ea, CSR_PMPADDR59=0x3eb, CSR_PMPADDR60=0x3ec, CSR_PMPADDR61=0x3ed,
+CSR_PMPADDR62=0x3ee, CSR_PMPADDR63=0x3ef, CSR_MCYCLE=0xb00, CSR_MINSTRET=0xb02,
+CSR_MHPMCOUNTER3=0xb03, CSR_MHPMCOUNTER4=0xb04, CSR_MHPMCOUNTER5=0xb05,
+CSR_MHPMCOUNTER6=0xb06, CSR_MHPMCOUNTER7=0xb07, CSR_MHPMCOUNTER8=0xb08,
+CSR_MHPMCOUNTER9=0xb09, CSR_MHPMCOUNTER10=0xb0a, CSR_MHPMCOUNTER11=0xb0b,
+CSR_MHPMCOUNTER12=0xb0c, CSR_MHPMCOUNTER13=0xb0d, CSR_MHPMCOUNTER14=0xb0e,
+CSR_MHPMCOUNTER15=0xb0f, CSR_MHPMCOUNTER16=0xb10, CSR_MHPMCOUNTER17=0xb11,
+CSR_MHPMCOUNTER18=0xb12, CSR_MHPMCOUNTER19=0xb13, CSR_MHPMCOUNTER20=0xb14,
+CSR_MHPMCOUNTER21=0xb15, CSR_MHPMCOUNTER22=0xb16, CSR_MHPMCOUNTER23=0xb17,
+CSR_MHPMCOUNTER24=0xb18, CSR_MHPMCOUNTER25=0xb19, CSR_MHPMCOUNTER26=0xb1a,
+CSR_MHPMCOUNTER27=0xb1b, CSR_MHPMCOUNTER28=0xb1c, CSR_MHPMCOUNTER29=0xb1d,
+CSR_MHPMCOUNTER30=0xb1e, CSR_MHPMCOUNTER31=0xb1f, CSR_MCYCLEH=0xb80,
+CSR_MINSTRETH=0xb82, CSR_MHPMCOUNTER3H=0xb83, CSR_MHPMCOUNTER4H=0xb84,
+CSR_MHPMCOUNTER5H=0xb85, CSR_MHPMCOUNTER6H=0xb86, CSR_MHPMCOUNTER7H=0xb87,
+CSR_MHPMCOUNTER8H=0xb88, CSR_MHPMCOUNTER9H=0xb89, CSR_MHPMCOUNTER10H=0xb8a,
+CSR_MHPMCOUNTER11H=0xb8b, CSR_MHPMCOUNTER12H=0xb8c, CSR_MHPMCOUNTER13H=0xb8d,
+CSR_MHPMCOUNTER14H=0xb8e, CSR_MHPMCOUNTER15H=0xb8f, CSR_MHPMCOUNTER16H=0xb90,
+CSR_MHPMCOUNTER17H=0xb91, CSR_MHPMCOUNTER18H=0xb92, CSR_MHPMCOUNTER19H=0xb93,
+CSR_MHPMCOUNTER20H=0xb94, CSR_MHPMCOUNTER21H=0xb95, CSR_MHPMCOUNTER22H=0xb96,
+CSR_MHPMCOUNTER23H=0xb97, CSR_MHPMCOUNTER24H=0xb98, CSR_MHPMCOUNTER25H=0xb99,
+CSR_MHPMCOUNTER26H=0xb9a, CSR_MHPMCOUNTER27H=0xb9b, CSR_MHPMCOUNTER28H=0xb9c,
+CSR_MHPMCOUNTER29H=0xb9d, CSR_MHPMCOUNTER30H=0xb9e, CSR_MHPMCOUNTER31H=0xb9f,
+CSR_MCOUNTINHIBIT=0x320, CSR_MHPMEVENT3=0x323, CSR_MHPMEVENT4=0x324,
+CSR_MHPMEVENT5=0x325, CSR_MHPMEVENT6=0x326, CSR_MHPMEVENT7=0x327,
+CSR_MHPMEVENT8=0x328, CSR_MHPMEVENT9=0x329, CSR_MHPMEVENT10=0x32a,
+CSR_MHPMEVENT11=0x32b, CSR_MHPMEVENT12=0x32c, CSR_MHPMEVENT13=0x32d,
+CSR_MHPMEVENT14=0x32e, CSR_MHPMEVENT15=0x32f, CSR_MHPMEVENT16=0x330,
+CSR_MHPMEVENT17=0x331, CSR_MHPMEVENT18=0x332, CSR_MHPMEVENT19=0x333,
+CSR_MHPMEVENT20=0x334, CSR_MHPMEVENT21=0x335, CSR_MHPMEVENT22=0x336,
+CSR_MHPMEVENT23=0x337, CSR_MHPMEVENT24=0x338, CSR_MHPMEVENT25=0x339,
+CSR_MHPMEVENT26=0x33a, CSR_MHPMEVENT27=0x33b, CSR_MHPMEVENT28=0x33c,
+CSR_MHPMEVENT29=0x33d, CSR_MHPMEVENT30=0x33e, CSR_MHPMEVENT31=0x33f,
 /* Privileged Hypervisor CSR addresses. */
-#define CSR_HSTATUS 0x600
-#define CSR_HEDELEG 0x602
-#define CSR_HIDELEG 0x603
-#define CSR_HIE 0x604
-#define CSR_HCOUNTEREN 0x606
-#define CSR_HGEIE 0x607
-#define CSR_HTVAL 0x643
-#define CSR_HIP 0x644
-#define CSR_HVIP 0x645
-#define CSR_HTINST 0x64a
-#define CSR_HGEIP 0xe12
-#define CSR_HENVCFG 0x60a
-#define CSR_HENVCFGH 0x61a
-#define CSR_HGATP 0x680
-#define CSR_HTIMEDELTA 0x605
-#define CSR_HTIMEDELTAH 0x615
-#define CSR_VSSTATUS 0x200
-#define CSR_VSIE 0x204
-#define CSR_VSTVEC 0x205
-#define CSR_VSSCRATCH 0x240
-#define CSR_VSEPC 0x241
-#define CSR_VSCAUSE 0x242
-#define CSR_VSTVAL 0x243
-#define CSR_VSIP 0x244
-#define CSR_VSATP 0x280
+CSR_HSTATUS=0x600, CSR_HEDELEG=0x602, CSR_HIDELEG=0x603, CSR_HIE=0x604,
+CSR_HCOUNTEREN=0x606, CSR_HGEIE=0x607, CSR_HTVAL=0x643, CSR_HIP=0x644, CSR_HVIP=0x645,
+CSR_HTINST=0x64a, CSR_HGEIP=0xe12, CSR_HENVCFG=0x60a, CSR_HENVCFGH=0x61a, CSR_HGATP=0x680,
+CSR_HTIMEDELTA=0x605, CSR_HTIMEDELTAH=0x615, CSR_VSSTATUS=0x200, CSR_VSIE=0x204,
+CSR_VSTVEC=0x205, CSR_VSSCRATCH=0x240, CSR_VSEPC=0x241, CSR_VSCAUSE=0x242,
+CSR_VSTVAL=0x243, CSR_VSIP=0x244, CSR_VSATP=0x280,
 /* Droppped CSR addresses.  */
-#define CSR_MBASE 0x380
-#define CSR_MBOUND 0x381
-#define CSR_MIBASE 0x382
-#define CSR_MIBOUND 0x383
-#define CSR_MDBASE 0x384
-#define CSR_MDBOUND 0x385
-#define CSR_MSCOUNTEREN 0x321
-#define CSR_MHCOUNTEREN 0x322
-#define CSR_USTATUS 0x0
-#define CSR_UIE 0x4
-#define CSR_UTVEC 0x5
-#define CSR_USCRATCH 0x40
-#define CSR_UEPC 0x41
-#define CSR_UCAUSE 0x42
-#define CSR_UTVAL 0x43
-#define CSR_UIP 0x44
-#define CSR_SEDELEG 0x102
-#define CSR_SIDELEG 0x103
+CSR_MBASE=0x380, CSR_MBOUND=0x381, CSR_MIBASE=0x382, CSR_MIBOUND=0x383, CSR_MDBASE=0x384,
+CSR_MDBOUND=0x385, CSR_MSCOUNTEREN=0x321, CSR_MHCOUNTEREN=0x322, CSR_USTATUS=0x0,
+CSR_UIE=0x4, CSR_UTVEC=0x5, CSR_USCRATCH=0x40, CSR_UEPC=0x41, CSR_UCAUSE=0x42,
+CSR_UTVAL=0x43, CSR_UIP=0x44, CSR_SEDELEG=0x102, CSR_SIDELEG=0x103,
 /* Smaia extension */
-#define CSR_MISELECT 0x350
-#define CSR_MIREG    0x351
-#define CSR_MTOPEI   0x35c
-#define CSR_MTOPI    0xfb0
-#define CSR_MVIEN    0x308
-#define CSR_MVIP     0x309
-#define CSR_MIDELEGH 0x313
-#define CSR_MIEH     0x314
-#define CSR_MVIENH   0x318
-#define CSR_MVIPH    0x319
-#define CSR_MIPH     0x354
+CSR_MISELECT=0x350, CSR_MIREG=   0x351, CSR_MTOPEI=  0x35c, CSR_MTOPI=   0xfb0,
+CSR_MVIEN=   0x308, CSR_MVIP=    0x309, CSR_MIDELEGH=0x313, CSR_MIEH=    0x314,
+CSR_MVIENH=  0x318, CSR_MVIPH=   0x319, CSR_MIPH=    0x354,
 /* Smstateen extension */
-#define CSR_MSTATEEN0 0x30c
-#define CSR_MSTATEEN1 0x30d
-#define CSR_MSTATEEN2 0x30e
-#define CSR_MSTATEEN3 0x30f
-#define CSR_SSTATEEN0 0x10c
-#define CSR_SSTATEEN1 0x10d
-#define CSR_SSTATEEN2 0x10e
-#define CSR_SSTATEEN3 0x10f
-#define CSR_HSTATEEN0 0x60c
-#define CSR_HSTATEEN1 0x60d
-#define CSR_HSTATEEN2 0x60e
-#define CSR_HSTATEEN3 0x60f
-#define CSR_MSTATEEN0H 0x31c
-#define CSR_MSTATEEN1H 0x31d
-#define CSR_MSTATEEN2H 0x31e
-#define CSR_MSTATEEN3H 0x31f
-#define CSR_HSTATEEN0H 0x61c
-#define CSR_HSTATEEN1H 0x61d
-#define CSR_HSTATEEN2H 0x61e
-#define CSR_HSTATEEN3H 0x61f
+CSR_MSTATEEN0=0x30c, CSR_MSTATEEN1=0x30d, CSR_MSTATEEN2=0x30e, CSR_MSTATEEN3=0x30f,
+CSR_SSTATEEN0=0x10c, CSR_SSTATEEN1=0x10d, CSR_SSTATEEN2=0x10e, CSR_SSTATEEN3=0x10f,
+CSR_HSTATEEN0=0x60c, CSR_HSTATEEN1=0x60d, CSR_HSTATEEN2=0x60e, CSR_HSTATEEN3=0x60f,
+CSR_MSTATEEN0H=0x31c, CSR_MSTATEEN1H=0x31d, CSR_MSTATEEN2H=0x31e, CSR_MSTATEEN3H=0x31f,
+CSR_HSTATEEN0H=0x61c, CSR_HSTATEEN1H=0x61d, CSR_HSTATEEN2H=0x61e, CSR_HSTATEEN3H=0x61f,
 /* Ssaia extension */
-#define CSR_SISELECT 0x150
-#define CSR_SIREG    0x151
-#define CSR_STOPEI   0x15c
-#define CSR_STOPI    0xdb0
-#define CSR_SIEH     0x114
-#define CSR_SIPH     0x154
-#define CSR_HVIEN     0x608
-#define CSR_HVICTL    0x609
-#define CSR_HVIPRIO1  0x646
-#define CSR_HVIPRIO2  0x647
-#define CSR_VSISELECT 0x250
-#define CSR_VSIREG    0x251
-#define CSR_VSTOPEI   0x25c
-#define CSR_VSTOPI    0xeb0
-#define CSR_HIDELEGH  0x613
-#define CSR_HVIENH    0x618
-#define CSR_HVIPH     0x655
-#define CSR_HVIPRIO1H 0x656
-#define CSR_HVIPRIO2H 0x657
-#define CSR_VSIEH     0x214
-#define CSR_VSIPH     0x254
+CSR_SISELECT=0x150, CSR_SIREG=   0x151, CSR_STOPEI=  0x15c, CSR_STOPI=   0xdb0,
+CSR_SIEH=    0x114, CSR_SIPH=    0x154, CSR_HVIEN=    0x608, CSR_HVICTL=   0x609,
+CSR_HVIPRIO1= 0x646, CSR_HVIPRIO2= 0x647, CSR_VSISELECT=0x250, CSR_VSIREG=   0x251,
+CSR_VSTOPEI=  0x25c, CSR_VSTOPI=   0xeb0, CSR_HIDELEGH= 0x613, CSR_HVIENH=   0x618,
+CSR_HVIPH=    0x655, CSR_HVIPRIO1H=0x656, CSR_HVIPRIO2H=0x657, CSR_VSIEH=    0x214,
+CSR_VSIPH=    0x254,
 /* Sscofpmf extension */
-#define CSR_SCOUNTOVF 0xda0
-#define CSR_MHPMEVENT3H 0x723
-#define CSR_MHPMEVENT4H 0x724
-#define CSR_MHPMEVENT5H 0x725
-#define CSR_MHPMEVENT6H 0x726
-#define CSR_MHPMEVENT7H 0x727
-#define CSR_MHPMEVENT8H 0x728
-#define CSR_MHPMEVENT9H 0x729
-#define CSR_MHPMEVENT10H 0x72a
-#define CSR_MHPMEVENT11H 0x72b
-#define CSR_MHPMEVENT12H 0x72c
-#define CSR_MHPMEVENT13H 0x72d
-#define CSR_MHPMEVENT14H 0x72e
-#define CSR_MHPMEVENT15H 0x72f
-#define CSR_MHPMEVENT16H 0x730
-#define CSR_MHPMEVENT17H 0x731
-#define CSR_MHPMEVENT18H 0x732
-#define CSR_MHPMEVENT19H 0x733
-#define CSR_MHPMEVENT20H 0x734
-#define CSR_MHPMEVENT21H 0x735
-#define CSR_MHPMEVENT22H 0x736
-#define CSR_MHPMEVENT23H 0x737
-#define CSR_MHPMEVENT24H 0x738
-#define CSR_MHPMEVENT25H 0x739
-#define CSR_MHPMEVENT26H 0x73a
-#define CSR_MHPMEVENT27H 0x73b
-#define CSR_MHPMEVENT28H 0x73c
-#define CSR_MHPMEVENT29H 0x73d
-#define CSR_MHPMEVENT30H 0x73e
-#define CSR_MHPMEVENT31H 0x73f
+CSR_SCOUNTOVF=0xda0, CSR_MHPMEVENT3H=0x723, CSR_MHPMEVENT4H=0x724, CSR_MHPMEVENT5H=0x725,
+CSR_MHPMEVENT6H=0x726, CSR_MHPMEVENT7H=0x727, CSR_MHPMEVENT8H=0x728, CSR_MHPMEVENT9H=0x729,
+CSR_MHPMEVENT10H=0x72a, CSR_MHPMEVENT11H=0x72b, CSR_MHPMEVENT12H=0x72c, CSR_MHPMEVENT13H=0x72d,
+CSR_MHPMEVENT14H=0x72e, CSR_MHPMEVENT15H=0x72f, CSR_MHPMEVENT16H=0x730, CSR_MHPMEVENT17H=0x731,
+CSR_MHPMEVENT18H=0x732, CSR_MHPMEVENT19H=0x733, CSR_MHPMEVENT20H=0x734, CSR_MHPMEVENT21H=0x735,
+CSR_MHPMEVENT22H=0x736, CSR_MHPMEVENT23H=0x737, CSR_MHPMEVENT24H=0x738, CSR_MHPMEVENT25H=0x739,
+CSR_MHPMEVENT26H=0x73a, CSR_MHPMEVENT27H=0x73b, CSR_MHPMEVENT28H=0x73c, CSR_MHPMEVENT29H=0x73d,
+CSR_MHPMEVENT30H=0x73e, CSR_MHPMEVENT31H=0x73f,
 /* Sstc extension */
-#define CSR_STIMECMP 0x14d
-#define CSR_STIMECMPH 0x15d
-#define CSR_VSTIMECMP 0x24d
-#define CSR_VSTIMECMPH 0x25d
+CSR_STIMECMP=0x14d, CSR_STIMECMPH=0x15d, CSR_VSTIMECMP=0x24d, CSR_VSTIMECMPH=0x25d,
 /* Unprivileged Floating-Point CSR addresses.  */
-#define CSR_FFLAGS 0x1
-#define CSR_FRM 0x2
-#define CSR_FCSR 0x3
+CSR_FFLAGS=0x1, CSR_FRM=0x2, CSR_FCSR=0x3,
 /* Unprivileged Debug CSR addresses.  */
-#define CSR_DCSR 0x7b0
-#define CSR_DPC 0x7b1
-#define CSR_DSCRATCH0 0x7b2
-#define CSR_DSCRATCH1 0x7b3
-#define CSR_TSELECT 0x7a0
-#define CSR_TDATA1 0x7a1
-#define CSR_TDATA2 0x7a2
-#define CSR_TDATA3 0x7a3
-#define CSR_TINFO 0x7a4
-#define CSR_TCONTROL 0x7a5
-#define CSR_HCONTEXT 0x6a8
-#define CSR_SCONTEXT 0x5a8
-#define CSR_MCONTEXT 0x7a8
-#define CSR_MSCONTEXT 0x7aa
+CSR_DCSR=0x7b0, CSR_DPC=0x7b1, CSR_DSCRATCH0=0x7b2, CSR_DSCRATCH1=0x7b3, CSR_TSELECT=0x7a0,
+CSR_TDATA1=0x7a1, CSR_TDATA2=0x7a2, CSR_TDATA3=0x7a3, CSR_TINFO=0x7a4, CSR_TCONTROL=0x7a5,
+CSR_HCONTEXT=0x6a8, CSR_SCONTEXT=0x5a8, CSR_MCONTEXT=0x7a8, CSR_MSCONTEXT=0x7aa,
 /* Unprivileged Scalar Crypto CSR addresses.  */
-#define CSR_SEED 0x015
+CSR_SEED=0x015,
 /* Unprivileged Vector CSR addresses.  */
-#define CSR_VSTART 0x008
-#define CSR_VXSAT 0x009
-#define CSR_VXRM 0x00a
-#define CSR_VCSR 0x00f
-#define CSR_VL 0xc20
-#define CSR_VTYPE 0xc21
-#define CSR_VLENB 0xc22
-#endif /* RISCV_ENCODING_H */
+CSR_VSTART=0x008, CSR_VXSAT=0x009, CSR_VXRM=0x00a, CSR_VCSR=0x00f, CSR_VL=0xc20,
+CSR_VTYPE=0xc21, CSR_VLENB=0xc22,
+};
 typedef uint64_t insn_t;
 
 static inline unsigned int riscv_insn_length (insn_t insn)
@@ -8244,63 +6113,21 @@ enum riscv_insn_class
 {
   INSN_CLASS_NONE,
 
-  INSN_CLASS_I,
-  INSN_CLASS_C,
-  INSN_CLASS_A,
-  INSN_CLASS_M,
-  INSN_CLASS_F,
-  INSN_CLASS_D,
-  INSN_CLASS_Q,
-  INSN_CLASS_F_AND_C,
-  INSN_CLASS_D_AND_C,
-  INSN_CLASS_ZICSR,
-  INSN_CLASS_ZIFENCEI,
-  INSN_CLASS_ZIHINTPAUSE,
-  INSN_CLASS_ZMMUL,
-  INSN_CLASS_ZAWRS,
-  INSN_CLASS_F_INX,
-  INSN_CLASS_D_INX,
-  INSN_CLASS_Q_INX,
-  INSN_CLASS_ZFH_INX,
-  INSN_CLASS_ZFHMIN,
-  INSN_CLASS_ZFHMIN_INX,
-  INSN_CLASS_ZFHMIN_AND_D_INX,
-  INSN_CLASS_ZFHMIN_AND_Q_INX,
-  INSN_CLASS_ZBA,
-  INSN_CLASS_ZBB,
-  INSN_CLASS_ZBC,
-  INSN_CLASS_ZBS,
-  INSN_CLASS_ZBKB,
-  INSN_CLASS_ZBKC,
-  INSN_CLASS_ZBKX,
-  INSN_CLASS_ZKND,
-  INSN_CLASS_ZKNE,
-  INSN_CLASS_ZKNH,
-  INSN_CLASS_ZKSED,
-  INSN_CLASS_ZKSH,
-  INSN_CLASS_ZBB_OR_ZBKB,
-  INSN_CLASS_ZBC_OR_ZBKC,
-  INSN_CLASS_ZKND_OR_ZKNE,
-  INSN_CLASS_V,
-  INSN_CLASS_ZVEF,
-  INSN_CLASS_SVINVAL,
-  INSN_CLASS_ZICBOM,
-  INSN_CLASS_ZICBOP,
-  INSN_CLASS_ZICBOZ,
-  INSN_CLASS_H,
-  INSN_CLASS_XTHEADBA,
-  INSN_CLASS_XTHEADBB,
-  INSN_CLASS_XTHEADBS,
-  INSN_CLASS_XTHEADCMO,
-  INSN_CLASS_XTHEADCONDMOV,
-  INSN_CLASS_XTHEADFMEMIDX,
-  INSN_CLASS_XTHEADFMV,
-  INSN_CLASS_XTHEADINT,
-  INSN_CLASS_XTHEADMAC,
-  INSN_CLASS_XTHEADMEMIDX,
-  INSN_CLASS_XTHEADMEMPAIR,
-  INSN_CLASS_XTHEADSYNC,
-  INSN_CLASS_XVENTANACONDOPS,
+  INSN_CLASS_I, INSN_CLASS_C, INSN_CLASS_A, INSN_CLASS_M, INSN_CLASS_F,
+  INSN_CLASS_D, INSN_CLASS_Q, INSN_CLASS_F_AND_C, INSN_CLASS_D_AND_C,
+  INSN_CLASS_ZICSR, INSN_CLASS_ZIFENCEI, INSN_CLASS_ZIHINTPAUSE, INSN_CLASS_ZMMUL,
+  INSN_CLASS_ZAWRS, INSN_CLASS_F_INX, INSN_CLASS_D_INX, INSN_CLASS_Q_INX,
+  INSN_CLASS_ZFH_INX, INSN_CLASS_ZFHMIN, INSN_CLASS_ZFHMIN_INX, INSN_CLASS_ZFHMIN_AND_D_INX,
+  INSN_CLASS_ZFHMIN_AND_Q_INX, INSN_CLASS_ZBA, INSN_CLASS_ZBB, INSN_CLASS_ZBC,
+  INSN_CLASS_ZBS, INSN_CLASS_ZBKB, INSN_CLASS_ZBKC, INSN_CLASS_ZBKX, INSN_CLASS_ZKND,
+  INSN_CLASS_ZKNE, INSN_CLASS_ZKNH, INSN_CLASS_ZKSED, INSN_CLASS_ZKSH,
+  INSN_CLASS_ZBB_OR_ZBKB, INSN_CLASS_ZBC_OR_ZBKC, INSN_CLASS_ZKND_OR_ZKNE,
+  INSN_CLASS_V, INSN_CLASS_ZVEF, INSN_CLASS_SVINVAL, INSN_CLASS_ZICBOM,
+  INSN_CLASS_ZICBOP, INSN_CLASS_ZICBOZ, INSN_CLASS_H, INSN_CLASS_XTHEADBA,
+  INSN_CLASS_XTHEADBB, INSN_CLASS_XTHEADBS, INSN_CLASS_XTHEADCMO,
+  INSN_CLASS_XTHEADCONDMOV, INSN_CLASS_XTHEADFMEMIDX, INSN_CLASS_XTHEADFMV,
+  INSN_CLASS_XTHEADINT, INSN_CLASS_XTHEADMAC, INSN_CLASS_XTHEADMEMIDX,
+  INSN_CLASS_XTHEADMEMPAIR, INSN_CLASS_XTHEADSYNC, INSN_CLASS_XVENTANACONDOPS,
 };
 
 /* This structure holds information for a particular instruction.  */
@@ -8376,41 +6203,11 @@ struct riscv_opcode
 #define INSN_MACRO		0xffffffff
 
 /* This is a list of macro expanded instructions.  */
-enum
-{
-  M_LA,
-  M_LLA,
-  M_LA_TLS_GD,
-  M_LA_TLS_IE,
-  M_LB,
-  M_LBU,
-  M_LH,
-  M_LHU,
-  M_LW,
-  M_LWU,
-  M_LD,
-  M_SB,
-  M_SH,
-  M_SW,
-  M_SD,
-  M_FLW,
-  M_FLD,
-  M_FLQ,
-  M_FSW,
-  M_FSD,
-  M_FSQ,
-  M_CALL,
-  M_J,
-  M_LI,
-  M_ZEXTH,
-  M_ZEXTW,
-  M_SEXTB,
-  M_SEXTH,
-  M_VMSGE,
-  M_VMSGEU,
-  M_FLH,
-  M_FSH,
-  M_NUM_MACROS
+enum {
+  M_LA, M_LLA, M_LA_TLS_GD, M_LA_TLS_IE, M_LB, M_LBU, M_LH, M_LHU, M_LW,
+  M_LWU, M_LD, M_SB, M_SH, M_SW, M_SD, M_FLW, M_FLD, M_FLQ, M_FSW, M_FSD,
+  M_FSQ, M_CALL, M_J, M_LI, M_ZEXTH, M_ZEXTW, M_SEXTB, M_SEXTH, M_VMSGE,
+  M_VMSGEU, M_FLH, M_FSH, M_NUM_MACROS
 };
 
 /* The mapping symbol states.  */
@@ -9047,7 +6844,6 @@ static fixS *fix_new (fragS *, unsigned long, unsigned long, symbolS *,
 		      offsetT, int, bfd_reloc_code_real_type);
 static fixS *fix_new_exp (fragS *, unsigned long, unsigned long,
 			  expressionS *, int, bfd_reloc_code_real_type);
-static void write_print_statistics (FILE *);
 static void as_bad_subtract (fixS *);
 #endif /* __write_h__ */
 /* frags.h - Header file for the frag concept. */
@@ -9273,9 +7069,6 @@ static void pseudo_set (symbolS * symbolP);
 static void read_a_source_file (const char *name);
 static void read_begin (void);
 static void read_end (void);
-static void read_print_statistics (FILE *);
-static void print_binary (FILE *file, const char *name, expressionS *exp);
-static char *read_symbol_name (void);
 static unsigned sizeof_leb128 (valueT, int);
 static void stabs_generate_asm_file (void);
 static void stabs_generate_asm_lineno (void);
@@ -9363,17 +7156,11 @@ static symbolS *symbol_temp_make (void);
 
 static symbolS *colon (const char *sym_name);
 static void symbol_begin (void);
-static void symbol_end (void);
 static void dot_symbol_init (void);
-static void symbol_print_statistics (FILE *);
 static void symbol_table_insert (symbolS * symbolP);
 static valueT resolve_symbol_value (symbolS *);
 static void resolve_local_symbol_values (void);
 static int snapshot_symbol (symbolS **, valueT *, segT *, fragS **);
-
-static void print_symbol_value_1 (FILE *, symbolS *);
-static void fb_label_instance_inc (unsigned int);
-static char *fb_label_name (unsigned int, unsigned int);
 
 static void copy_symbol_attributes (symbolS *, symbolS *);
 
@@ -9604,7 +7391,6 @@ static void	htab_remove_elt	(htab_t, const void *);
 static void	htab_remove_elt_with_hash (htab_t, const void *, hashval_t);
 
 static size_t	htab_size (htab_t);
-static size_t	htab_elements (htab_t);
 
 /* A hash function for null-terminated strings.  */
 static hashval_t htab_hash_string (const void *);
@@ -9622,6 +7408,7 @@ struct string_tuple {
   const void *value;
 };
 typedef struct string_tuple string_tuple_t;
+static char    *read_symbol_name(void);
 /* Hash function for a string_tuple.  */
 static hashval_t hash_string_tuple (const void *);
 /* Equality function for a string_tuple.  */
@@ -9630,8 +7417,6 @@ static int eq_string_tuple (const void *, const void *);
    are overwritten.  If ELEMENT already exists, a pointer to the slot
    is returned.  Otherwise NULL is returned.  */
 static void **htab_insert (htab_t, void * /* element */, int /* replace */);
-/* Print statistics about a hash table.  */
-static void htab_print_statistics (FILE *f, const char *name, htab_t table);
 /* Inline string hash table functions.  */
 static inline string_tuple_t *
 string_tuple_alloc (htab_t table, const char *key, const void *value)
@@ -9743,10 +7528,7 @@ static int flag_sectname_subst;
 #define LOCAL_LABELS_FB 0
 #endif
 
-#ifndef LABELS_WITHOUT_COLONS
 #define LABELS_WITHOUT_COLONS 0
-#endif
-
 #define TEXT_SECTION_NAME	".text"
 #define DATA_SECTION_NAME	".data"
 #define BSS_SECTION_NAME	".bss"
@@ -10228,8 +8010,6 @@ typedef struct segment_info_struct {
   ((segment_info_type *) bfd_section_userdata (sec))
 
 static symbolS *section_symbol (segT);
-static void subsegs_print_statistics (FILE *);
-static void print_expr_1 (FILE *file, expressionS *exp);
 static void output_file_close (void);
 static void output_file_create (const char *name);
 

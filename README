@@ -3,11 +3,12 @@ This is a digest of the gnu assembler for riscv machines.
 Copy the two files (asm.c and asm.h) somewhere in your
 machine.
 2: Compile it with:
-   gcc -o asm asm.c
+   gcc -o asm asm.c -lz
 In some systems, the obtack library is not included in the C library.
 If that is the case in your system, the command should be:
-   gcc -o asm asm.c obstack.c
+   gcc -o asm asm.c obstack.c -lz
 There is no Makefile. You can write one if you want.
+
 ENJOY!
 
 jacob

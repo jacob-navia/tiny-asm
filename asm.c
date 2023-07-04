@@ -361,7 +361,6 @@ static void	parse_args(int *pargc,char ***pargv)
 		,{"no-pad-sections",no_argument,NULL,OPTION_NO_PAD_SECTIONS}
 		,{"no-warn",no_argument,NULL,'W'}
 		,{"reduce-memory-overheads",no_argument,NULL,OPTION_REDUCE_MEMORY_OVERHEADS}
-		,{"statistics",no_argument,NULL,OPTION_STATISTICS}
 		,{"strip-local-absolute",no_argument,NULL,OPTION_STRIP_LOCAL_ABSOLUTE}
 		,{"version",no_argument,NULL,OPTION_VERSION}
 		,{"verbose",no_argument,NULL,OPTION_VERBOSE}
@@ -509,22 +508,18 @@ This program has absolutely no warranty.\n");
 		case OPTION_COMPRESS_DEBUG:
 			break;
 		case 'g':
-			/*
-			 * Some backends,eg Alpha and Mips,use the -g switch
+			/* Some backends,eg Alpha and Mips,use the -g switch
 			 * for their own purposes.  So we check here for an
 			 * explicit -g and allow the backend to decide if it
-			 * wants to process it.
-			 */
+			 * wants to process it.  */
 			if (old_argv[optind - 1][1] == 'g'
 			    && md_parse_option(optc,optarg))
 				continue;
 
-			/*
-			 * We end up here for any
+			/* We end up here for any
 			 * -gsomething-not-already-a-long-option. give some
 			 * useful feedback on not (yet) supported -gdwarfxxx
-			 * versions/sections/options.
-			 */
+			 * versions/sections/options.  */
 			if (startswith(old_argv[optind - 1],"-gdwarf"))
 				as_fatal(("unknown DWARF option %s\n"),old_argv[optind - 1]);
 			else
@@ -598,43 +593,22 @@ This program has absolutely no warranty.\n");
 			}
 			break;
 
-		case 'J':
-			flag_signed_overflow_ok = 1;
-			break;
-
-		case 'L':
-			flag_keep_locals = 1;
-			break;
-
-		case 'R':
-			flag_readonly_data_in_text = 1;
-			break;
-
-		case 'W':
-			flag_no_warnings = 1;
-			break;
-
-		case OPTION_WARN:
-			flag_no_warnings = 0;
-			flag_fatal_warnings = 0;
-			break;
-
-		case OPTION_WARN_FATAL:
-			flag_no_warnings = 0;
-			flag_fatal_warnings = 1;
-			break;
+		case 'J': flag_signed_overflow_ok = 1; break;
+		case 'L': flag_keep_locals = 1; break;
+		case 'R': flag_readonly_data_in_text = 1; break;
+		case 'W': flag_no_warnings = 1; break;
+		case OPTION_WARN: flag_no_warnings = 0; flag_fatal_warnings = 0; break;
+		case OPTION_WARN_FATAL:flag_no_warnings=0;flag_fatal_warnings=1; break;
 
 #if defined OBJ_ELF || defined OBJ_MAYBE_ELF
 		case OPTION_EXECSTACK:
 			flag_execstack = 1;
 			flag_noexecstack = 0;
 			break;
-
 		case OPTION_NOEXECSTACK:
 			flag_noexecstack = 1;
 			flag_execstack = 0;
 			break;
-
 		case OPTION_SIZE_CHECK:
 			if (strcasecmp(optarg,"error") == 0)
 				flag_allow_nonconst_size = false;
@@ -644,7 +618,6 @@ This program has absolutely no warranty.\n");
 				else
 					as_fatal(("Invalid --size-check= option: `%s'"),optarg);
 			break;
-
 		case OPTION_ELF_STT_COMMON:
 			if (strcasecmp(optarg,"no") == 0)
 				flag_use_elf_stt_common = 0;
@@ -655,11 +628,7 @@ This program has absolutely no warranty.\n");
 					as_fatal(("Invalid --elf-stt-common= option: `%s'"),
 						 optarg);
 			break;
-
-		case OPTION_SECTNAME_SUBST:
-			flag_sectname_subst = 1;
-			break;
-
+		case OPTION_SECTNAME_SUBST: flag_sectname_subst = 1; break;
 		case OPTION_ELF_BUILD_NOTES:
 			if (strcasecmp(optarg,"no") == 0)
 				flag_generate_build_notes = false;
@@ -675,16 +644,10 @@ This program has absolutely no warranty.\n");
 			as_fatal("sframe not supported!\n");
 			//flag_gen_sframe = 1;
 			break;
-
 #endif				/* OBJ_ELF */
 
-		case 'Z':
-			flag_always_generate_output = 1;
-			break;
-
-		case OPTION_AL:
-			break;
-
+		case 'Z': flag_always_generate_output = 1; break;
+		case OPTION_AL: break;
 		case OPTION_ALTERNATE:
 			optarg = old_argv[optind - 1];
 			while (*optarg == '-')
@@ -725,25 +688,12 @@ This program has absolutely no warranty.\n");
 			flag_debug = 1;
 			break;
 
-		case 'f':
-			flag_no_comments = 1;
+		case 'f': flag_no_comments = 1; break;
+		case 'o': out_file_name = notes_strdup(optarg); break;
+		case 'w': break;
+		case 'X': /* -X means treat warnings as errors.  */ break;
 			break;
-
-		case 'o':
-			out_file_name = notes_strdup(optarg);
-			break;
-
-		case 'w':
-			break;
-
-		case 'X':
-			/* -X means treat warnings as errors.  */
-			break;
-
-			break;
-
-		case OPTION_HASH_TABLE_SIZE:
-			break;
+		case OPTION_HASH_TABLE_SIZE: break;
 		}
 	}
 
@@ -791,17 +741,13 @@ static void	perform_an_assembly_pass(int argc,char **argv)
 
 	need_pass_2 = 0;
 
-	/*
-	 * Create the standard sections,and those the assembler uses
-	 * internally.
-	 */
+	/* Create the standard sections,and those the assembler uses
+	 * internally.  */
 	text_section = subseg_new(TEXT_SECTION_NAME,0);
 	data_section = subseg_new(DATA_SECTION_NAME,0);
 	bss_section = subseg_new(BSS_SECTION_NAME,0);
-	/*
-	 * @@ FIXME -- we're setting the RELOC flag so that sections are
-	 * assumed to have relocs,otherwise we don't find out in time.
-	 */
+	/* @@ FIXME -- we're setting the RELOC flag so that sections are
+	 * assumed to have relocs,otherwise we don't find out in time.  */
 	//applicable = stdoutput->xvec->section_flags;
 	applicable = 0x3c1a13f;
 	text_section->flags = applicable & (SEC_ALLOC|SEC_LOAD|SEC_RELOC
@@ -818,16 +764,10 @@ static void	perform_an_assembly_pass(int argc,char **argv)
 #ifndef OBJ_MACH_O
 	subseg_set(text_section,0);
 #endif
-
-	/*
-	 * This may add symbol table entries,which requires having an open
-	 * BFD,and sections already created.
-	 */
+	/* This may add symbol table entries,which requires having an open
+	 * BFD,and sections already created.  */
 	md_begin();
-
-#ifdef obj_begin
-	obj_begin();
-#endif
+	elf_begin();
 
 	/* Skip argv[0].  */
 	argv++;
@@ -943,16 +883,14 @@ static void	gas_init(void)
 	}
 }
 
-int		main       (int argc,char **argv)
+int	main(int argc,char **argv)
 {
 	struct stat	sob;
 
 	gas_early_init(&argc,&argv);
 
-	/*
-	 * Call parse_args before gas_init so that switches like --hash-size
-	 * can be honored.
-	 */
+	/* Call parse_args before gas_init so that switches like --hash-size
+	 * can be honored.  */
 	parse_args(&argc,&argv);
 
 	if (argc > 1 && stat(out_file_name,&sob) == 0) {
@@ -961,26 +899,21 @@ int		main       (int argc,char **argv)
 		for (i = 1; i < argc; ++i) {
 			struct stat	sib;
 
-			/*
-			 * Check that the input file and output file are
+			/* Check that the input file and output file are
 			 * different.
 			 */
 			if (stat(argv[i],&sib) == 0
 			    && sib.st_ino == sob.st_ino
-			/*
-			 * POSIX emulating systems may support stat() but if
+			/* POSIX emulating systems may support stat() but if
 			 * the underlying file system does not support a file
 			 * serial number of some kind then they will return 0
 			 * for the inode.  So two files with an inode of 0 may
 			 * not actually be the same. On real POSIX systems no
-			 * ordinary file will ever have an inode of 0.
-			 */
+			 * ordinary file will ever have an inode of 0. */
 			    && sib.st_ino != 0
-			/*
-			 * Different files may have the same inode number if
+			/* Different files may have the same inode number if
 			 * they reside on different devices,so check the
-			 * st_dev field as well.
-			 */
+			 * st_dev field as well. */
 			    && sib.st_dev == sob.st_dev
 			/*
 			 * PR 25572: Only check regular files.  Devices,
@@ -988,8 +921,7 @@ int		main       (int argc,char **argv)
 			 * and output.  Plus there is a use case for using
 			 * /dev/null as both input and output when checking for
 			 * command line option support in a script: as --foo
-			 * /dev/null -o /dev/null; if $? then ...
-			 */
+			 * /dev/null -o /dev/null; if $? then ...  */
 			    && S_ISREG(sib.st_mode)) {
 				const char     *saved_out_file_name = out_file_name;
 
@@ -1503,31 +1435,9 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 							/* quit out of loop gracefully */
 							decimal_exponent = 0;
 						} else {
-#ifdef TRACE
-							printf("before multiply,place_number = %d.,power_of_10_flonum:\n",
-							       place_number);
-
-							flonum_print(&power_of_10_flonum);
-							(void)putchar('\n');
-#endif
-#ifdef TRACE
-							printf("multiplier:\n");
-							flonum_print(multiplicand + place_number);
-							(void)putchar('\n');
-#endif
 							flonum_multip(multiplicand + place_number,
 								      &power_of_10_flonum,&temporary_flonum);
-#ifdef TRACE
-							printf("after multiply:\n");
-							flonum_print(&temporary_flonum);
-							(void)putchar('\n');
-#endif
 							flonum_copy(&temporary_flonum,&power_of_10_flonum);
-#ifdef TRACE
-							printf("after copy:\n");
-							flonum_print(&power_of_10_flonum);
-							(void)putchar('\n');
-#endif
 						}	/* If this bit of
 							 * decimal_exponent was
 							 * computable. */
@@ -1535,11 +1445,6 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 						 * decimal_exponent was set.  */
 				}	/* For each bit of binary
 					 * representation of exponent */
-#ifdef TRACE
-				printf("after computing power_of_10_flonum:\n");
-				flonum_print(&power_of_10_flonum);
-				(void)putchar('\n');
-#endif
 			}
 		}
 
@@ -1559,25 +1464,6 @@ static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 	}
 	return return_value;
 }
-
-#ifdef TRACE
-static void	flonum_print(const FLONUM_TYPE *f)
-{
-	LITTLENUM_TYPE *lp;
-	char		littlenum_format[10];
-	sprintf(littlenum_format," %%0%dx",sizeof(LITTLENUM_TYPE) * 2);
-#define print_littlenum(LP)	(printf (littlenum_format,LP))
-	printf("flonum @%p %c e%ld",f,f->sign,f->exponent);
-	if (f->low < f->high)
-		for (lp = f->high; lp >= f->low; lp--)
-			print_littlenum(*lp);
-	else
-		for (lp = f->low; lp <= f->high; lp++)
-			print_littlenum(*lp);
-	printf("\n");
-	fflush(stdout);
-}
-#endif
 /* end of atof_generic.c */
 /* ==================================================** compress-debug.c */
 /* compress-debug.c - compress debug sections */
@@ -1673,16 +1559,10 @@ struct symbol;
 
 /* Structures for md_cfi_end.  */
 
-#define SUPPORT_FRAME_LINKONCE 0
-
 #ifdef tc_cfi_reloc_for_encoding
 #define SUPPORT_COMPACT_EH 1
 #else
 #define SUPPORT_COMPACT_EH 0
-#endif
-
-#ifndef TARGET_MULTIPLE_EH_FRAME_SECTIONS
-#define TARGET_MULTIPLE_EH_FRAME_SECTIONS 0
 #endif
 
 struct cfi_insn_data {
@@ -1728,8 +1608,7 @@ struct cfi_insn_data {
  * 
  * The header type is initialized to EH_COMPACT_UNKNOWN until the format is
  * discovered by encountering a .fde_data entry. Failure to find a .fde_data
- * entry will cause an EH_COMPACT_LEGACY header to be generated.
- */
+ * entry will cause an EH_COMPACT_LEGACY header to be generated.  */
 enum { EH_COMPACT_UNKNOWN, EH_COMPACT_LEGACY, EH_COMPACT_INLINE,
 	EH_COMPACT_OUTLINE, EH_COMPACT_OUTLINE_DONE,
 	/* Outline if .cfi_inline_lsda used,otherwise legacy FDE.  */
@@ -1797,7 +1676,6 @@ extern struct fde_entry *all_fde_data;
 #endif				/* DW2GENCFI_H */
 static void	output_sframe(segT sframe_seg);
 
-#ifdef TARGET_USE_CFIPOP
 
 /* By default,use difference expressions if DIFF_EXPR_OK is defined.  */
 #ifndef CFI_DIFF_EXPR_OK
@@ -1850,8 +1728,7 @@ static void	output_sframe(segT sframe_seg);
 #define tc_cfi_endproc(fde) ((void) (fde))
 #endif
 
-#define EH_FRAME_LINKONCE (compact_eh \
-			   || TARGET_MULTIPLE_EH_FRAME_SECTIONS)
+#define EH_FRAME_LINKONCE (compact_eh)
 
 #ifndef DWARF2_FORMAT
 #define DWARF2_FORMAT(SEC) dwarf2_format_32bit
@@ -1970,16 +1847,10 @@ static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 			exp->X_add_number,howto->pc_relative,code);
 	} else
 		if ((encoding & 0x70) == DW_EH_PE_pcrel) {
-#if CFI_DIFF_EXPR_OK
 			expressionS	tmp = *exp;
 			tmp.X_op = O_subtract;
 			tmp.X_op_symbol = symbol_temp_new_now();
 			emit_expr(&tmp,size);
-#elif defined (tc_cfi_emit_pcrel_expr)
-			tc_cfi_emit_pcrel_expr(exp,size);
-#else
-			abort();
-#endif
 		} else
 			emit_expr(exp,size);
 }
@@ -2007,16 +1878,10 @@ static char    *get_debugseg_name(segT seg,const char *base_name)
 
 		name = "";
 	} else
-		if (!dollar)
-			name = dot;
-		else
-			if (!dot)
-				name = dollar;
-			else
-				if (dot < dollar)
-					name = dot;
-				else
-					name = dollar;
+		if (!dollar) name = dot;
+		else if (!dot) name = dollar;
+		else if (dot < dollar) name = dot;
+		else name = dollar;
 
 	return notes_concat(base_name,name,NULL);
 }
@@ -2036,9 +1901,6 @@ static struct dwcfi_seg_list *alloc_debugseg_item(segT seg,int subseg,char *name
 static segT	is_now_linkonce_segment(void)
 {
 	if (compact_eh)
-		return now_seg;
-
-	if (TARGET_MULTIPLE_EH_FRAME_SECTIONS)
 		return now_seg;
 
 	if ((now_seg->flags
@@ -3101,13 +2963,10 @@ static void	dot_cfi_endproc(int ignored ATTRIBUTE_UNUSED)
 		tc_cfi_endproc(last_fde);
 }
 
-static		segT
-		get_cfi_seg   (segT cseg,const char *base,uint32_t flags,int align)
+static	segT get_cfi_seg(segT cseg,const char *base,uint32_t flags,int align)
 {
 	/* Exclude .debug_frame sections for Compact EH.  */
-	if (((flags & SEC_DEBUGGING) == 0 && compact_eh)
-	    || ((flags & SEC_DEBUGGING) == 0 && TARGET_MULTIPLE_EH_FRAME_SECTIONS)) {
-		segT		iseg = cseg;
+	if ((flags & SEC_DEBUGGING) == 0 && compact_eh) {
 		struct dwcfi_seg_list *l;
 
 		l = dwcfi_hash_find_or_make(cseg,base,flags);
@@ -3115,22 +2974,6 @@ static		segT
 		cseg = l->seg;
 		subseg_set(cseg,l->subseg);
 
-		if (TARGET_MULTIPLE_EH_FRAME_SECTIONS
-		    && (flags & DWARF2_EH_FRAME_READ_ONLY)) {
-			const frchainS *ifrch = seg_info(iseg)->frchainP;
-			const frchainS *frch = seg_info(cseg)->frchainP;
-			expressionS	exp;
-
-			exp.X_op = O_symbol;
-			exp.X_add_symbol = (symbolS *) local_symbol_make(cseg->name,cseg,frch->frch_root,0);
-			exp.X_add_number = 0;
-			subseg_set(iseg,ifrch->frch_subseg);
-			fix_new_exp(ifrch->frch_root,0,0,&exp,0,BFD_RELOC_NONE);
-
-			/* Restore the original segment info.  */
-			subseg_set(cseg,l->subseg);
-		}
-	} else {
 		cseg = subseg_new(base,0);
 		cseg->flags = flags;
 	}
@@ -3824,39 +3667,35 @@ static void	cfi_finish(void)
 			    SEC_READONLY|SEC_DEBUGGING,
 			    alignment);
 
-		do {
-			ccseg = NULL;
-			seek_next_seg = 0;
+		ccseg = NULL;
+		seek_next_seg = 0;
 
-			for (cie = cie_root; cie; cie = cie_next) {
-				cie_next = cie->next;
-				free((void *)cie);
-			}
-			cie_root = NULL;
-
-			for (fde = all_fde_data; fde; fde = fde->next) {
-				if ((fde->sections & CFI_EMIT_debug_frame) == 0)
-					continue;
-
-				if (fde->end_address == NULL) {
-					as_bad(("open CFI at the end of file; "
-					   "missing .cfi_endproc directive"));
-					fde->end_address = fde->start_address;
-				}
-				fde->per_encoding = DW_EH_PE_omit;
-				fde->lsda_encoding = DW_EH_PE_omit;
-		//disabled:	cfi_change_reg_numbers(fde->data,ccseg);
-				cie = select_cie_for_fde(fde,false,&first,alignment);
-				output_fde(fde,cie,false,first,alignment);
-			}
+		for (cie = cie_root; cie; cie = cie_next) {
+			cie_next = cie->next;
+			free((void *)cie);
 		}
-		while (SUPPORT_FRAME_LINKONCE && seek_next_seg == 2);
+		cie_root = NULL;
+
+		for (fde = all_fde_data; fde; fde = fde->next) {
+			if ((fde->sections & CFI_EMIT_debug_frame) == 0)
+				continue;
+
+			if (fde->end_address == NULL) {
+				as_bad(("open CFI at the end of file; "
+				   "missing .cfi_endproc directive"));
+				fde->end_address = fde->start_address;
+			}
+			fde->per_encoding = DW_EH_PE_omit;
+			fde->lsda_encoding = DW_EH_PE_omit;
+		//disabled:	cfi_change_reg_numbers(fde->data,ccseg);
+			cie = select_cie_for_fde(fde,false,&first,alignment);
+			output_fde(fde,cie,false,first,alignment);
+		}
 
 	}
 	if (dwcfi_hash)
 		htab_delete(dwcfi_hash);
 }
-#endif				/* TARGET_USE_CFIPOP */
 /* =======================================================** dwarf2dbg.c */
 /*
  * dwarf2dbg.c - DWARF2 debug support Logical line numbers can be controlled by
@@ -3867,7 +3706,6 @@ static void	cfi_finish(void)
  * VALUE]
  */
 
-#define INSERT_DIR_SEPARATOR(string,offset) string[offset] = '/'
 #ifndef DWARF2_FORMAT
 #define DWARF2_FORMAT(SEC) dwarf2_format_32bit
 #endif
@@ -9525,7 +9363,6 @@ static void	frag_init(void)
 /* Check that we're not trying to assemble into a section that can't allocate
  * frags (currently,this is only possible in the absolute section),or into an
  * mri common.  */
-
 static void	frag_alloc_check(const struct obstack *ob)
 {
 	if (ob->chunk_size == 0) {
@@ -10022,24 +9859,16 @@ struct saved_file {
 /* These hooks accommodate most operating systems.  */
 
 static char    *input_file_give_next_buffer(char *where);
-static size_t	input_file_buffer_size(void);
 static void	input_file_close(void);
 static void	input_file_open(const char *filename,int pre);
 static void	input_file_pop(char *arg);
-
-/* Return BUFFER_SIZE.  */
-static size_t	input_file_buffer_size(void)
-{
-	return (BUFFER_SIZE);
-}
 
 static void	input_file_pop(char *arg ATTRIBUTE_UNUSED)
 {
 }
 
 /* Open the specified file,"" means stdin.  Filename must not be null.  */
-static void	input_file_open(const char *filename,
-			 		int		pre	ATTRIBUTE_UNUSED)
+static void	input_file_open(const char *filename, int pre ATTRIBUTE_UNUSED)
 {
 	int		c;
 
@@ -10079,7 +9908,6 @@ static void	input_file_open(const char *filename,
 }
 
 /* Close input file.  */
-
 void		input_file_close(void)
 {
 	/* Don't close a null file pointer.  */
@@ -10090,9 +9918,7 @@ void		input_file_close(void)
 }
 
 /* This function is passed to do_scrub_chars.  */
-
-static		size_t
-		input_file_get(char *buf,size_t buflen)
+static		size_t input_file_get(char *buf,size_t buflen)
 {
 	size_t		size;
 
@@ -10106,7 +9932,6 @@ static		size_t
 }
 
 /* Read a buffer from the input file.  */
-
 static char    *
 		input_file_give_next_buffer(char *where	/* Where to place 1st
 							 * character of new
@@ -10166,10 +9991,6 @@ static char    *
 #define AFTER_STRING ("\0")	/* memcpy of 0 chars might choke.  */
 #define BEFORE_SIZE (1)
 #define AFTER_SIZE  (1)
-
-#ifndef TC_EOL_IN_INSN
-#define TC_EOL_IN_INSN(P) 0
-#endif
 
 static char    *buffer_start;	/*->1st char of full buffer area.  */
 static char    *partial_where;	/*->after last full line in buffer.  */
@@ -10265,7 +10086,7 @@ static void	input_scrub_reinit(void)
 	logical_input_file = NULL;
 	sb_index = -1;
 
-	buffer_length = input_file_buffer_size() * 2;
+	buffer_length = BUFFER_SIZE * 2;
 	buffer_start = XNEWVEC(char,BEFORE_SIZE + AFTER_SIZE + 1 + buffer_length);
 	memcpy(buffer_start,BEFORE_STRING,(int)BEFORE_SIZE);
 }
@@ -10307,7 +10128,6 @@ static void	input_scrub_begin(void)
 	next_saved_file = NULL;	/* At EOF,don't pop to any other file */
 	macro_nest = 0;
 	input_scrub_reinit();
-	do_scrub_begin(0);
 }
 
 static void	input_scrub_end(void)
@@ -10377,14 +10197,11 @@ static char    *input_scrub_next_buffer(char **bufp)
 			*p++ = '\n';
 			limit = p;
 		} else {
-			/*
-			 * Terminate the buffer to avoid confusing
-			 * TC_EOL_IN_INSN.
-			 */
+			/* Terminate the buffer to avoid confusing  TC_EOL_IN_INSN.  */
 			*limit = '\0';
 
 			/* Find last newline.  */
-			for (p = limit - 1; *p != '\n' || TC_EOL_IN_INSN(p); --p)
+			for (p = limit - 1; *p != '\n' ; --p)
 				if (p < start)
 					goto read_more;
 			++p;
@@ -10407,7 +10224,7 @@ static char    *input_scrub_next_buffer(char **bufp)
 read_more:
 		/* Didn't find a newline.  Read more text.  */
 		partial_size = limit - (buffer_start + BEFORE_SIZE);
-		if (buffer_length - input_file_buffer_size() < partial_size) {
+		if (buffer_length - BUFFER_SIZE < partial_size) {
 			/*
 			 * Increase the buffer when it doesn't have room for
 			 * the next block of input.
@@ -11175,12 +10992,7 @@ static void	output_file_close(void)
 	if (!keep_it && filename)
 		unlink(filename);
 
-#ifdef md_end
-	md_end();
-#endif
-#ifdef obj_end
-	obj_end();
-#endif
+	elf_end();
 	expr_end();
 	read_end();
 	htab_delete(sy_hash);
@@ -11330,7 +11142,7 @@ static segT	get_known_segmented_expression(expressionS * expP);
 static void	pobegin(void);
 static void	poend(void);
 static void	generate_file_debug(void);
-static char *_find_end_of_line(char *,int,int,int);
+static char *_find_end_of_line(char *);
 
 static void	read_begin(void)
 {
@@ -11408,11 +11220,6 @@ static const pseudo_typeS potable[] = {
 	{"dc.x",float_cons,'x'},
 	{"dcb",s_space,2},
 	{"dcb.b",s_space,1},
-	{"dcb.d",s_float_space,'d'},
-	{"dcb.l",s_space,4},
-	{"dcb.s",s_float_space,'f'},
-	{"dcb.w",s_space,2},
-	{"dcb.x",s_float_space,'x'},
 	{"ds",s_space,2},
 	{"ds.b",s_space,1},
 	{"ds.d",s_space,8},
@@ -11840,7 +11647,7 @@ static void	read_a_source_file(const char *name)
 								/* Also: input_line_pointer->`\0` where
 								 * nul_char was.  */
 								(void)restore_line_pointer(nul_char);
-								input_line_pointer = _find_end_of_line(input_line_pointer,0,1,0);
+								input_line_pointer = _find_end_of_line(input_line_pointer);
 								next_char = nul_char = *input_line_pointer;
 								*input_line_pointer = '\0';
 
@@ -12578,20 +12385,8 @@ static void	bss_alloc(symbolS * symbolP,addressT size,unsigned int align)
 	pfrag = frag_var(rs_org,1,1,0,symbolP,size * OCTETS_PER_BYTE,NULL);
 	*pfrag = 0;
 
-#ifdef S_SET_SIZE
 	S_SET_SIZE(symbolP,size);
-#endif
 	S_SET_SEGMENT(symbolP,bss_seg);
-
-#ifdef OBJ_COFF
-	/*
-	 * The symbol may already have been created with a preceding ".globl"
-	 * directive -- be careful not to step on storage class in that case.
-	 * Otherwise,set it to static.
-	 */
-	if (S_GET_STORAGE_CLASS(symbolP) != C_EXT)
-		S_SET_STORAGE_CLASS(symbolP,C_STAT);
-#endif				/* OBJ_COFF */
 
 	subseg_set(current_seg,current_subseg);
 }
@@ -13144,20 +12939,15 @@ static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_
 
 	SKIP_WHITESPACE();
 
-	/*
-	 * Skip any 0{letter} that may be present.  Don't even check if the
+	/* Skip any 0{letter} that may be present.  Don't even check if the
 	 * letter is legal.  Someone may invent a "z" format and this routine
 	 * has no use for such information. Lusers beware: you get diagnostics
-	 * if your input is ill-conditioned.
-	 */
-	if (input_line_pointer[0] == '0'
-	    && ISALPHA(input_line_pointer[1]))
+	 * if your input is ill-conditioned.  */
+	if (input_line_pointer[0] == '0' && ISALPHA(input_line_pointer[1]))
 		input_line_pointer += 2;
 
-	/*
-	 * Accept :xxxx,where the x's are hex digits,for a floating point
-	 * with the exact digits specified.
-	 */
+	/* Accept :xxxx,where the x's are hex digits,for a floating point
+	 * with the exact digits specified.  */
 	if (input_line_pointer[0] == ':') {
 		++input_line_pointer;
 		length = hex_float(float_type,temp);
@@ -13177,49 +12967,8 @@ static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_
 			return -1;
 		}
 	}
-
 	return length;
 }
-
-/* This is like s_space,but the value is a floating point number with the
- * given precision.  This is for the MRI dcb.s pseudo-op and friends.  */
-static void	s_float_space(int float_type)
-{
-	offsetT		count;
-	int		flen;
-	char		temp      [MAXIMUM_NUMBER_OF_CHARS_FOR_FLOAT];
-
-	riscv_mapping_state (MAP_DATA, 0, 0);
-	count = get_absolute_expression();
-
-	SKIP_WHITESPACE();
-	if (*input_line_pointer != ',') {
-		int		pad;
-
-		flen = float_length(float_type,&pad);
-		if (flen >= 0)
-			memset(temp,0,flen += pad);
-	} else {
-		++input_line_pointer;
-
-		flen = parse_one_float(float_type,temp);
-	}
-
-	if (flen < 0) {
-		return;
-	}
-	while (--count >= 0) {
-		char           *p;
-
-		p = frag_more(flen);
-		memcpy(p,temp,(unsigned int)flen);
-	}
-
-	demand_empty_rest_of_line();
-
-}
-
-/* Handle the .struct pseudo-op,as found in MIPS assemblers.  */
 static void	s_struct(int ignore ATTRIBUTE_UNUSED)
 {
 	abs_section_offset = get_absolute_expression();
@@ -13555,11 +13304,8 @@ void		do_parse_cons_expression(expressionS * exp,
 }
 
 
-/*
- * Worker to do .byte etc statements. Clobbers input_line_pointer and checks
- * end-of-line.
- */
-
+/* Worker to do .byte etc statements. Clobbers input_line_pointer and checks
+ * end-of-line.  */
 static void	cons_worker(int nbytes,	/* 1=.byte,2=.word,4=.long.  */
 					int		rva)
 {
@@ -13687,9 +13433,7 @@ static void	s_reloc(int ignore ATTRIBUTE_UNUSED)
 		expression(&exp);
 	}
 	switch (exp.X_op) {
-	case O_illegal:
-	case O_big:
-	case O_register:
+	case O_illegal: case O_big: case O_register:
 		as_bad(("bad reloc expression"));
 err_out:
 		ignore_rest_of_line();
@@ -13720,10 +13464,8 @@ err_out:
 	demand_empty_rest_of_line();
 }
 
-/*
- * Put the contents of expression EXP into the object file using NBYTES bytes.
- * If need_pass_2 is 1,this does nothing.
- */
+/* Put the contents of expression EXP into the object file using NBYTES bytes.
+ * If need_pass_2 is 1,this does nothing.  */
 static void	emit_expr(expressionS * exp,unsigned int nbytes)
 {
 	emit_expr_with_reloc(exp,nbytes,TC_PARSE_CONS_RETURN_NONE);
@@ -14963,44 +14705,28 @@ static void	s_ignore(int arg ATTRIBUTE_UNUSED)
 #if !defined(TC_SINGLE_QUOTE_STRINGS) && defined(SINGLE_QUOTE_STRINGS)
 #define TC_SINGLE_QUOTE_STRINGS 1
 #endif
-
-static char * _find_end_of_line(char *s,int mri_string,int insn ATTRIBUTE_UNUSED,
-		    		int		in_macro)
+/* interface trimmed for the single call to this function.
+ * _find_end_of_line(input_line_pointer,0,1,0); */
+static char * _find_end_of_line(char *s)
 {
 	char		inquote = '\0';
 	int		inescape = 0;
 
 	while (!is_end_of_line[(unsigned char)*s]
-	       || (inquote && !ISCNTRL(*s))
-#ifdef TC_EOL_IN_INSN
-	       || (insn && TC_EOL_IN_INSN(s))
-#endif
-	/*
-	 * PR 6926:  When we are parsing the body of a macro the sequence \@ is
-	 * special - it refers to the invocation count.  If the @ character
-	 * happens to be registered as a line-separator character by the
-	 * target,then the is_end_of_line[] test above will have returned
-	 * true,but we need to ignore the line separating semantics in this
-	 * particular case.
-	 */
-	       || (in_macro && inescape && *s == '@')
-		) {
-		if (mri_string && *s == '\'')
-			inquote ^= *s;
+	       || (inquote && !ISCNTRL(*s))) {
+		if (inescape)
+			inescape = 0;
 		else
-			if (inescape)
-				inescape = 0;
+			if (*s == '\\')
+				inescape = 1;
 			else
-				if (*s == '\\')
-					inescape = 1;
-				else
-					if (!inquote
-					    ? *s == '"'
+				if (!inquote
+				    ? *s == '"'
 #ifdef TC_SINGLE_QUOTE_STRINGS
-					    || (TC_SINGLE_QUOTE_STRINGS && *s == '\'')
+				    || (TC_SINGLE_QUOTE_STRINGS && *s == '\'')
 #endif
-					    : *s == inquote)
-						inquote ^= *s;
+				    : *s == inquote)
+					inquote ^= *s;
 		++s;
 	}
 	if (inquote)
@@ -15013,8 +14739,7 @@ static char * _find_end_of_line(char *s,int mri_string,int insn ATTRIBUTE_UNUSED
 static char    *saved_ilp;
 static char    *saved_limit;
 
-/*
- * Use BUF as a temporary input pointer for calling other functions in this
+/* Use BUF as a temporary input pointer for calling other functions in this
  * file.  BUF must be a C string,so that its end can be found by strlen. Also
  * sets the buffer_limit variable (local to this file) so that buffer overruns
  * should not occur.  Saves the current input line pointer so that it can be
@@ -20891,127 +20616,6 @@ static void	number_to_chars_littleendian(char *buf,valueT val,int n)
 }
 
 /* ====================================================================== app.c */
-static char	lex [256];
-static const char symbol_chars[] =
-"$._ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-#define LEX_IS_SYMBOL_COMPONENT		1
-#define LEX_IS_WHITESPACE		2
-#define LEX_IS_LINE_SEPARATOR		3
-#define LEX_IS_COMMENT_START		4
-#define LEX_IS_LINE_COMMENT_START	5
-#define	LEX_IS_TWOCHAR_COMMENT_1ST	6
-#define	LEX_IS_STRINGQUOTE		8
-#define	LEX_IS_COLON			9
-#define	LEX_IS_NEWLINE			10
-#define	LEX_IS_ONECHAR_QUOTE		11
-#ifdef TC_M32R
-#define DOUBLEBAR_PARALLEL
-#endif
-#ifdef DOUBLEBAR_PARALLEL
-#define LEX_IS_DOUBLEBAR_1ST		13
-#endif
-#define LEX_IS_PARALLEL_SEPARATOR	14
-#ifdef H_TICK_HEX
-#define LEX_IS_H			15
-#endif
-#define IS_SYMBOL_COMPONENT(c)		(lex[c] == LEX_IS_SYMBOL_COMPONENT)
-#define IS_WHITESPACE(c)		(lex[c] == LEX_IS_WHITESPACE)
-#define IS_LINE_SEPARATOR(c)		(lex[c] == LEX_IS_LINE_SEPARATOR)
-#define IS_PARALLEL_SEPARATOR(c)	(lex[c] == LEX_IS_PARALLEL_SEPARATOR)
-#define IS_COMMENT(c)			(lex[c] == LEX_IS_COMMENT_START)
-#define IS_LINE_COMMENT(c)		(lex[c] == LEX_IS_LINE_COMMENT_START)
-#define	IS_NEWLINE(c)			(lex[c] == LEX_IS_NEWLINE)
-
-/*
- * FIXME-soon: The entire lexer/parser thingy should be built statically at
- * compile time rather than dynamically each and every time the assembler is
- * run.  xoxorich.
- */
-static void	do_scrub_begin(int m68k_mri ATTRIBUTE_UNUSED)
-{
-	const char     *p;
-	int		c;
-
-	lex[' '] = LEX_IS_WHITESPACE;
-	lex['\t'] = LEX_IS_WHITESPACE;
-	lex['\r'] = LEX_IS_WHITESPACE;
-	lex['\n'] = LEX_IS_NEWLINE;
-	lex[':'] = LEX_IS_COLON;
-
-	lex['"'] = LEX_IS_STRINGQUOTE;
-
-#if ! defined (TC_HPPA)
-	lex['\''] = LEX_IS_ONECHAR_QUOTE;
-#endif
-
-#ifdef SINGLE_QUOTE_STRINGS
-	lex['\''] = LEX_IS_STRINGQUOTE;
-#endif
-
-	/*
-	 * Note: if any other character can be LEX_IS_STRINGQUOTE,the loop in
-	 * state 5 of do_scrub_chars must be changed.
-	 */
-
-	/*
-	 * Note that these override the previous defaults,e.g. if ';' is a
-	 * comment char,then it isn't a line separator.
-	 */
-	for (p = symbol_chars; *p; ++p)
-		lex[(unsigned char)*p] = LEX_IS_SYMBOL_COMPONENT;
-
-	for (c = 128; c < 256; ++c)
-		lex[c] = LEX_IS_SYMBOL_COMPONENT;
-
-#ifdef tc_symbol_chars
-	/*
-	 * This macro permits the processor to specify all characters which may
-	 * appears in an operand.  This will prevent the scrubber from
-	 * discarding meaningful whitespace in certain cases.  The i386 backend
-	 * uses this to support prefixes,which can confuse the scrubber as to
-	 * whether it is parsing operands or opcodes.
-	 */
-	for (p = tc_symbol_chars; *p; ++p)
-		lex[(unsigned char)*p] = LEX_IS_SYMBOL_COMPONENT;
-#endif
-
-	/* The m68k backend wants to be able to change comment_chars.  */
-#ifndef tc_comment_chars
-#define tc_comment_chars comment_chars
-#endif
-	for (p = tc_comment_chars; *p; p++)
-		lex[(unsigned char)*p] = LEX_IS_COMMENT_START;
-
-	for (p = line_comment_chars; *p; p++)
-		lex[(unsigned char)*p] = LEX_IS_LINE_COMMENT_START;
-
-#ifndef tc_line_separator_chars
-#define tc_line_separator_chars line_separator_chars
-#endif
-	for (p = tc_line_separator_chars; *p; p++)
-		lex[(unsigned char)*p] = LEX_IS_LINE_SEPARATOR;
-
-#ifdef tc_parallel_separator_chars
-	/*
-	 * This macro permits the processor to specify all characters which
-	 * separate parallel insns on the same line.
-	 */
-	for (p = tc_parallel_separator_chars; *p; p++)
-		lex[(unsigned char)*p] = LEX_IS_PARALLEL_SEPARATOR;
-#endif
-
-	/*
-	 * Only allow slash-star comments if slash is not in use. FIXME: This
-	 * isn't right.  We should always permit them.
-	 */
-	if (lex['/'] == 0)
-		lex['/'] = LEX_IS_TWOCHAR_COMMENT_1ST;
-
-#ifdef DOUBLEBAR_PARALLEL
-	lex['|'] = LEX_IS_DOUBLEBAR_1ST;
-#endif
-
-}
 
 #define MULTIBYTE_WARN_COUNT_LIMIT 10
 static unsigned int multibyte_warn_count = 0;
@@ -22447,8 +22051,6 @@ enum {
 };
 #endif				/* _ELF_RISCV_H */
 
-#define ELF_ARCH			bfd_arch_riscv
-#define ELF_TARGET_ID			RISCV_ELF_DATA
 #define ELF_MACHINE_CODE		EM_RISCV
 #define ELF_MAXPAGESIZE			0x1000
 #define ELF_COMMONPAGESIZE		0x1000
@@ -22463,11 +22065,6 @@ struct _bfd_riscv_elf_obj_tdata {
 
 /* A second format for recording PC-relative hi relocations.  This stores the
  * information required to relax them to GP-relative addresses. */
-#define TARGET_LITTLE_SYM			riscv_elf64_vec
-#define TARGET_LITTLE_NAME			"elf64-littleriscv"
-#define TARGET_BIG_SYM				riscv_elf64_be_vec
-#define TARGET_BIG_NAME				"elf64-bigriscv"
-
 #undef  elf_backend_obj_attrs_vendor
 #define elf_backend_obj_attrs_vendor		"riscv"
 #undef  elf_backend_obj_attrs_arg_type
@@ -22484,15 +22081,11 @@ struct _bfd_riscv_elf_obj_tdata {
 struct riscv_cl_insn {
 	/* The opcode's entry in riscv_opcodes.  */
 	const struct riscv_opcode *insn_mo;
-	/*
-	 * The encoded instruction bits (first bits enough to extract
-	 * instruction length on a long opcode).
-	 */
+	/* The encoded instruction bits (first bits enough to extract
+	 * instruction length on a long opcode).  */
 	insn_t		insn_opcode;
-	/*
-	 * The long encoded instruction bits ([0] is non-zero on a long
-	 * opcode).
-	 */
+	/* The long encoded instruction bits ([0] is non-zero on a long
+	 * opcode).  */
 	char		insn_long_opcode[RISCV_MAX_INSN_LEN];
 	/* The frag that contains the instruction.  */
 	struct frag    *frag;
@@ -22534,29 +22127,23 @@ enum riscv_csr_class {
 
 /* This structure holds all restricted conditions for a CSR.  */
 struct riscv_csr_extra {
-	/*
-	 * Class to which this CSR belongs.  Used to decide whether or not this
-	 * CSR is legal in the current -march context.
-	 */
+	/* Class to which this CSR belongs.  Used to decide whether or not this
+	 * CSR is legal in the current -march context.  */
 	enum riscv_csr_class csr_class;
 	/* CSR may have differnet numbers in the previous priv spec.  */
 	unsigned	address;
 	/* Record the CSR is defined/valid in which versions.  */
 	enum riscv_spec_class define_version;
-	/*
-	 * Record the CSR is aborted/invalid from which versions.  If it isn't
+	/* Record the CSR is aborted/invalid from which versions.  If it isn't
 	 * aborted in the current version,then it should be
-	 * PRIV_SPEC_CLASS_DRAFT.
-	 */
+	 * PRIV_SPEC_CLASS_DRAFT.  */
 	enum riscv_spec_class abort_version;
 	/* The CSR may have more than one setting.  */
 	struct riscv_csr_extra *next;
 };
 
-/*
- * This structure contains information about errors that occur within the
- * riscv_ip function
- */
+/* This structure contains information about errors that occur within the
+ * riscv_ip function */
 struct riscv_ip_error {
 	/* General error message */
 	const char     *msg;
@@ -22711,10 +22298,8 @@ static void	riscv_arch_str1(riscv_subset_t * subset,
 
 	strncat(attr_str,buf,bufsz);
 
-	/*
-	 * Skip 'i' extension after 'e',or skip extensions which versions are
-	 * unknown.
-	 */
+	/* Skip 'i' extension after 'e',or skip extensions which versions are
+	 * unknown.  */
 	while (subset_t->next
 	       && ((strcmp(subset_t->name,"e") == 0
 		    && strcmp(subset_t->next->name,"i") == 0)
@@ -22758,12 +22343,10 @@ static char    *riscv_arch_str(unsigned Xlen,const riscv_subset_list_t * subset)
 
 	return attr_str;
 }
-/*
- * The linked list hanging off of .subsets_list records all enabled extensions,
+/* The linked list hanging off of .subsets_list records all enabled extensions,
  * which are parsed from the architecture string.  The architecture string can
  * be set by the -march option,the elf architecture attributes,and the
- * --with-arch configure option.
- */
+ * --with-arch configure option.  */
 static riscv_parse_subset_t riscv_rps_as =
 {
 	NULL,			/* subset_list,we will set it later once
@@ -22883,14 +22466,8 @@ static void	riscv_set_abi_by_arch(void)
 /* Handle of the OPCODE hash table.  */
 static htab_t	op_hash = NULL;
 
-/* Handle of the type of .insn hash table.  */
+/* Handle of the type of .insn hash table. */
 static htab_t	insn_type_hash = NULL;
-
-/*
- * This array holds the chars that always start a comment.  If the
- * pre-processor is disabled,these aren't very useful.
- */
-static const char comment_chars[] = "#";
 
 /* This array holds the chars that only start a comment at the beginning of a
  * line.  If the line seems to have the form '# 123 filename' .line and .file
@@ -22901,8 +22478,6 @@ static const char comment_chars[] = "#";
  * beginning of its output.
  * 
  * Also note that C style comments are always supported.  */
-static const char line_comment_chars[] = "#";
-
 /* This array holds machine specific line separator characters.  */
 static const char line_separator_chars[] = ";";
 
@@ -22989,13 +22564,11 @@ static void	make_mapping_symbol(enum riscv_seg_mstate State,
 		seg_info(now_seg)->tc_segment_info_data.arch_map_symbol = symbol;
 		xfree((void *)buff);
 	}
-	/*
-	 * If .fill or other data filling directive generates zero sized data,
+	/* If .fill or other data filling directive generates zero sized data,
 	 * then mapping symbol for the following code will have the same value.
 	 * 
 	 * Please see gas/testsuite/gas/riscv/mapping.s: .text.zero.fill.first and
-	 * .text.zero.fill.last.
-	 */
+	 * .text.zero.fill.last.  */
 	symbolS        *first = frag->tc_frag_data.first_map_symbol;
 	symbolS        *last = frag->tc_frag_data.last_map_symbol;
 	symbolS        *removed = NULL;
@@ -23082,20 +22655,16 @@ static void	riscv_mapping_state(enum riscv_seg_mstate to_state,
 /* Add the odd bytes of paddings for riscv_handle_align.  */
 static void	riscv_add_odd_padding_symbol(fragS * frag)
 {
-	/*
-	 * If there was already a mapping symbol,it should be removed in the
+	/* If there was already a mapping symbol,it should be removed in the
 	 * make_mapping_symbol. Please see gas/testsuite/gas/riscv/mapping.s:
-	 * .text.odd.align.*.
-	 */
+	 * .text.odd.align.*.  */
 	make_mapping_symbol(MAP_DATA,frag->fr_fix,frag,
 			  NULL /* arch_str */ ,true /* odd_data_padding */ );
 }
 
-/*
- * Remove any excess mapping symbols generated for alignment frags in SEC.  We
+/* Remove any excess mapping symbols generated for alignment frags in SEC.  We
  * may have created a mapping symbol before a zero byte alignment; remove it if
- * there's a mapping symbol after the alignment.
- */
+ * there's a mapping symbol after the alignment.  */
 static void	riscv_check_mapping_symbols(asection * sec,
 			 		void         *dummy ATTRIBUTE_UNUSED)
 {
@@ -23114,10 +22683,8 @@ static void	riscv_check_mapping_symbols(asection * sec,
 		if (last == NULL || next == NULL)
 			continue;
 
-		/*
-		 * Check the last mapping symbol if it is at the boundary of
-		 * fragment.
-		 */
+		/* Check the last mapping symbol if it is at the boundary of
+		 * fragment.  */
 		if (S_GET_VALUE(last) < next->fr_address)
 			continue;
 		know(S_GET_VALUE(last) == next->fr_address);
@@ -23125,13 +22692,10 @@ static void	riscv_check_mapping_symbols(asection * sec,
 		do {
 			symbolS        *next_first = next->tc_frag_data.first_map_symbol;
 			if (next_first != NULL) {
-				/*
-				 * The last mapping symbol overlaps with
-				 * another one which at the start of the next
-				 * frag.
+				/* The last mapping symbol overlaps with
+				 * another one which at the start of the next frag.
 				 * 
-				 * Please see the
-				 * gas/testsuite/gas/riscv/mapping.s:
+				 * Please see the gas/testsuite/gas/riscv/mapping.s:
 				 * .text.zero.fill.align.A and
 				 * .text.zero.fill.align.B.
 				 */
@@ -23144,14 +22708,12 @@ static void	riscv_check_mapping_symbols(asection * sec,
 				break;
 			}
 			if (next->fr_next == NULL) {
-				/*
-				 * The last mapping symbol is at the end of the
+				/* The last mapping symbol is at the end of the
 				 * section.
 				 * 
 				 * Please see the
 				 * gas/testsuite/gas/riscv/mapping.s:
-				 * .text.last.section.
-				 */
+				 * .text.last.section.  */
 				know(next->fr_fix == 0 && next->fr_var == 0);
 				symbol_remove(last,&symbol_rootP,&symbol_lastP);
 				break;
@@ -23423,8 +22985,7 @@ static void	riscv_init_csr_hash(const char *name,
 		pre_entry->next = entry;
 }
 
-/*
- * Return the CSR address after checking the ISA dependency and the privileged
+/* Return the CSR address after checking the ISA dependency and the privileged
  * spec version.
  * 
  * There are one warning and two errors for CSR,
@@ -23432,9 +22993,7 @@ static void	riscv_init_csr_hash(const char *name,
  * Invalid CSR: the CSR was defined,but isn't allowed for the current ISA or the
  * privileged spec,report warning only if -mcsr-check is set. Unknown CSR: the
  * CSR has never been defined,report error. Improper CSR: the CSR number over
- * the range (> 0xfff),report error.
- */
-
+ * the range (> 0xfff),report error.  */
 static unsigned int riscv_csr_address(const char *csr_name,
 				      		struct	riscv_csr_extra *entry)
 {
@@ -23505,10 +23064,8 @@ static unsigned int riscv_csr_address(const char *csr_name,
 	case CSR_CLASS_SSCOFPMF:
 		extension = "sscofpmf";
 		break;
-	case CSR_CLASS_SSTC:
-	case CSR_CLASS_SSTC_AND_H:
-	case CSR_CLASS_SSTC_32:
-	case CSR_CLASS_SSTC_AND_H_32:
+	case CSR_CLASS_SSTC: case CSR_CLASS_SSTC_AND_H:
+	case CSR_CLASS_SSTC_32: case CSR_CLASS_SSTC_AND_H_32:
 		is_rv32_only = (csr_class == CSR_CLASS_SSTC_32
 				|| csr_class == CSR_CLASS_SSTC_AND_H_32);
 		is_h_required = (csr_class == CSR_CLASS_SSTC_AND_H
@@ -24593,12 +24150,10 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 	}
 	add_fixed_insn(ip);
 
-	/*
-	 * We need to start a new frag after any instruction that can be
+	/* We need to start a new frag after any instruction that can be
 	 * optimized away or compressed by the linker during relaxation,to
 	 * prevent the assembler from computing static offsets across such an
-	 * instruction. This is necessary to get correct EH info.
-	 */
+	 * instruction. This is necessary to get correct EH info.  */
 	if (reloc_type == BFD_RELOC_RISCV_HI20
 	    || reloc_type == BFD_RELOC_RISCV_PCREL_HI20
 	    || reloc_type == BFD_RELOC_RISCV_TPREL_HI20
@@ -24608,11 +24163,9 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 	}
 }
 
-/*
- * Build an instruction created by a macro expansion.  This is passed a pointer
+/* Build an instruction created by a macro expansion.  This is passed a pointer
  * to the count of instructions created so far,an expression,the name of the
- * instruction to build,an operand format string,and corresponding arguments.
- */
+ * instruction to build,an operand format string,and corresponding arguments. */
 
 static void	macro_build(expressionS * ep,const char *name,const char *fmt,...)
 {
@@ -24702,10 +24255,8 @@ static void	macro_build(expressionS * ep,const char *name,const char *fmt,...)
 	append_insn(&insn,ep,r);
 }
 
-/*
- * Build an instruction created by a macro expansion.  Like md_assemble but
- * accept a printf-style format string and arguments.
- */
+/* Build an instruction created by a macro expansion.  Like md_assemble but
+ * accept a printf-style format string and arguments. */
 static void	md_assemblef(const char *format,...)
 {
 	char           *buf = NULL;
@@ -25142,11 +24693,9 @@ static const struct percent_op_match percent_op_null[] =
 	{0,0}
 };
 
-/*
- * Return true if *STR points to a relocation operator.  When returning true,
+/* Return true if *STR points to a relocation operator.  When returning true,
  * move *STR over the operator and store its relocation code in *RELOC. Leave
- * both *STR and *RELOC alone when returning false.
- */
+ * both *STR and *RELOC alone when returning false.  */
 static bool	parse_relocation(char **str,bfd_reloc_code_real_type * reloc,
 	      		const		struct	percent_op_match *percent_op)
 {
@@ -25189,13 +24738,11 @@ static void	my_getExpression(expressionS * ep,char *str)
 	input_line_pointer = save_in;
 }
 
-/*
- * Parse string STR as a 16-bit relocatable operand.  Store the expression in
+/* Parse string STR as a 16-bit relocatable operand.  Store the expression in
  * *EP and the relocation,if any,in RELOC. Return the number of relocation
  * operators used (0 or 1).
  * 
- * On exit,EXPR_PARSE_END points to the first character after the expression.
- */
+ * On exit,EXPR_PARSE_END points to the first character after the expression.  */
 static size_t	my_getSmallExpression(expressionS * ep,bfd_reloc_code_real_type * reloc,
      		char         *str,const struct percent_op_match *percent_op)
 {
@@ -25231,20 +24778,16 @@ static size_t	my_getSmallExpression(expressionS * ep,bfd_reloc_code_real_type * 
 	       && parse_relocation(&str,reloc,percent_op));
 
 	if (*str == '%') {
-		/*
-		 * expression() will choke on anything looking like an
+		/* expression() will choke on anything looking like an
 		 * (unrecognized) relocation specifier.  Don't even call it,
 		 * avoiding multiple (and perhaps redundant) error messages;
-		 * our caller will issue one.
-		 */
+		 * our caller will issue one.  */
 		ep->X_op = O_illegal;
 		return 0;
 	}
-	/*
-	 * Anything inside parentheses or subject to a relocation operator
+	/* Anything inside parentheses or subject to a relocation operator
 	 * cannot be a register and hence can be treated the same as operands
-	 * to directives (other than .insn).
-	 */
+	 * to directives (other than .insn). */
 	if (str_depth || reloc_index)
 		probing_insn_operands = false;
 
@@ -25280,10 +24823,8 @@ static size_t	my_getOpcodeExpression(expressionS * ep,bfd_reloc_code_real_type *
 	return my_getSmallExpression(ep,reloc,str,percent_op_null);
 }
 
-/*
- * Parse string STR as a vsetvli operand.  Store the expression in *EP. On
- * exit,EXPR_PARSE_END points to the first character after the expression.
- */
+/* Parse string STR as a vsetvli operand.  Store the expression in *EP. On
+ * exit,EXPR_PARSE_END points to the first character after the expression.  */
 static void	my_getVsetvliExpression(expressionS * ep,char *str)
 {
 	unsigned int	vsew_value = 0,vlmul_value = 0;
@@ -25332,17 +24873,13 @@ static void	my_getVsetvliExpression(expressionS * ep,char *str)
 	}
 }
 
-/*
- * Detect and handle implicitly zero load-store offsets.  For example,"lw t0,
+/* Detect and handle implicitly zero load-store offsets.  For example,"lw t0,
  * (t1)" is shorthand for "lw t0,0(t1)".  Return true if such an implicit
- * offset was detected.
- */
+ * offset was detected. */
 static bool	riscv_handle_implicit_zero_offset(expressionS * ep,const char *s)
 {
-	/*
-	 * Check whether there is only a single bracketed expression left. If
-	 * so,it must be the base register and the constant must be zero.
-	 */
+	/* Check whether there is only a single bracketed expression left. If
+	 * so,it must be the base register and the constant must be zero.  */
 	if (*s == '(' && strchr(s + 1,'(') == 0) {
 		ep->X_op = O_constant;
 		ep->X_add_number = 0;
@@ -25377,11 +24914,9 @@ static enum csr_insn_type riscv_csr_insn_type(insn_t insn)
 				return INSN_NOT_CSR;
 }
 
-/*
- * CSRRW and CSRRWI always write CSR.  CSRRS,CSRRC,CSRRSI and CSRRCI write
+/* CSRRW and CSRRWI always write CSR.  CSRRS,CSRRC,CSRRSI and CSRRCI write
  * CSR when RS1 isn't zero.  The CSR is read only if the [11:10] bits of CSR
- * address is 0x3.
- */
+ * address is 0x3. */
 static bool	riscv_csr_read_only_check(insn_t insn)
 {
 	int		csr = (insn & (OP_MASK_CSR << OP_SH_CSR)) >> OP_SH_CSR;
@@ -25399,8 +24934,7 @@ static bool	riscv_csr_read_only_check(insn_t insn)
 	return true;
 }
 
-/*
- * Return true if it is a privileged instruction.  Otherwise,return false.
+/* Return true if it is a privileged instruction.  Otherwise,return false.
  * 
  * uret is actually a N-ext instruction.  So it is better to regard it as an user
  * instruction rather than the priv instruction.
@@ -25418,28 +24952,21 @@ static bool	riscv_is_priv_insn(insn_t insn)
 		|| ((insn ^ MATCH_MRET) & MASK_MRET) == 0
 		|| ((insn ^ MATCH_SFENCE_VMA) & MASK_SFENCE_VMA) == 0
 		|| ((insn ^ MATCH_WFI) & MASK_WFI) == 0
-	/*
-	 * The sfence.vm is dropped in the v1.10 priv specs,but we still need
-	 * to check it here to keep the compatible.
-	 */
+	/* The sfence.vm is dropped in the v1.10 priv specs,but we still need
+	 * to check it here to keep the compatible. */
 		|| ((insn ^ MATCH_SFENCE_VM) & MASK_SFENCE_VM) == 0);
 }
 
 static symbolS *deferred_sym_rootP;
 static symbolS *deferred_sym_lastP;
-/*
- * Since symbols can't easily be freed,try to recycle ones which weren't
- * committed.
- */
+/* Since symbols can't easily be freed,try to recycle ones which weren't
+ * committed.  */
 static symbolS *orphan_sym_rootP;
 static symbolS *orphan_sym_lastP;
 
-/*
- * This routine assembles an instruction into its binary format.  As a side
+/* This routine assembles an instruction into its binary format.  As a side
  * effect,it sets the global variable imm_reloc to the type of relocation to
- * do if one of the operands is an address expression.
- */
-
+ * do if one of the operands is an address expression.  */
 static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,expressionS * imm_expr,
 		  		bfd_reloc_code_real_type * imm_reloc,htab_t hash)
 {
@@ -25458,11 +24985,9 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 	/* Indicate we are assembling instruction with CSR.  */
 	bool		insn_with_csr = false;
 
-	/*
-	 * Parse the name of the instruction.  Terminate the string if
+	/* Parse the name of the instruction.  Terminate the string if
 	 * whitespace is found so that str_hash_find only sees the name part of
-	 * the string.
-	 */
+	 * the string. */
 	for (asarg = str; *asarg != '\0'; ++asarg)
 		if (ISSPACE(*asarg)) {
 			save_c = *asarg;
@@ -26130,12 +25655,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					if (*asarg == ' ')
 						++asarg;
 
-					/*
-					 * Now that we have assembled one
-					 * operand,we use the args string to
-					 * figure out where it goes in the
-					 * instruction.
-					 */
+					/* Now that we have assembled one operand,we use the args
+					 * string to figure out where it goes in the instruction */
 					switch (c) {
 					case 's':
 						INSERT_OPERAND(RS1,*ip,regno);
@@ -26208,10 +25729,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 			case 'B':
 				my_getExpression(imm_expr,asarg);
 				normalize_constant_expr(imm_expr);
-				/*
-				 * The 'B' format specifier must be a symbol or
-				 * a constant.
-				 */
+				/* The 'B' format specifier must be a symbol or
+				 * a constant. */
 				if (imm_expr->X_op != O_symbol && imm_expr->X_op != O_constant)
 					break;
 				if (imm_expr->X_op == O_symbol)
@@ -26232,12 +25751,10 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				*imm_reloc = BFD_RELOC_RISCV_LO12_I;
 				goto load_store;
 			case '1':
-				/*
-				 * This is used for TLS,where the fourth
+				/* This is used for TLS,where the fourth
 				 * operand is %tprel_add,to get a relocation
 				 * applied to an add instruction,for
-				 * relaxation to use.
-				 */
+				 * relaxation to use.  */
 				p = percent_op_rtype;
 				goto alu_op;
 			case '0':	/* AMO displacement,which must be
@@ -26246,11 +25763,9 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				if (riscv_handle_implicit_zero_offset(imm_expr,asarg))
 					continue;
 		alu_op:
-				/*
-				 * If this value won't fit into a 16 bit
+				/* If this value won't fit into a 16 bit
 				 * offset,then go find a macro that will
-				 * generate the 32 bit offset code pattern.
-				 */
+				 * generate the 32 bit offset code pattern. */
 				if (!my_getSmallExpression(imm_expr,imm_reloc,asarg,p)) {
 					normalize_constant_expr(imm_expr);
 					if (imm_expr->X_op != O_constant
@@ -26524,10 +26039,8 @@ out:
 	return error;
 }
 
-/*
- * Similar to riscv_ip,but assembles an instruction according to the hardcode
- * values of .insn directive.
- */
+/* Similar to riscv_ip,but assembles an instruction according to the hardcode
+ * values of .insn directive.  */
 static const char *riscv_ip_hardcode(char *str,struct riscv_cl_insn *ip,
 		       		expressionS *	imm_expr,const char *error)
 {
@@ -26543,18 +26056,14 @@ static const char *riscv_ip_hardcode(char *str,struct riscv_cl_insn *ip,
 			values[num++] = (insn_t) imm_expr->X_add_number;
 			break;
 		case O_big:
-			/*
-			 * Extract lower 32-bits of a big number. Assume that
-			 * generic_bignum_to_int32 work on such number.
-			 */
+			/* Extract lower 32-bits of a big number. Assume that
+			 * generic_bignum_to_int32 work on such number.  */
 			values[num++] = (insn_t) generic_bignum_to_int32();
 			break;
 		default:
-			/*
-			 * The first value isn't constant,so it should be
+			/* The first value isn't constant,so it should be
 			 * .insn <type> <operands>.  We have been parsed it in
-			 * the riscv_ip.
-			 */
+			 * the riscv_ip. */
 			if (num == 0)
 				return error;
 			return ("values must be constant");
@@ -26608,10 +26117,8 @@ static void	md_assemble(char *str)
 	expressionS	imm_expr;
 	bfd_reloc_code_real_type imm_reloc = BFD_RELOC_UNUSED;
 
-	/*
-	 * The architecture and privileged elf attributes should be set before
-	 * assembling.
-	 */
+	/* The architecture and privileged elf attributes should be set before
+	 * assembling.  */
 	if (!start_assemble) {
 		start_assemble = true;
 
@@ -26661,32 +26168,23 @@ static int	md_parse_option(int c,const char *arg)
 	case OPTION_MABI:
 		if (strcmp(arg,"ilp32") == 0)
 			riscv_set_abi(32,FLOAT_ABI_SOFT,false);
-		else
-			if (strcmp(arg,"ilp32e") == 0)
+		else if (strcmp(arg,"ilp32e") == 0)
 				riscv_set_abi(32,FLOAT_ABI_SOFT,true);
-			else
-				if (strcmp(arg,"ilp32f") == 0)
+			else if (strcmp(arg,"ilp32f") == 0)
 					riscv_set_abi(32,FLOAT_ABI_SINGLE,false);
-				else
-					if (strcmp(arg,"ilp32d") == 0)
+				else if (strcmp(arg,"ilp32d") == 0)
 						riscv_set_abi(32,FLOAT_ABI_DOUBLE,false);
-					else
-						if (strcmp(arg,"ilp32q") == 0)
+					else if (strcmp(arg,"ilp32q") == 0)
 							riscv_set_abi(32,FLOAT_ABI_QUAD,false);
-						else
-							if (strcmp(arg,"lp64") == 0)
+						else if (strcmp(arg,"lp64") == 0)
 								riscv_set_abi(64,FLOAT_ABI_SOFT,false);
-							else
-								if (strcmp(arg,"lp64f") == 0)
+							else if (strcmp(arg,"lp64f") == 0)
 									riscv_set_abi(64,FLOAT_ABI_SINGLE,false);
-								else
-									if (strcmp(arg,"lp64d") == 0)
+								else if (strcmp(arg,"lp64d") == 0)
 										riscv_set_abi(64,FLOAT_ABI_DOUBLE,false);
-									else
-										if (strcmp(arg,"lp64q") == 0)
+									else if (strcmp(arg,"lp64q") == 0)
 											riscv_set_abi(64,FLOAT_ABI_QUAD,false);
-										else
-											return 0;
+										else return 0;
 		explicit_mabi = true;
 		break;
 
@@ -26737,10 +26235,8 @@ static int	md_parse_option(int c,const char *arg)
 
 static void	riscv_after_parse_args(void)
 {
-	/*
-	 * The --with-arch is optional for now,so we still need to set the
-	 * xlen according to the default_arch,which is set by the --target.
-	 */
+	/* The --with-arch is optional for now,so we still need to set the
+	 * xlen according to the default_arch,which is set by the --target. */
 	if (xlen == 0) {
 		xlen = 64;
 	}
@@ -26752,11 +26248,9 @@ static void	riscv_after_parse_args(void)
 
 	riscv_set_arch(default_arch_with_ext);
 
-	/*
-	 * If the CIE to be produced has not been overridden on the command
+	/* If the CIE to be produced has not been overridden on the command
 	 * line,then produce version 3 by default.  This allows us to use the
-	 * full range of registers in a .cfi_return_column directive.
-	 */
+	 * full range of registers in a .cfi_return_column directive.  */
 	if (flag_dwarf_cie_version == -1)
 		flag_dwarf_cie_version = 3;
 }
@@ -26779,11 +26273,9 @@ static bool	riscv_parse_name(const char *name,struct expressionS *ep,
 	if (symbol_find(name) != NULL)
 		return false;
 
-	/*
-	 * Create a symbol without adding it to the symbol table yet. Insertion
+	/* Create a symbol without adding it to the symbol table yet. Insertion
 	 * will happen only once we commit to using the insn we're probing
-	 * operands for.
-	 */
+	 * operands for.  */
 	for (sym = deferred_sym_rootP; sym; sym = symbol_next(sym))
 		if (strcmp(name,S_GET_NAME(sym)) == 0)
 			break;
@@ -26826,8 +26318,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 	fixP->fx_addnumber = *valP;
 
 	switch (fixP->fx_r_type) {
-	case BFD_RELOC_RISCV_HI20:
-	case BFD_RELOC_RISCV_LO12_I:
+	case BFD_RELOC_RISCV_HI20: case BFD_RELOC_RISCV_LO12_I:
 	case BFD_RELOC_RISCV_LO12_S:
 		bfd_putl32(riscv_apply_const_reloc(fixP->fx_r_type,*valP)
 			  |bfd_getl32(buf),buf);
@@ -26836,33 +26327,23 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 		relaxable = true;
 		break;
 
-	case BFD_RELOC_RISCV_GOT_HI20:
-	case BFD_RELOC_RISCV_ADD8:
-	case BFD_RELOC_RISCV_ADD16:
-	case BFD_RELOC_RISCV_ADD32:
-	case BFD_RELOC_RISCV_ADD64:
-	case BFD_RELOC_RISCV_SUB6:
-	case BFD_RELOC_RISCV_SUB8:
-	case BFD_RELOC_RISCV_SUB16:
-	case BFD_RELOC_RISCV_SUB32:
-	case BFD_RELOC_RISCV_SUB64:
+	case BFD_RELOC_RISCV_GOT_HI20: case BFD_RELOC_RISCV_ADD8:
+	case BFD_RELOC_RISCV_ADD16: case BFD_RELOC_RISCV_ADD32:
+	case BFD_RELOC_RISCV_ADD64: case BFD_RELOC_RISCV_SUB6:
+	case BFD_RELOC_RISCV_SUB8: case BFD_RELOC_RISCV_SUB16:
+	case BFD_RELOC_RISCV_SUB32: case BFD_RELOC_RISCV_SUB64:
 	case BFD_RELOC_RISCV_RELAX:
 		/* cvt_frag_to_fill () has called output_leb128 ().  */
-	case BFD_RELOC_RISCV_SET_ULEB128:
-	case BFD_RELOC_RISCV_SUB_ULEB128:
+	case BFD_RELOC_RISCV_SET_ULEB128: case BFD_RELOC_RISCV_SUB_ULEB128:
 		break;
 
-	case BFD_RELOC_RISCV_TPREL_HI20:
-	case BFD_RELOC_RISCV_TPREL_LO12_I:
-	case BFD_RELOC_RISCV_TPREL_LO12_S:
-	case BFD_RELOC_RISCV_TPREL_ADD:
+	case BFD_RELOC_RISCV_TPREL_HI20: case BFD_RELOC_RISCV_TPREL_LO12_I:
+	case BFD_RELOC_RISCV_TPREL_LO12_S: case BFD_RELOC_RISCV_TPREL_ADD:
 		relaxable = true;
 		/* Fall through.  */
 
-	case BFD_RELOC_RISCV_TLS_GOT_HI20:
-	case BFD_RELOC_RISCV_TLS_GD_HI20:
-	case BFD_RELOC_RISCV_TLS_DTPREL32:
-	case BFD_RELOC_RISCV_TLS_DTPREL64:
+	case BFD_RELOC_RISCV_TLS_GOT_HI20: case BFD_RELOC_RISCV_TLS_GD_HI20:
+	case BFD_RELOC_RISCV_TLS_DTPREL32: case BFD_RELOC_RISCV_TLS_DTPREL64:
 		if (fixP->fx_addsy != NULL)
 			S_SET_THREAD_LOCAL(fixP->fx_addsy);
 		else
@@ -26871,15 +26352,13 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 		break;
 
 	case BFD_RELOC_32:
-		/*
-		 * Use pc-relative relocation for FDE initial location. The
+		/* Use pc-relative relocation for FDE initial location. The
 		 * symbol address in .eh_frame may be adjusted in
 		 * _bfd_elf_discard_section_eh_frame,and the content of
 		 * .eh_frame will be adjusted in
 		 * _bfd_elf_write_section_eh_frame. Therefore,we cannot insert
 		 * a relocation whose addend symbol is in .eh_frame.
-		 * Othrewise,the value may be adjusted twice.
-		 */
+		 * Othrewise,the value may be adjusted twice.  */
 		if (fixP->fx_addsy && fixP->fx_subsy
 		    && (sub_segment = S_GET_SEGMENT(fixP->fx_subsy))
 		    && strcmp(sub_segment->name,".eh_frame") == 0
@@ -26890,9 +26369,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 			break;
 		}
 		/* Fall through.  */
-	case BFD_RELOC_64:
-	case BFD_RELOC_16:
-	case BFD_RELOC_8:
+	case BFD_RELOC_64: case BFD_RELOC_16: case BFD_RELOC_8:
 	case BFD_RELOC_RISCV_CFA:
 		if (fixP->fx_addsy && fixP->fx_subsy) {
 			fixP->fx_next = xmemdup(fixP,sizeof(*fixP),sizeof(*fixP));
@@ -26973,11 +26450,9 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 		/* Fall through.  */
 
 	case BFD_RELOC_RVA:
-		/*
-		 * If we are deleting this reloc entry,we must fill in the
+		/* If we are deleting this reloc entry,we must fill in the
 		 * value now.  This can happen if we have a .word which is not
-		 * resolved when it appears but is later defined.
-		 */
+		 * resolved when it appears but is later defined.  */
 		if (fixP->fx_addsy == NULL) {
 			gas_assert(fixP->fx_size <= sizeof(valueT));
 			md_number_to_chars((char *)buf,*valP,fixP->fx_size);
@@ -26987,10 +26462,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_JMP:
 		if (fixP->fx_addsy) {
-			/*
-			 * Fill in a tentative value to improve objdump
-			 * readability.
-			 */
+			/* Fill in a tentative value to improve objdump
+			 * readability.  */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl32(bfd_getl32(buf)|ENCODE_JTYPE_IMM(delta),buf);
@@ -26999,10 +26472,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_12_PCREL:
 		if (fixP->fx_addsy) {
-			/*
-			 * Fill in a tentative value to improve objdump
-			 * readability.
-			 */
+			/* Fill in a tentative value to improve objdump
+			 * readability.  */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl32(bfd_getl32(buf)|ENCODE_BTYPE_IMM(delta),buf);
@@ -27011,10 +26482,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_RVC_BRANCH:
 		if (fixP->fx_addsy) {
-			/*
-			 * Fill in a tentative value to improve objdump
-			 * readability.
-			 */
+			/* Fill in a tentative value to improve objdump
+			 * readability.  */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl16(bfd_getl16(buf)|ENCODE_CBTYPE_IMM(delta),buf);
@@ -27023,23 +26492,19 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_RVC_JUMP:
 		if (fixP->fx_addsy) {
-			/*
-			 * Fill in a tentative value to improve objdump
-			 * readability.
-			 */
+			/* Fill in a tentative value to improve objdump
+			 * readability.  */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl16(bfd_getl16(buf)|ENCODE_CJTYPE_IMM(delta),buf);
 		}
 		break;
 
-	case BFD_RELOC_RISCV_CALL:
-	case BFD_RELOC_RISCV_CALL_PLT:
+	case BFD_RELOC_RISCV_CALL: case BFD_RELOC_RISCV_CALL_PLT:
 		relaxable = true;
 		break;
 
-	case BFD_RELOC_RISCV_PCREL_HI20:
-	case BFD_RELOC_RISCV_PCREL_LO12_S:
+	case BFD_RELOC_RISCV_PCREL_HI20: case BFD_RELOC_RISCV_PCREL_LO12_S:
 	case BFD_RELOC_RISCV_PCREL_LO12_I:
 		relaxable = riscv_opts.relax;
 		break;
@@ -27065,10 +26530,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 	}
 }
 
-/*
- * Because the value of .cfi_remember_state may changed after relaxation,we
- * insert a fix to relocate it again in link-time.
- */
+/* Because the value of .cfi_remember_state may changed after relaxation,we
+ * insert a fix to relocate it again in link-time.  */
 static void	riscv_pre_output_hook(void)
 {
 	const frchainS *frch;
@@ -31901,20 +31364,16 @@ static void	elf_frob_symbol(symbolS * symp,int *puntp)
 	}
 	versioned_name = sy_obj->versioned_name;
 	if (versioned_name) {
-		/*
-		 * This symbol was given a new name with the .symver directive.
+		/* This symbol was given a new name with the .symver directive.
 		 * If this is an external reference,just rename the symbol to
 		 * include the version string.  This will make the relocs be
-		 * against the correct versioned symbol.
-		 */
+		 * against the correct versioned symbol. */
 
 		/* We will have already reported an version error.  */
 		if (sy_obj->bad_version)
 			*puntp = true;
-		/*
-		 * elf_frob_file_before_adjust only allows one version symbol
-		 * for renamed symbol.
-		 */
+		/* elf_frob_file_before_adjust only allows one version symbol
+		 * for renamed symbol.  */
 		else
 			if (sy_obj->rename)
 				S_SET_NAME(symp,versioned_name->name);
@@ -31927,8 +31386,7 @@ static void	elf_frob_symbol(symbolS * symp,int *puntp)
 					asymbol        *bfdsym;
 					elf_symbol_type *elfsym;
 
-					/*
-					 * This is a definition.  Add an alias for each version. FIXME: Using an
+					/* This is a definition.  Add an alias for each version. FIXME: Using an
 					 * alias will permit the debugging information to refer to the right
 					 * symbol. However,it's not clear* whether it is the best approach.  */
 
@@ -33971,26 +33429,12 @@ char           *getpwd(void)
 #endif				/* VMS || _WIN32 && !__CYGWIN__ */
 /* Return time used so far,in microseconds. */
 
-/*
- * There are several ways to get elapsed execution time; unfortunately no
+/* There are several ways to get elapsed execution time; unfortunately no
  * single way is available for all host systems,nor are there reliable ways to
- * find out which way is correct for a given host.
- */
-
-#ifndef RUSAGE_SELF
-#define RUSAGE_SELF 0
-#endif
+ * find out which way is correct for a given host.  */
 
 #ifdef _SC_CLK_TCK
 #define GNU_HZ  sysconf(_SC_CLK_TCK)
-#else
-#ifdef HZ
-#define GNU_HZ  HZ
-#else
-#ifdef CLOCKS_PER_SEC
-#define GNU_HZ  CLOCKS_PER_SEC
-#endif
-#endif
 #endif
 
 /*
@@ -35313,11 +34757,9 @@ static bool	strtab_emit(register bfd * abfd,struct elf_strtab_hash *tab)
 	gas_assert(off == tab->sec_size);
 	return true;
 }
-/*
- * Compute the file positions we are going to put the sections at,and
+/* Compute the file positions we are going to put the sections at,and
  * otherwise prepare to begin writing out the ELF file.  If LINK_INFO is not
- * NULL,this is being called by the ELF backend linker.
- */
+ * NULL,this is being called by the ELF backend linker. */
 static bool	compute_section_file_positions(bfd * abfd,
 					 		void         *link_info)
 {
@@ -35330,11 +34772,6 @@ static bool	compute_section_file_positions(bfd * abfd,
 	if (abfd->output_has_begun)
 		return true;
 
-#if 0
-	/* Do any elf backend specific processing first.  */
-	if (bed->elf_backend_begin_write_processing)
-		(*bed->elf_backend_begin_write_processing) (abfd,link_info);
-#endif
 	if (!elf_init_file_header(abfd,link_info))
 		return false;
 
@@ -35412,12 +34849,10 @@ static bool	compute_section_file_positions(bfd * abfd,
 
 	return true;
 }
-/*
- * This generic function can only be used in implementations where creating NEW
+/* This generic function can only be used in implementations where creating NEW
  * sections is disallowed.  It is useful in patching existing sections in
  * read-write files,though.  See other set_section_contents functions to see
- * why it doesn't work for new sections.
- */
+ * why it doesn't work for new sections.  */
 static bool	generic_set_section_contents(bfd * abfd,
 					 		sec_ptr	section,
 			       		const		void  *location,
@@ -35579,8 +35014,7 @@ static bool	elf_init_file_header(bfd * abfd,
 		i_ehdrp->e_machine = EM_NONE;
 		break;
 
-		/*
-		 * There used to be a long list of cases here,each one setting
+		/* There used to be a long list of cases here,each one setting
 		 * e_machine to the same EM_* macro #defined as
 		 * ELF_MACHINE_CODE in the corresponding bfd definition.  To
 		 * avoid duplication,the switch was removed.  Machines that
@@ -35588,8 +35022,7 @@ static bool	elf_init_file_header(bfd * abfd,
 		 * elf_backend_final_write_processing(),unless they need the
 		 * information earlier than the final write. Such need can
 		 * generally be supplied by replacing the tests for e_machine
-		 * with the conditions used to determine it.
-		 */
+		 * with the conditions used to determine it. */
 	default:
 		i_ehdrp->e_machine = EM_RISCV;
 		//bed->elf_machine_code;
@@ -36371,10 +35804,8 @@ static bool	elf_write_shdrs_and_ehdr(bfd * abfd)
 	    || bfd_bwrite(&x_ehdr,amt,abfd) != amt)
 		return false;
 
-	/*
-	 * Some fields in the first section header handle overflow of ehdr
-	 * fields.
-	 */
+	/* Some fields in the first section header handle overflow of ehdr
+	 * fields.  */
 	if (i_ehdrp->e_phnum >= PN_XNUM)
 		i_shdrp[0]->sh_info = i_ehdrp->e_phnum;
 	if (i_ehdrp->e_shnum >= (SHN_LORESERVE & 0xffff))
@@ -36413,13 +35844,11 @@ static int	_bfd_elf_symbol_from_bfd_symbol(bfd * abfd,asymbol ** asym_ptr_ptr)
 	int		idx;
 	flagword	flags = asym_ptr->flags;
 
-	/*
-	 * When gas creates relocations against local labels,it creates its
+	/* When gas creates relocations against local labels,it creates its
 	 * own symbol for the section,but does put the symbol into the symbol
 	 * chain,so udata is 0.  When the linker is generating relocatable
 	 * output,this section symbol may be for one of the input sections
-	 * rather than the output section.
-	 */
+	 * rather than the output section.  */
 	if (asym_ptr->udata.i == 0
 	    && (flags & BSF_SECTION_SYM)
 	    && asym_ptr->section) {
@@ -37691,12 +37120,9 @@ static void	error_handler(const char *fmt,...)
 	va_end(ap);
 }
 
-/*
- * Each instruction belongs to an instruction class INSN_CLASS_*. Call
- * riscv_subset_supports to make sure that the instuction is valid.
- */
-static		bool
-		riscv_multi_subset_supports(riscv_parse_subset_t * rps,
+/* Each instruction belongs to an instruction class INSN_CLASS_*. Call
+ * riscv_subset_supports to make sure that the instuction is valid.  */
+static	bool riscv_multi_subset_supports(riscv_parse_subset_t * rps,
 					enum		riscv_insn_class insn_class)
 {
 	switch (insn_class) {
@@ -37994,10 +37420,8 @@ static struct bfd_hash_entry *
 			  		struct	bfd_hash_table *table,
 			  		const		char  *string)
 {
-	/*
-	 * Allocate the structure if it has not already been allocated by a
-	 * subclass.
-	 */
+	/* Allocate the structure if it has not already been allocated by a
+	 * subclass.  */
 	if (entry == NULL)
 		entry = (struct bfd_hash_entry *)
 		bfd_hash_allocate(table,sizeof(struct elf_strtab_hash_entry));
@@ -38093,8 +37517,7 @@ static void	bfd_rename_section(asection * sec,const char *newname)
 /* Compressed section support (intended for debug sections). */
 #define MAX_COMPRESSION_HEADER_SIZE 24
 
-/* FUNCTION bfd_update_compression_header
- * compress.c:153
+/* FUNCTION bfd_update_compression_header compress.c:153
  * SYNOPSIS void bfd_update_compression_header (bfd *abfd,bfd_byte *contents,
  * asection *sec);
  * 

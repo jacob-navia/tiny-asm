@@ -222,10 +222,7 @@
 #define gas_assert(P)	((void) ((P) ? 0 : (abort (), 0)))
 #undef abort
 #define abort()		as_abort (__FILE__, __LINE__, __PRETTY_FUNCTION__)
-#define TARGET_ALIAS "riscv64-unknown-linux-gnu"
-#define TARGET_CANONICAL "riscv64-unknown-linux-gnu"
 #define DEFAULT_COMPRESSED_DEBUG_ALGORITHM COMPRESS_DEBUG_GABI_ZLIB
-#define TARGET_CPU "riscv64"
 /* Main header file for the bfd library -- portable access to object files. */
 #ifndef __BFD_H_SEEN__
 #define __BFD_H_SEEN__
@@ -236,11 +233,8 @@
    is error prone, so using this macro is safer.  */
 #define STRING_COMMA_LEN(STR) (STR), (sizeof (STR) - 1)
 
-/* Boolean type used in bfd.
-   General rule: Functions which are bfd_boolean return TRUE on
-   success and FALSE on failure (unless they're a predicate).  */
-# define FALSE 0
-# define TRUE 1
+#define FALSE 0
+#define TRUE 1
 
 /* Represent a target address.  Also used as a generic unsigned type
    which is guaranteed to be big enough to hold any arithmetic types
@@ -254,8 +248,7 @@ typedef uint64_t bfd_vma;
 typedef int64_t bfd_signed_vma;
 typedef uint64_t symvalue;
 
-/* An offset into a file.  BFD always uses the largest possible offset
-   based on the build time availability of fseek, fseeko, or fseeko64.  */
+/* An offset into a file.  */
 typedef int64_t file_ptr;
 typedef uint64_t ufile_ptr;
 typedef uint32_t flagword;	/* 32 bits of flags */
@@ -1199,9 +1192,7 @@ typedef enum bfd_format {
 } bfd_format;
 
 enum bfd_direction {
-    no_direction = 0,
-    read_direction = 1,
-    write_direction = 2,
+    no_direction = 0, read_direction = 1, write_direction = 2,
     both_direction = 3
 };
 
@@ -1537,28 +1528,22 @@ static inline bool bfd_get_cacheable (const bfd *abfd)
 static inline enum bfd_format bfd_get_format (const bfd *abfd)
 { return abfd->format; }
 
-static inline flagword
-bfd_get_file_flags (const bfd *abfd)
+static inline flagword bfd_get_file_flags (const bfd *abfd)
 {
   return abfd->flags;
 }
-
-static inline bfd_vma
-bfd_get_start_address (const bfd *abfd)
+static inline bfd_vma bfd_get_start_address (const bfd *abfd)
 {
   return abfd->start_address;
 }
-
 static inline unsigned int bfd_get_symcount (const bfd *abfd)
 {
   return abfd->symcount;
 }
-
 static inline unsigned int bfd_get_dynamic_symcount (const bfd *abfd)
 {
   return abfd->dynsymcount;
 }
-
 static inline struct bfd_symbol ** bfd_get_outsymbols (const bfd *abfd)
 { return abfd->outsymbols; }
 
@@ -1713,8 +1698,7 @@ static inline bool bfd_section_removed_from_list (const bfd *abfd, const asectio
   return s->next ? s->next->prev != s : abfd->section_last != s;
 }
 
-typedef enum bfd_error
-{
+typedef enum bfd_error {
   bfd_error_no_error = 0, bfd_error_system_call, bfd_error_invalid_target,
   bfd_error_wrong_format, bfd_error_wrong_object_format,
   bfd_error_invalid_operation, bfd_error_no_memory, bfd_error_no_symbols,
@@ -1744,37 +1728,14 @@ static void bfd_sprintf_vma (bfd *, char *, bfd_vma);
 static size_t bfd_bwrite (const void *, size_t, bfd *);
 static int Seek (bfd *, file_ptr, int);
 
-/* Extracted from bfdwin.c.  */
-struct _bfd_window_internal;
-
-typedef struct _bfd_window {
-  /* What the user asked for.  */
-  void *data;
-  size_t size;
-  /* The actual window used by BFD.  Small user-requested read-only
-     regions sharing a page may share a single window into the object
-     file.  Read-write versions shouldn't until I've fixed things to
-     keep track of which portions have been claimed by the
-     application; don't want to give the same region back when the
-     application wants two writable copies!  */
-  struct _bfd_window_internal *i;
-} bfd_window;
-
 /* Extracted from compress.c.  */
 /* Types of compressed DWARF debug sections.  */
-enum compressed_debug_section_type
-{
+enum compressed_debug_section_type {
   COMPRESS_DEBUG_NONE = 0,
   COMPRESS_DEBUG_GNU_ZLIB = 1 << 1,
   COMPRESS_DEBUG_GABI_ZLIB = 1 << 2,
   COMPRESS_DEBUG_ZSTD = 1 << 3,
   COMPRESS_UNKNOWN = 1 << 4
-};
-
-/* Tuple for compressed_debug_section_type and their name.  */
-struct compressed_type_tuple {
-  enum compressed_debug_section_type type;
-  const char *name;
 };
 
 /* Compression header ch_type values.  */
@@ -2667,7 +2628,6 @@ static const char * as_where (unsigned int *);
 static const char * as_where_top (unsigned int *);
 static const char * as_where_physical (unsigned int *);
 static void   bump_line_counters (void);
-static void   do_scrub_begin (int);
 static void   input_scrub_begin (void);
 static void   input_scrub_close (void);
 static void   input_scrub_end (void);
@@ -4100,7 +4060,6 @@ struct elf_segment_map
    corresponding asymbol.  Every symbol is an ELF file is actually a
    pointer to this structure, although it is often handled as a
    pointer to an asymbol.  */
-
 typedef struct {
   /* The BFD symbol.  */
   asymbol symbol;
@@ -4146,31 +4105,6 @@ struct plt_entry;
   (!(H)->def_regular							\
    && !(H)->def_dynamic							\
    && (H)->root.type == bfd_link_hash_defined)
-
-/* Records local symbols to be emitted in the dynamic symbol table.  */
-
-struct elf_link_local_dynamic_entry
-{
-  struct elf_link_local_dynamic_entry *next;
-
-  /* The input bfd this symbol came from.  */
-  bfd *input_bfd;
-
-  /* The index of the local symbol being copied.  */
-  long input_indx;
-
-  /* The index in the outgoing dynamic symbol table.  */
-  long dynindx;
-
-  /* A copy of the input symbol.  */
-  Elf_Internal_Sym isym;
-};
-
-struct elf_link_loaded_list
-{
-  struct elf_link_loaded_list *next;
-  bfd *abfd;
-};
 
 /* Structures used by the eh_frame optimization code.  */
 struct eh_cie_fde {
@@ -4518,26 +4452,14 @@ enum {
 
 /* The following struct stores information about every SystemTap section
    found in the object file.  */
-struct sdt_note
-{
+struct sdt_note {
   struct sdt_note *next;
   size_t size;
   bfd_byte data[1];
 };
 
-/* tdata information grabbed from an elf core file.  */
-struct core_elf_obj_tdata
-{
-  int signal;
-  int pid;
-  int lwpid;
-  char* program;
-  char* command;
-};
-
 /* Extra tdata information held for output ELF BFDs.  */
-struct output_elf_obj_tdata
-{
+struct output_elf_obj_tdata {
   struct elf_segment_map *seg_map;
   struct elf_strtab_hash *strtab_ptr;
 
@@ -4586,16 +4508,14 @@ struct output_elf_obj_tdata
 /* Indicate if the bfd contains SHF_GNU_MBIND/SHF_GNU_RETAIN sections or
    symbols that have the STT_GNU_IFUNC symbol type or STB_GNU_UNIQUE
    binding.  Used to set the osabi field in the ELF header structure.  */
-enum elf_gnu_osabi
-{
+enum elf_gnu_osabi {
   elf_gnu_osabi_mbind = 1 << 0,
   elf_gnu_osabi_ifunc = 1 << 1,
   elf_gnu_osabi_unique = 1 << 2,
   elf_gnu_osabi_retain = 1 << 3,
 };
 
-typedef struct elf_section_list
-{
+typedef struct elf_section_list {
   Elf_Internal_Shdr	     hdr;
   unsigned int		     ndx;
   struct elf_section_list *  next;
@@ -4611,9 +4531,7 @@ enum dynamic_lib_link_class {
 
 /* Some private data is stashed away for future use using the tdata pointer
    in the bfd structure.  */
-
-struct elf_obj_tdata
-{
+struct elf_obj_tdata {
   Elf_Internal_Ehdr elf_header[1];	/* Actual data, but ref like ptr */
   Elf_Internal_Shdr **elf_sect_ptr;
   Elf_Internal_Phdr *phdr;
@@ -4757,9 +4675,7 @@ struct elf_obj_tdata
 #define elf_elfsections(bfd)	(elf_tdata(bfd) -> elf_sect_ptr)
 #define elf_numsections(bfd)	(elf_tdata(bfd) -> num_elf_sections)
 #define elf_seg_map(bfd)	(elf_tdata(bfd) -> o->seg_map)
-#define elf_link_info(bfd)	(elf_tdata(bfd) -> o->link_info)
 #define elf_next_file_pos(bfd)	(elf_tdata(bfd) -> o->next_file_pos)
-#define elf_stack_flags(bfd)	(elf_tdata(bfd) -> o->stack_flags)
 #define elf_sframe(bfd)		(elf_tdata(bfd) -> o->sframe)
 #define elf_shstrtab(bfd)	(elf_tdata(bfd) -> o->strtab_ptr)
 #define elf_onesymtab(bfd)	(elf_tdata(bfd) -> symtab_section)
@@ -4789,14 +4705,9 @@ struct elf_obj_tdata
 #define elf_other_obj_attributes_proc(bfd) \
   (elf_other_obj_attributes (bfd) [OBJ_ATTR_PROC])
 
-static unsigned int _bfd_elf_section_from_bfd_section
-  (bfd *, asection *);
+static unsigned int _bfd_elf_section_from_bfd_section (bfd *, asection *);
 static bfd_reloc_status_type bfd_elf_generic_reloc (bfd *, arelent *, asymbol *, void *, asection *, bfd *, char **);
 static bool bfd_elf_allocate_object (bfd *, size_t, enum elf_target_id);
-#define _bfd_generic_init_private_section_data \
-  _bfd_elf_init_private_section_data
-#define _bfd_elf_read_minisymbols _bfd_generic_read_minisymbols
-#define _bfd_elf_minisymbol_to_symbol _bfd_generic_minisymbol_to_symbol
 /* If the target doesn't have reloc handling written yet:  */
 static int _bfd_elf_symbol_from_bfd_symbol (bfd *, asymbol **);
 static struct elf_strtab_hash * _bfd_elf_strtab_init (void);
@@ -4819,19 +4730,6 @@ static void bfd_elf_add_obj_attr_int_string (bfd *, int, unsigned int,
   bfd_elf_add_obj_attr_int_string ((BFD), OBJ_ATTR_PROC, (TAG), \
 				   (INTVAL), (STRVAL))
 static int _bfd_elf_obj_attrs_arg_type (bfd *, int, unsigned int);
-/* Hash for local symbol with the first section id, ID, in the input
-   file and the local symbol index, SYM.  */
-#define ELF_LOCAL_SYMBOL_HASH(ID, SYM) \
-  (((((ID) & 0xffU) << 24) | (((ID) & 0xff00) << 8)) \
-   ^ (SYM) ^ (((ID) & 0xffff0000U) >> 16))
-
-/* Will a symbol be bound to the definition within the shared
-   library, if any.  A unique symbol can never be bound locally.  */
-#define SYMBOLIC_BIND(INFO, H) \
-    (!(H)->unique_global \
-     && ((INFO)->symbolic \
-	 || (H)->start_stop \
-	 || ((INFO)->dynamic && !(H)->dynamic)))
 
 /* Determine if a section contains CTF data, using its name.  */
 static inline bool bfd_section_is_ctf (const asection *sec)
@@ -6307,8 +6205,6 @@ static void riscv_pre_output_hook (void);
 #define TC_FORCE_RELOCATION_LOCAL(FIX) 1
 #define DIFF_EXPR_OK 1
 
-#define TARGET_USE_CFIPOP 1
-
 #define tc_cfi_frame_initial_instructions riscv_cfi_frame_initial_instructions
 static void riscv_cfi_frame_initial_instructions (void);
 
@@ -6409,14 +6305,8 @@ struct elf_section_match {
 
 #define OBJ_SYMFIELD_TYPE struct elf_obj_sy
 
-#ifndef obj_begin
-#define obj_begin() elf_begin ()
-#endif
 static void elf_begin (void);
 
-#ifndef obj_end
-#define obj_end() elf_end ()
-#endif
 static void elf_end (void);
 
 #ifndef LOCAL_LABEL_PREFIX
@@ -6453,10 +6343,6 @@ static int elf_s_get_other (symbolS *);
   (elf_symbol (symbol_get_bfdsym (S))->internal_elf_sym.st_other = (V))
 #endif
 static void elf_frob_file (void);
-
-#ifndef obj_frob_file_before_adjust
-#define obj_frob_file_before_adjust  elf_frob_file_before_adjust
-#endif
 static void elf_frob_file_before_adjust (void);
 static void elf_frob_file_after_relocs (void);
 
@@ -7015,8 +6901,6 @@ static int is_it_end_of_statement (void);
 static int target_big_endian;
 
 /* These are initialized by the CPU specific target files (tc-*.c).  */
-static const char comment_chars[];
-static const char line_comment_chars[];
 static const char line_separator_chars[];
 
 /* Table of -I directories.  */
@@ -7084,7 +6968,6 @@ static void s_linefile (int);
 static void s_comm (int);
 static void s_data (int);
 static void s_fill (int);
-static void s_float_space (int mult);
 static void s_func (int);
 static void s_globl (int arg);
 static void s_ignore (int arg);
@@ -7463,15 +7346,9 @@ static inline htab_t str_htab_create (void)
 static int    md_parse_option (int, const char *);
 static void   md_assemble (char *);
 static void   md_begin (void);
-#ifndef md_number_to_chars
 static void   md_number_to_chars (char *, valueT, int);
-#endif
 static void   md_apply_fix (fixS *, valueT *, segT);
-
 static long    md_pcrel_from (fixS *);
-#ifndef md_operand
-static void    md_operand (expressionS *);
-#endif
 #ifndef md_estimate_size_before_relax
 static int     md_estimate_size_before_relax (fragS * fragP, segT);
 #endif
@@ -7493,10 +7370,6 @@ static arelent **tc_gen_reloc (asection *, fixS *);
 
 static const char FLT_CHARS[];
 static const char EXP_CHARS[];
-
-#ifdef H_TICK_HEX
-static int enable_h_tick_hex;
-#endif
 
 #if defined OBJ_ELF || defined OBJ_MAYBE_ELF
 /* If .size directive failure should be error or warning.  */
@@ -7549,14 +7422,11 @@ typedef struct sb {
   char *ptr;			/* Points to the current block.  */
   size_t len;			/* How much is used.  */
   size_t max;			/* The maximum length.  */
-}
-sb;
+} sb;
 
 /* Actually in input-scrub.c.  */
 enum expansion { expanding_none, expanding_repeat, expanding_macro, };
 #endif /* SB_H */
-
-/* Don't do the contents of this file more than once.  */
 
 #ifndef _OBSTACK_H
 #define _OBSTACK_H 1
@@ -8025,43 +7895,7 @@ static unsigned int bfd_log2 (bfd_vma x) ;
 
 /* Extracted from bfd.c.  */
 bfd_error_handler_type _bfd_set_error_handler_caching (bfd *);
-
 const char *_bfd_get_error_program_name (void);
-
-/* Extracted from bfdio.c.  */
-struct bfd_iovec
-{
-  /* To avoid problems with macros, a "b" rather than "f"
-     prefix is prepended to each method name.  */
-  /* Attempt to read/write NBYTES on ABFD's IOSTREAM storing/fetching
-     bytes starting at PTR.  Return the number of bytes actually
-     transfered (a read past end-of-file returns less than NBYTES),
-     or -1 (setting <<bfd_error>>) if an error occurs.  */
-  file_ptr (*bread) (struct bfd *abfd, void *ptr, file_ptr nbytes);
-  file_ptr (*bwrite) (struct bfd *abfd, const void *ptr,
-		      file_ptr nbytes);
-  /* Return the current IOSTREAM file offset, or -1 (setting <<bfd_error>>
-     if an error occurs.  */
-  file_ptr (*btell) (struct bfd *abfd);
-  /* For the following, on successful completion a value of 0 is returned.
-     Otherwise, a value of -1 is returned (and <<bfd_error>> is set).  */
-  int (*bseek) (struct bfd *abfd, file_ptr offset, int whence);
-  int (*bclose) (struct bfd *abfd);
-  int (*bflush) (struct bfd *abfd);
-  int (*bstat) (struct bfd *abfd, struct stat *sb);
-  /* Mmap a part of the files. ADDR, LEN, PROT, FLAGS and OFFSET are the usual
-     mmap parameter, except that LEN and OFFSET do not need to be page
-     aligned.  Returns (void *)-1 on failure, mmapped address on success.
-     Also write in MAP_ADDR the address of the page aligned buffer and in
-     MAP_LEN the size mapped (a page multiple).  Use unmap with MAP_ADDR and
-     MAP_LEN to unmap.  */
-  void *(*bmmap) (struct bfd *abfd, void *addr, size_t len,
-		  int prot, int flags, file_ptr offset,
-		  void **map_addr, size_t *map_len);
-};
-extern const struct bfd_iovec _bfd_memory_iovec;
-
-/* Extracted from archive.c.  */
 /* Used in generating armaps (archive tables of contents).  */
 struct orl             /* Output ranlib.  */
 {
@@ -8083,15 +7917,6 @@ static void *bfd_arch_default_fill (size_t count,
     bool is_bigendian,
     bool code);
 
-/* Extracted from bfdwin.c.  */
-typedef struct _bfd_window_internal
-{
-  struct _bfd_window_internal *next;
-  void *data;
-  size_t size;
-  int refcount : 31;           /* should be enough...  */
-  unsigned mapped : 1;         /* 1 = mmap, 0 = malloc */
-} bfd_window_internal;
 #define IS_DIR_SEPARATOR(c) (c == '/')
 static int filename_cmp (const char *s1, const char *s2);
 #define FILENAME_CMP(s1, s2)	filename_cmp(s1, s2)
@@ -8405,264 +8230,30 @@ LAST_UNUSED_STAB_CODE
    To avoid conflicts, this header defines the isxxx functions in upper
    case, e.g. ISALPHA not isalpha.  */
 
-#ifndef SAFE_CTYPE_H
-#define SAFE_CTYPE_H
+#define ISALPHA(c)  isalpha(c)
+#define ISALNUM(c)  isalnum(c)
+#define ISBLANK(c)  isblank(c)
+#define ISCNTRL(c)  iscntrl(c)
+#define ISDIGIT(c)  isdigit(c)
+#define ISGRAPH(c)  isgraph(c)
+#define ISLOWER(c)  islower(c)
+#define ISPRINT(c)  isprint(c)
+#define ISPUNCT(c)  ispunct(c)
+#define ISSPACE(c)  isspace(c)
+#define ISUPPER(c)  isupper(c)
+#define ISXDIGIT(c) isxdigit(c)
 
-/* Determine host character set.  */
-#define HOST_CHARSET_UNKNOWN 0
-#define HOST_CHARSET_ASCII   1
-#define HOST_CHARSET_EBCDIC  2
-
-#if  '\n' == 0x0A && ' ' == 0x20 && '0' == 0x30 \
-   && 'A' == 0x41 && 'a' == 0x61 && '!' == 0x21
-#  define HOST_CHARSET HOST_CHARSET_ASCII
-#else
-# if '\n' == 0x15 && ' ' == 0x40 && '0' == 0xF0 \
-   && 'A' == 0xC1 && 'a' == 0x81 && '!' == 0x5A
-#  define HOST_CHARSET HOST_CHARSET_EBCDIC
-# else
-#  define HOST_CHARSET HOST_CHARSET_UNKNOWN
-# endif
-#endif
-
-/* Categories.  */
-
-enum {
-  /* In C99 */
-  _sch_isblank  = 0x0001,	/* space \t */
-  _sch_iscntrl  = 0x0002,	/* nonprinting characters */
-  _sch_isdigit  = 0x0004,	/* 0-9 */
-  _sch_islower  = 0x0008,	/* a-z */
-  _sch_isprint  = 0x0010,	/* any printing character including ' ' */
-  _sch_ispunct  = 0x0020,	/* all punctuation */
-  _sch_isspace  = 0x0040,	/* space \t \n \r \f \v */
-  _sch_isupper  = 0x0080,	/* A-Z */
-  _sch_isxdigit = 0x0100,	/* 0-9A-Fa-f */
-
-  /* Extra categories useful to cpplib.  */
-  _sch_isidst	= 0x0200,	/* A-Za-z_ */
-  _sch_isvsp    = 0x0400,	/* \n \r */
-  _sch_isnvsp   = 0x0800,	/* space \t \f \v \0 */
-
-  /* Combinations of the above.  */
-  _sch_isalpha  = _sch_isupper|_sch_islower,	/* A-Za-z */
-  _sch_isalnum  = _sch_isalpha|_sch_isdigit,	/* A-Za-z0-9 */
-  _sch_isidnum  = _sch_isidst|_sch_isdigit,	/* A-Za-z0-9_ */
-  _sch_isgraph  = _sch_isalnum|_sch_ispunct,	/* isprint and not space */
-  _sch_iscppsp  = _sch_isvsp|_sch_isnvsp,	/* isspace + \0 */
-  _sch_isbasic  = _sch_isprint|_sch_iscppsp     /* basic charset of ISO C
-						   (plus ` and @)  */
-};
-/* <ctype.h> replacement macros. */
-
-/* Shorthand */
-#define bl _sch_isblank
-#define cn _sch_iscntrl
-#define di _sch_isdigit
-#define is _sch_isidst
-#define lo _sch_islower
-#define nv _sch_isnvsp
-#define pn _sch_ispunct
-#define pr _sch_isprint
-#define Sp _sch_isspace
-#define up _sch_isupper
-#define vs _sch_isvsp
-#define xd _sch_isxdigit
-
-/* Masks.  */
-#define L  (const unsigned short) (lo|is   |pr)	/* lower case letter */
-#define XL (const unsigned short) (lo|is|xd|pr)	/* lowercase hex digit */
-#define U  (const unsigned short) (up|is   |pr)	/* upper case letter */
-#define XU (const unsigned short) (up|is|xd|pr)	/* uppercase hex digit */
-#define D  (const unsigned short) (di   |xd|pr)	/* decimal digit */
-#define P  (const unsigned short) (pn      |pr)	/* punctuation */
-#define _U  (const unsigned short) (pn|is   |pr)	/* underscore */
-
-#define C  (const unsigned short) (         cn)	/* control character */
-#define Z  (const unsigned short) (nv      |cn)	/* NUL */
-#define M  (const unsigned short) (nv|Sp   |cn)	/* cursor movement: \f \v */
-#define V  (const unsigned short) (vs|Sp   |cn)	/* vertical space: \r \n */
-#define T  (const unsigned short) (nv|Sp|bl|cn)	/* tab */
-#define S  (const unsigned short) (nv|Sp|bl|pr)	/* space */
-
-/* Character classification.  */
-static const unsigned short _sch_istable[256] = {
-  Z,  C,  C,  C,   C,  C,  C,  C,   /* NUL SOH STX ETX  EOT ENQ ACK BEL */
-  C,  T,  V,  M,   M,  V,  C,  C,   /* BS  HT  LF  VT   FF  CR  SO  SI  */
-  C,  C,  C,  C,   C,  C,  C,  C,   /* DLE DC1 DC2 DC3  DC4 NAK SYN ETB */
-  C,  C,  C,  C,   C,  C,  C,  C,   /* CAN EM  SUB ESC  FS  GS  RS  US  */
-  S,  P,  P,  P,   P,  P,  P,  P,   /* SP  !   "   #    $   %   &   '   */
-  P,  P,  P,  P,   P,  P,  P,  P,   /* (   )   *   +    ,   -   .   /   */
-  D,  D,  D,  D,   D,  D,  D,  D,   /* 0   1   2   3    4   5   6   7   */
-  D,  D,  P,  P,   P,  P,  P,  P,   /* 8   9   :   ;    <   =   >   ?   */
-  P, XU, XU, XU,  XU, XU, XU,  U,   /* @   A   B   C    D   E   F   G   */
-  U,  U,  U,  U,   U,  U,  U,  U,   /* H   I   J   K    L   M   N   O   */
-  U,  U,  U,  U,   U,  U,  U,  U,   /* P   Q   R   S    T   U   V   W   */
-  U,  U,  U,  P,   P,  P,  P,  _U,  /* X   Y   Z   [    \   ]   ^   _   */
-  P, XL, XL, XL,  XL, XL, XL,  L,   /* `   a   b   c    d   e   f   g   */
-  L,  L,  L,  L,   L,  L,  L,  L,   /* h   i   j   k    l   m   n   o   */
-  L,  L,  L,  L,   L,  L,  L,  L,   /* p   q   r   s    t   u   v   w   */
-  L,  L,  L,  P,   P,  P,  P,  C,   /* x   y   z   {    |   }   ~   DEL */
-
-  /* high half of unsigned char is locale-specific, so all tests are
-     false in "C" locale */
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,
-};
-
-const unsigned char _sch_tolower[256] = {
-   0,  1,  2,  3,   4,  5,  6,  7,   8,  9, 10, 11,  12, 13, 14, 15,
-  16, 17, 18, 19,  20, 21, 22, 23,  24, 25, 26, 27,  28, 29, 30, 31,
-  32, 33, 34, 35,  36, 37, 38, 39,  40, 41, 42, 43,  44, 45, 46, 47,
-  48, 49, 50, 51,  52, 53, 54, 55,  56, 57, 58, 59,  60, 61, 62, 63,
-  64,
-
-  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-
-  91, 92, 93, 94, 95, 96,
-
-  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-  'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-
- 123,124,125,126,127,
-
- 128,129,130,131, 132,133,134,135, 136,137,138,139, 140,141,142,143,
- 144,145,146,147, 148,149,150,151, 152,153,154,155, 156,157,158,159,
- 160,161,162,163, 164,165,166,167, 168,169,170,171, 172,173,174,175,
- 176,177,178,179, 180,181,182,183, 184,185,186,187, 188,189,190,191,
-
- 192,193,194,195, 196,197,198,199, 200,201,202,203, 204,205,206,207,
- 208,209,210,211, 212,213,214,215, 216,217,218,219, 220,221,222,223,
- 224,225,226,227, 228,229,230,231, 232,233,234,235, 236,237,238,239,
- 240,241,242,243, 244,245,246,247, 248,249,250,251, 252,253,254,255,
-};
-
-const unsigned char _sch_toupper[256] = {
-   0,  1,  2,  3,   4,  5,  6,  7,   8,  9, 10, 11,  12, 13, 14, 15,
-  16, 17, 18, 19,  20, 21, 22, 23,  24, 25, 26, 27,  28, 29, 30, 31,
-  32, 33, 34, 35,  36, 37, 38, 39,  40, 41, 42, 43,  44, 45, 46, 47,
-  48, 49, 50, 51,  52, 53, 54, 55,  56, 57, 58, 59,  60, 61, 62, 63,
-  64,
-
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-
-  91, 92, 93, 94, 95, 96,
-
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-
- 123,124,125,126,127,
-
- 128,129,130,131, 132,133,134,135, 136,137,138,139, 140,141,142,143,
- 144,145,146,147, 148,149,150,151, 152,153,154,155, 156,157,158,159,
- 160,161,162,163, 164,165,166,167, 168,169,170,171, 172,173,174,175,
- 176,177,178,179, 180,181,182,183, 184,185,186,187, 188,189,190,191,
-
- 192,193,194,195, 196,197,198,199, 200,201,202,203, 204,205,206,207,
- 208,209,210,211, 212,213,214,215, 216,217,218,219, 220,221,222,223,
- 224,225,226,227, 228,229,230,231, 232,233,234,235, 236,237,238,239,
- 240,241,242,243, 244,245,246,247, 248,249,250,251, 252,253,254,255,
-};
-
-#define _sch_test(c, bit) (_sch_istable[(c) & 0xff] & (unsigned short)(bit))
-
-#define ISALPHA(c)  _sch_test(c, _sch_isalpha)
-#define ISALNUM(c)  _sch_test(c, _sch_isalnum)
-#define ISBLANK(c)  _sch_test(c, _sch_isblank)
-#define ISCNTRL(c)  _sch_test(c, _sch_iscntrl)
-#define ISDIGIT(c)  _sch_test(c, _sch_isdigit)
-#define ISGRAPH(c)  _sch_test(c, _sch_isgraph)
-#define ISLOWER(c)  _sch_test(c, _sch_islower)
-#define ISPRINT(c)  _sch_test(c, _sch_isprint)
-#define ISPUNCT(c)  _sch_test(c, _sch_ispunct)
-#define ISSPACE(c)  _sch_test(c, _sch_isspace)
-#define ISUPPER(c)  _sch_test(c, _sch_isupper)
-#define ISXDIGIT(c) _sch_test(c, _sch_isxdigit)
-
-#define ISIDNUM(c)	_sch_test(c, _sch_isidnum)
-#define ISIDST(c)	_sch_test(c, _sch_isidst)
-#define IS_ISOBASIC(c)	_sch_test(c, _sch_isbasic)
-#define IS_VSPACE(c)	_sch_test(c, _sch_isvsp)
-#define IS_NVSPACE(c)	_sch_test(c, _sch_isnvsp)
-#define IS_SPACE_OR_NUL(c)	_sch_test(c, _sch_iscppsp)
+#define ISIDNUM(c)	isidnum(c)
+#define ISIDST(c)	isidst(c)
+#define IS_ISOBASIC(c)	isbasic(c)
+#define IS_VSPACE(c)	isvsp(c)
+#define IS_NVSPACE(c)	isnvsp(c)
 
 /* Character transformation.  */
-extern const unsigned char  _sch_toupper[256];
-extern const unsigned char  _sch_tolower[256];
-#define TOUPPER(c) _sch_toupper[(c) & 0xff]
-#define TOLOWER(c) _sch_tolower[(c) & 0xff]
-
-/* Prevent the users of safe-ctype.h from accidently using the routines
-   from ctype.h.  Initially, the approach was to produce an error when
-   detecting that ctype.h has been included.  But this was causing
-   trouble as ctype.h might get indirectly included as a result of
-   including another system header (for instance gnulib's stdint.h).
-   So we include ctype.h here and then immediately redefine its macros.  */
+#define TOUPPER(c) toupper(c)
+#define TOLOWER(c) tolower(c)
 
 #include <ctype.h>
-#undef isalpha
-#define isalpha(c) do_not_use_isalpha_with_safe_ctype
-#undef isalnum
-#define isalnum(c) do_not_use_isalnum_with_safe_ctype
-#undef iscntrl
-#define iscntrl(c) do_not_use_iscntrl_with_safe_ctype
-#undef isdigit
-#define isdigit(c) do_not_use_isdigit_with_safe_ctype
-#undef isgraph
-#define isgraph(c) do_not_use_isgraph_with_safe_ctype
-#undef islower
-#define islower(c) do_not_use_islower_with_safe_ctype
-#undef isprint
-#define isprint(c) do_not_use_isprint_with_safe_ctype
-#undef ispunct
-#define ispunct(c) do_not_use_ispunct_with_safe_ctype
-#undef isspace
-#define isspace(c) do_not_use_isspace_with_safe_ctype
-#undef isupper
-#define isupper(c) do_not_use_isupper_with_safe_ctype
-#undef isxdigit
-#define isxdigit(c) do_not_use_isxdigit_with_safe_ctype
-#undef toupper
-#define toupper(c) do_not_use_toupper_with_safe_ctype
-#undef tolower
-#define tolower(c) do_not_use_tolower_with_safe_ctype
-
-#undef L  
-#undef XL 
-#undef U  
-#undef XU 
-#undef D  
-#undef P  
-#undef _U  
-
-#undef C  
-#undef Z  
-#undef M  
-#undef V  
-#undef T  
-#undef S  
-#undef bl 
-#undef cn 
-#undef di 
-#undef is 
-#undef lo 
-#undef nv 
-#undef pn 
-#undef pr 
-#undef Sp 
-#undef up 
-#undef vs 
-#undef xd 
-#endif /* SAFE_CTYPE_H */
 
 /* objalloc.h -- routines to allocate memory for objects */
 #ifndef OBJALLOC_H
@@ -8961,15 +8552,14 @@ struct stab_find_info {
 };
 
 static const struct bfd_elf_special_section * get_sec_type_attr (bfd *abfd, asection *sec);
-#define DW_EH_PE_omit 0xff
 enum dwarf1 {
-	DW_LANG_Mips_Assembler = 0x8001, DW_AT_name=0x03, DW_AT_comp_dir=0x1b, DW_AT_external=0x3f,
-	DW_AT_stmt_list=0x10, DW_AT_producer=0x25, DW_AT_language=0x13, DW_AT_type=0x49,
-	DW_FORM_strp=0x0e, DW_FORM_udata=0x0F, DW_AT_low_pc=0x11, DW_AT_high_pc=0x12,
-	DW_AT_ranges=0x55, DW_FORM_addr = 0x01, DW_FORM_flag=0x0c, DW_FORM_flag_present=0x19,
-	DW_FORM_line_strp=0x1f, DW_FORM_data2=0x05, DW_FORM_data4=0x06, DW_FORM_data8=0x07,
-	DW_FORM_data16=0x1e, DW_FORM_block=0x09, DW_TAG_subprogram=0x2e, DW_TAG_unspecified_type=0x3b,
-	DW_TAG_compile_unit=0x11,
+	DW_LANG_Mips_Assembler=0x8001,DW_AT_name=0x03,DW_AT_comp_dir=0x1b,DW_AT_external=0x3f,
+	DW_AT_stmt_list=0x10,DW_AT_producer=0x25,DW_AT_language=0x13,DW_AT_type=0x49,
+	DW_FORM_strp=0x0e,DW_FORM_udata=0x0F,DW_AT_low_pc=0x11,DW_AT_high_pc=0x12,
+	DW_AT_ranges=0x55,DW_FORM_addr=0x01,DW_FORM_flag=0x0c,DW_FORM_flag_present=0x19,
+	DW_FORM_line_strp=0x1f,DW_FORM_data2=0x05,DW_FORM_data4=0x06,DW_FORM_data8=0x07,
+	DW_FORM_data16=0x1e,DW_FORM_block=0x09,DW_TAG_subprogram=0x2e,
+	DW_TAG_unspecified_type=0x3b, DW_TAG_compile_unit=0x11,
 };
 enum dwarf_call_frame_info { DW_CFA_advance_loc = 0x40 , DW_CFA_offset = 0x80
 , DW_CFA_restore = 0xc0 , DW_CFA_nop = 0x00 , DW_CFA_set_loc = 0x01
@@ -8987,29 +8577,17 @@ enum dwarf_call_frame_info { DW_CFA_advance_loc = 0x40 , DW_CFA_offset = 0x80
 
 };
 enum dwarf3 {
-	DW_LNCT_directory_index=0x02,
-	DW_LNCT_timestamp=0x3,
-	DW_LNCT_size=0x04,
-	DW_LNCT_MD5=0x5,
-	DW_RLE_start_length = 0x07,
+	DW_LNCT_directory_index=0x02, DW_LNCT_timestamp=0x3, DW_LNCT_size=0x04,
+	DW_LNCT_MD5=0x5, DW_RLE_start_length = 0x07,
 };
-#define DW_EH_PE_absptr		0x00
-#define DW_EH_PE_omit		0xff
-#define DW_EH_PE_uleb128	0x01
-#define DW_EH_PE_udata2		0x02
-#define DW_EH_PE_udata4		0x03
-#define DW_EH_PE_udata8		0x04
-#define DW_EH_PE_sleb128	0x09
-#define DW_EH_PE_sdata2		0x0A
-#define DW_EH_PE_sdata4		0x0B
-#define DW_EH_PE_sdata8		0x0C
-#define DW_EH_PE_signed		0x08
-#define DW_EH_PE_pcrel		0x10
-#define DW_EH_PE_textrel	0x20
-#define DW_EH_PE_datarel	0x30
-#define DW_EH_PE_funcrel	0x40
-#define DW_EH_PE_aligned	0x50
-#define DW_EH_PE_indirect	0x80
+enum dwarf4 {
+DW_EH_PE_absptr=0x00, DW_EH_PE_omit=0xff, DW_EH_PE_uleb128=0x01,
+DW_EH_PE_udata2=0x02, DW_EH_PE_udata4=0x03, DW_EH_PE_udata8=0x04,
+DW_EH_PE_sleb128=0x09, DW_EH_PE_sdata2=0x0A, DW_EH_PE_sdata4=0x0B,
+DW_EH_PE_sdata8=0x0C, DW_EH_PE_signed=0x08, DW_EH_PE_pcrel=0x10,
+DW_EH_PE_textrel=0x20, DW_EH_PE_datarel=0x30, DW_EH_PE_funcrel=0x40,
+DW_EH_PE_aligned=0x50, DW_EH_PE_indirect=0x80,
+};
 enum dwarf_line_number_ops { DW_LNS_extended_op = 0, DW_LNS_copy = 1, DW_LNS_advance_pc = 2, DW_LNS_advance_line = 3,
  DW_LNS_set_file = 4, DW_LNS_set_column = 5, DW_LNS_negate_stmt = 6, DW_LNS_set_basic_block = 7,
  DW_LNS_const_add_pc = 8, DW_LNS_fixed_advance_pc = 9, DW_LNS_set_prologue_end = 10,

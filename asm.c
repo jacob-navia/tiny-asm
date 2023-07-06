@@ -2966,7 +2966,7 @@ static void	dot_cfi_endproc(int ignored ATTRIBUTE_UNUSED)
 static	segT get_cfi_seg(segT cseg,const char *base,uint32_t flags,int align)
 {
 	/* Exclude .debug_frame sections for Compact EH.  */
-	if ((flags & SEC_DEBUGGING) == 0 && compact_eh) {
+ 	if ((flags & SEC_DEBUGGING) == 0 && compact_eh) {
 		struct dwcfi_seg_list *l;
 
 		l = dwcfi_hash_find_or_make(cseg,base,flags);
@@ -2974,6 +2974,10 @@ static	segT get_cfi_seg(segT cseg,const char *base,uint32_t flags,int align)
 		cseg = l->seg;
 		subseg_set(cseg,l->subseg);
 
+		cseg = subseg_new(base,0);
+		cseg->flags = flags;
+	}
+	else {
 		cseg = subseg_new(base,0);
 		cseg->flags = flags;
 	}

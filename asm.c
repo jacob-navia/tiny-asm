@@ -17972,16 +17972,13 @@ static void	record_alignment(	/* Segment to which alignment pertains.  */
 	if (seg == absolute_section)
 		return;
 
-	if (align > bfd_section_alignment(seg))
-		bfd_set_section_alignment(seg,align);
+	if (align > seg->alignment_power)
+		seg->alignment_power = align;
 }
 
 static int	get_recorded_alignment(segT seg)
 {
-	if (seg == absolute_section)
-		return 0;
-
-	return bfd_section_alignment(seg);
+	return (seg == absolute_section)? 0 : seg->alignment_power;
 }
 
 /* Reset the section indices after removing the gas created sections.  */
@@ -18942,24 +18939,31 @@ static fragS   *get_frag_for_reloc(fragS * last_frag,
 			   		const		struct	reloc_list *r)
 {
 	fragS          *f;
+	int i =0;
 
-	for (f = last_frag; f != NULL; f = f->fr_next)
+	for (f = last_frag; f != NULL; f = f->fr_next) {
+		if (f->fr_address <= r->u.b.r.address
+		    && r->u.b.r.address < f->fr_address + f->fr_fix)
+				return f;
+		i++;
+	}
+
+	for (f = seginfo->frchainP->frch_root; f != NULL; f = f->fr_next) {
 		if (f->fr_address <= r->u.b.r.address
 		    && r->u.b.r.address < f->fr_address + f->fr_fix)
 			return f;
-
-	for (f = seginfo->frchainP->frch_root; f != NULL; f = f->fr_next)
-		if (f->fr_address <= r->u.b.r.address
-		    && r->u.b.r.address < f->fr_address + f->fr_fix)
-			return f;
-
+	}
+	/* This third loop is needed, as Mr Modra told me in an email:
+	 * The third loop (the one you're asking about) wasn't added with the
+	 * above, but rather by commit 740bdc67c057 (also by Alan).  
+	 * It contains testcase and justification.  (Hint: as last resort, 
+	 * and only then, a reloc is associated with a frag at the _end_ 
+	 * of section. frags can be var-length). */
 	for (f = seginfo->frchainP->frch_root; f != NULL; f = f->fr_next)
 		if (f->fr_address <= r->u.b.r.address
 		    && r->u.b.r.address <= f->fr_address + f->fr_fix)
 			return f;
-
-	as_bad_where(r->file,r->line,
-		     ("reloc not within (fixed part of) section"));
+	as_bad_where(r->file,r->line,"reloc not within fixed part of section");
 	return NULL;
 }
 
@@ -18973,17 +18977,14 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	fixS           *fixp;
 	fragS          *last_frag;
 
-	/*
-	 * If seginfo is NULL,we did not create this section; don't do
-	 * anything with it.
-	 */
+	/* If seginfo is NULL,we did not create this section; don't do
+	 * anything with it.  */
 	if (seginfo == NULL)
 		return;
 
 	n = 0;
 	for (fixp = seginfo->fix_root; fixp; fixp = fixp->fx_next)
-		if (!fixp->fx_done)
-			n++;
+		n += !fixp->fx_done;
 
 	/* Extract relocs for this section from reloc_list.  */
 	rp = &reloc_list;
@@ -24948,8 +24949,7 @@ static bool	riscv_csr_read_only_check(insn_t insn)
  * should be controlled by the hypervisor spec rather than priv spec in the
  * future.
  * 
- * dret is defined in the debug spec,so it should be checked in the future,too.
- */
+ * dret is defined in the debug spec,so it should be checked in the future,too.  */
 static bool	riscv_is_priv_insn(insn_t insn)
 {
 	return (((insn ^ MATCH_SRET) & MASK_SRET) == 0
@@ -25031,7 +25031,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 		*imm_reloc = BFD_RELOC_UNUSED;
 		p = percent_op_null;
 
-		for (oparg = insn->args;; ++oparg) {
+		for (oparg = insn->args; ;++oparg) {
 			opargStart = oparg;
 			asarg += strspn(asarg," \t");
 			switch (*oparg) {
@@ -25040,42 +25040,27 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					if (!insn->match_func(insn,ip->insn_opcode))
 						break;
 
-					/*
-					 * For .insn,insn->match and
-					 * insn->mask are 0.
-					 */
+					/* For .insn,insn->match and * insn->mask are 0. */
 					if (riscv_insn_length((insn->match == 0 && insn->mask == 0)
 							      ? ip->insn_opcode
 							   : insn->match) == 2
 					    && !riscv_opts.rvc)
 						break;
-
 					if (riscv_is_priv_insn(ip->insn_opcode))
 						explicit_priv_attr = true;
-
-					/*
-					 * Check if we write a read-only CSR by
-					 * the CSR instruction.
-					 */
+					/* Check if we write a read-only CSR by the CSR instruction. */
 					if (insn_with_csr
 					    && riscv_opts.csr_check
 					    && !riscv_csr_read_only_check(ip->insn_opcode)) {
-						/*
-						 * Restore the character in
-						 * advance,since we want to
-						 * report the detailed warning
-						 * message here.
-						 */
+						/* Restore the character in advance,since we want to report 
+						 * the detailed warning * message here.  */
 						if (save_c)
 							*(asargStart - 1) = save_c;
 						as_warn(("read-only CSR is written `%s'"),str);
 						insn_with_csr = false;
 					}
-					/*
-					 * The (segmant) load and store with
-					 * EEW 64 cannot be used when zve32x is
-					 * enabled.
-					 */
+					/* The (segmant) load and store with EEW 64 cannot be used when 
+					 * zve32x is enabled.  */
 					if (ip->insn_mo->pinfo & INSN_V_EEW64
 					    && riscv_subset_supports(&riscv_rps_as,"zve32x")
 					    && !riscv_subset_supports(&riscv_rps_as,"zve64x")) {
@@ -25128,8 +25113,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					    || EXTRACT_OPERAND(CRS2S,ip->insn_opcode) + 8 != regno)
 						break;
 					continue;
-				case 'U':	/* RS1,constrained to equal
-						 * RD.  */
+				case 'U':	/* RS1,constrained to equal RD.  */
 					if (!reg_lookup(&asarg,RCLASS_GPR,&regno)
 					    || EXTRACT_OPERAND(RD,ip->insn_opcode) != regno)
 						break;
@@ -25139,14 +25123,12 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 						break;
 					INSERT_OPERAND(CRS2,*ip,regno);
 					continue;
-				case 'c':	/* RS1,constrained to equal
-						 * sp.  */
+				case 'c':	/* RS1,constrained to equal sp.  */
 					if (!reg_lookup(&asarg,RCLASS_GPR,&regno)
 					    || regno != X_SP)
 						break;
 					continue;
-				case 'z':	/* RS2,constrained to equal
-						 * x0.  */
+				case 'z':	/* RS2,constrained to equal x0.  */
 					if (!reg_lookup(&asarg,RCLASS_GPR,&regno)
 					    || regno != 0)
 						break;
@@ -25157,7 +25139,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					    || (unsigned long)imm_expr->X_add_number >= xlen)
 						break;
 					ip->insn_opcode |= ENCODE_CITYPE_IMM(imm_expr->X_add_number);
-			rvc_imm_done:
+	rvc_imm_done:
 					asarg = expr_parse_end;
 					imm_expr->X_op = O_absent;
 					continue;
@@ -25237,12 +25219,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				case 'o':
 					if (my_getSmallExpression(imm_expr,imm_reloc,asarg,p)
 					    || imm_expr->X_op != O_constant
-					/*
-					 * C.addiw,c.li,and c.andi allow zero
-					 * immediate. C.addi allows zero
-					 * immediate as hint.  Otherwise this
-					 * is same as 'j'.
-					 */
+					/* C.addiw,c.li,and c.andi allow zero immediate. C.addi allows 
+					 * zero immediate as hint.  Otherwise this is same as 'j'. */
 					    || !VALID_CITYPE_IMM((valueT) imm_expr->X_add_number))
 						break;
 					ip->insn_opcode |= ENCODE_CITYPE_IMM(imm_expr->X_add_number);
@@ -25454,13 +25432,10 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					INSERT_OPERAND(VS2,*ip,regno);
 					continue;
 
-					/*
-					 * The `V0` is carry-in register for
-					 * v[m]adc and v[m]sbc,and is used to
-					 * choose vs1/rs1/frs1/imm or vs2 for
-					 * v[f]merge.  It use the same encoding
-					 * as the vector mask register.
-					 */
+					/* The `V0` is carry-in register for v[m]adc and v[m]sbc,
+					 * and is used to choose vs1/rs1/frs1/imm or vs2 for
+					 * v[f]merge.  It use the same encoding as the vector
+					 * mask register. */
 				case '0':
 					if (reg_lookup(&asarg,RCLASS_VECR,&regno) && regno == 0)
 						continue;
@@ -25490,8 +25465,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					asarg = expr_parse_end;
 					continue;
 
-				case 'i':	/* vector arith signed
-						 * immediate */
+				case 'i':	/* vector arith signed immediate */
 					my_getExpression(imm_expr,asarg);
 					check_absolute_expr(ip,imm_expr,FALSE);
 					if (imm_expr->X_add_number > 15
@@ -25503,8 +25477,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					asarg = expr_parse_end;
 					continue;
 
-				case 'j':	/* vector arith unsigned
-						 * immediate */
+				case 'j':	/* vector arith unsigned immediate */
 					my_getExpression(imm_expr,asarg);
 					check_absolute_expr(ip,imm_expr,FALSE);
 					if (imm_expr->X_add_number < 0
@@ -25516,8 +25489,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					asarg = expr_parse_end;
 					continue;
 
-				case 'k':	/* vector arith signed
-						 * immediate,minus 1 */
+				case 'k':	/* vector arith signed immediate,minus 1 */
 					my_getExpression(imm_expr,asarg);
 					check_absolute_expr(ip,imm_expr,FALSE);
 					if (imm_expr->X_add_number > 16
@@ -25549,15 +25521,11 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 					}
 					break;
 
-				case 'T':	/* vector macro temporary
-						 * register */
+				case 'T':	/* vector macro temporary register */
 					if (!reg_lookup(&asarg,RCLASS_VECR,&regno) || regno == 0)
 						break;
-					/*
-					 * Store it in the FUNCT6 field as we
-					 * don't have anyplace else to store
-					 * it.
-					 */
+					/* Store it in the FUNCT6 field as we don't have anyplace 
+					 * else to store it. */
 					INSERT_OPERAND(VFUNCT6,*ip,regno);
 					continue;
 
@@ -25572,10 +25540,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				asarg--;
 				break;
 
-			case '(':
-			case ')':
-			case '[':
-			case ']':
+			case '(': case ')': case '[': case ']':
 				if (*asarg++ == *oparg)
 					continue;
 				break;
@@ -25761,8 +25726,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				 * relaxation to use.  */
 				p = percent_op_rtype;
 				goto alu_op;
-			case '0':	/* AMO displacement,which must be
-					 * zero.  */
+			case '0':	/* AMO displacement,which must be zero.  */
 		load_store:
 				if (riscv_handle_implicit_zero_offset(imm_expr,asarg))
 					continue;
@@ -27092,12 +27056,9 @@ static void	s_riscv_leb128(int sign)
 	return s_leb128(sign);
 }
 
-/*
- * Parse the .insn directive.  There are three formats,Format 1: .insn <type>
+/* Parse the .insn directive.  There are three formats,Format 1: .insn <type>
  * <operand1>,<operand2>,... Format 2: .insn <length>,<value> Format 3:
- * .insn <value>.
- */
-
+ * .insn <value>. */
 static void	s_riscv_insn(int x ATTRIBUTE_UNUSED)
 {
 	char           *str = input_line_pointer;

@@ -66,13 +66,10 @@ static char    *myname;
 /*
  * The default obstack chunk size.  If we set this to zero,the obstack code
  * will use whatever will fit in a 4096 byte block.  */
-static int	chunksize = 0;
 
 /* To monitor memory allocation more effectively,make this non-zero. Then the
  * chunk sizes for gas and bfd will be reduced.  */
-static int	debug_memory = 0;
-/* Enable verbose mode.  */
-static int	verbose = 0;
+#define CHUNKSIZE 0
 
 /* Which version of DWARF CIE to produce.  This default value of -1 indicates
  * that this value has not been set yet,a default value is provided in
@@ -290,7 +287,7 @@ static void	parse_args(int *pargc,char ***pargv)
 		OPTION_TRADITIONAL_FORMAT,OPTION_WARN,OPTION_TARGET_HELP,
 		OPTION_EXECSTACK,OPTION_NOEXECSTACK,OPTION_SIZE_CHECK,
 		OPTION_ELF_STT_COMMON,OPTION_ELF_BUILD_NOTES,	/* = STD_BASE + 30 */
-		OPTION_SECTNAME_SUBST,OPTION_ALTERNATE,OPTION_AL,
+		OPTION_SECTNAME_SUBST,OPTION_ALTERNATE,
 		OPTION_HASH_TABLE_SIZE,OPTION_REDUCE_MEMORY_OVERHEADS,
 		OPTION_WARN_FATAL,OPTION_COMPRESS_DEBUG,OPTION_NOCOMPRESS_DEBUG,
 		OPTION_NO_PAD_SECTIONS,OPTION_MULTIBYTE_HANDLING,	/* = STD_BASE + 40 */
@@ -311,7 +308,6 @@ static void	parse_args(int *pargc,char ***pargv)
 		 * take an argument.  */
 		,{"a",optional_argument,NULL,'a'}
 		/* Handle -al=<FILE>.  */
-		,{"al",optional_argument,NULL,OPTION_AL}
 		,{"compress-debug-sections",optional_argument,NULL,OPTION_COMPRESS_DEBUG}
 		,{"nocompress-debug-sections",no_argument,NULL,OPTION_NOCOMPRESS_DEBUG}
 		,{"debug-prefix-map",required_argument,NULL,OPTION_DEBUG_PREFIX_MAP}
@@ -414,7 +410,6 @@ static void	parse_args(int *pargc,char ***pargv)
 		case 'v':
 		case OPTION_VERBOSE:
 				print_version_id();
-				verbose = 1;
 				break;
 			} else
 				as_bad("unrecognized option -%c%s",optc,optarg ? optarg : "");
@@ -647,7 +642,6 @@ This program has absolutely no warranty.\n");
 #endif				/* OBJ_ELF */
 
 		case 'Z': flag_always_generate_output = 1; break;
-		case OPTION_AL: break;
 		case OPTION_ALTERNATE:
 			optarg = old_argv[optind - 1];
 			while (*optarg == '-')
@@ -658,28 +652,6 @@ This program has absolutely no warranty.\n");
 				break;
 			}
 			optarg++;
-			/* Fall through.  */
-
-		case 'a':
-			if (optarg) {
-				if (optarg != old_argv[optind] && optarg[-1] == '=')
-					--optarg;
-
-				if (md_parse_option(optc,optarg) != 0)
-					break;
-
-				while (*optarg) {
-					switch (*optarg) {
-					case 'c': case 'd': case 'g': case 'h': case 'l':
-					case 'm': case 'n': case 's': case '=':
-						break;
-					default:
-						as_fatal(("invalid listing option `%c'"),*optarg);
-						break;
-					}
-					optarg++;
-				}
-			}
 			break;
 
 		case 'D':
@@ -727,8 +699,7 @@ static void    *zmalloc(size_t siz)
 
 /* Here to attempt 1 pass over each input file. We scan argv[*] looking for
  * filenames or exactly "" which is shorthand for stdin. Any argv that is NULL
- * is not a file-name. We set need_pass_2 TRUE if,after this,we still have
- * unresolved expressions of the form (unknown value)+-(unknown value).
+ * is not a file-name. 
  * 
  * Note the un*x semantics: there is only 1 logical input file,but it may be a
  * catenation of many 'physical' input files.  */
@@ -738,8 +709,6 @@ static void	perform_an_assembly_pass(int argc,char **argv)
 #ifndef OBJ_MACH_O
 	uint32_t	applicable;
 #endif
-
-	need_pass_2 = 0;
 
 	/* Create the standard sections,and those the assembler uses
 	 * internally.  */
@@ -796,17 +765,14 @@ static void	gas_early_init(int *argcp ATTRIBUTE_UNUSED,char ***argvp)
 	start_time = get_run_time();
 	signal_init();
 
-#ifdef HAVE_LC_MESSAGES
+//#ifdef HAVE_LC_MESSAGES
 	setlocale(LC_MESSAGES,"");
-#endif
+//#endif
 	setlocale(LC_CTYPE,"");
-
-	if (debug_memory)
-		chunksize = 64;
 
 	out_file_name = "a.out";
 
-	obstack_begin(&notes,chunksize);
+	obstack_begin(&notes,CHUNKSIZE);
 	xatexit(free_notes);
 
 	myname = **argvp;
@@ -815,6 +781,7 @@ static void	gas_early_init(int *argcp ATTRIBUTE_UNUSED,char ***argvp)
 	riscv_init_ext_order();
 }
 
+static const char *physical_input_file;
 /* The bulk of gas initialisation.  This is after args are parsed.  */
 static void	gas_init(void)
 {
@@ -822,7 +789,16 @@ static void	gas_init(void)
 	frag_init();
 	subsegs_begin();
 	read_begin();
-	input_scrub_begin();
+	physical_input_file = NULL;	/* No file read yet.  */
+	//input_scrub_reinit();
+	f_in = 0;	/* Reinitialize! */
+	logical_input_line = -1u;
+	logical_input_file = NULL;
+
+	buffer_length = BUFFER_SIZE * 2;
+	buffer_start = XNEWVEC(char,BEFORE_SIZE + AFTER_SIZE + 1 + buffer_length);
+	memcpy(buffer_start,BEFORE_STRING,(int)BEFORE_SIZE);
+
 	expr_begin();
 	eh_begin();
 
@@ -833,48 +809,29 @@ static void	gas_init(void)
 	local_symbol_make(".gasversion.",absolute_section,
 			  &predefined_address_frag,BFD_VERSION / 10000UL);
 
-	/*
-	 * Note: Put new initialisation calls that don't depend on stdoutput
+	/* Note: Put new initialisation calls that don't depend on stdoutput
 	 * being open above this point.  stdoutput must be open for anything
 	 * that might use stdoutput objalloc memory,eg. calling bfd_alloc or
-	 * creating global symbols (via bfd_make_empty_symbo).
-	 */
+	 * creating global symbols (via bfd_make_empty_symbo).  */
 	xatexit(output_file_close);
 	output_file_create(out_file_name);
 	gas_assert(stdoutput != 0);
 
-#if 0
-	/*
-	 * Must be called before output_file_close.  xexit calls the xatexit
-	 * list in reverse order.
-	 */
-	if (flag_print_statistics)
-		xatexit(dump_statistics);
-#endif
 	dot_symbol_init();
 
-#ifdef tc_init_after_args
-	tc_init_after_args();
-#endif
-
-
-	/*
-	 * Now that we have fully initialized,and have created the output
+	/* Now that we have fully initialized,and have created the output
 	 * file,define any symbols requested by --defsym command line
-	 * arguments.
-	 */
+	 * arguments.  */
 	while (defsyms != NULL) {
 		symbolS        *sym;
 		struct defsym_list *next;
 
 		sym = symbol_new(defsyms->name,absolute_section,
 				 &zero_address_frag,defsyms->value);
-		/*
-		 * Make symbols defined on the command line volatile,so that
+		/* Make symbols defined on the command line volatile,so that
 		 * they can be redefined inside a source file.  This makes this
 		 * assembler's behaviour compatible with earlier versions,but
-		 * it may not be completely intuitive.
-		 */
+		 * it may not be completely intuitive.  */
 		S_SET_VOLATILE(sym);
 		symbol_table_insert(sym);
 		next = defsyms->next;
@@ -956,7 +913,7 @@ int	main(int argc,char **argv)
 	cfi_finish();
 
 	keep_it = 0;
-	if (seen_at_least_1_file()) {
+	if (physical_input_file) {
 		int		n_warns   ,n_errs;
 		char		warn_msg  [50];
 		char		err_msg   [50];
@@ -989,7 +946,8 @@ int	main(int argc,char **argv)
 	}
 	fflush(stderr);
 
-	input_scrub_end();
+	free(buffer_start);
+	buffer_start = 0;
 
 	/* Use xexit instead of return,because under VMS environments they may
 	 * not place the same interpretation on the value given.
@@ -1649,9 +1607,6 @@ struct fde_entry {
 	/* For out of line tables and FDEs.  */
 	symbolS        *eh_loc;
 	int		sections;
-#ifdef tc_fde_entry_extras
-	tc_fde_entry_extras
-#endif
 };
 
 /* The list of all FDEs that have been collected.  */
@@ -3649,7 +3604,7 @@ static void	cfi_finish(void)
 	 * Generate SFrame section if the user specifies: - the command line
 	 * option to gas,or - .sframe in the .cfi_sections directive.
 	 */
-	if (flag_gen_sframe || (all_cfi_sections & CFI_EMIT_sframe) != 0) {
+	if ((all_cfi_sections & CFI_EMIT_sframe) != 0) {
 		if (support_sframe_p()) {
 			segT		sframe_seg;
 			int		alignment = 3;
@@ -4197,18 +4152,7 @@ static void	dwarf2_gen_line_info(addressT ofs,struct dwarf2_line_info *loc)
 		dw2_line = loc->line;
 		dw2_filename = loc->u.filename;
 	}
-	if (linkrelax) {
-		char		name      [32];
-
-		/*
-		 * Use a non-fake name for the line number location,so that it
-		 * can be referred to by relocations.
-		 */
-		sprintf(name,".Loc.%u",label_num);
-		label_num++;
-		sym = symbol_new(name,now_seg,frag_now,ofs);
-	} else
-		sym = symbol_temp_new(now_seg,frag_now,ofs);
+	sym = symbol_temp_new(now_seg,frag_now,ofs);
 	dwarf2_gen_line_info_1(sym,loc);
 }
 
@@ -4607,7 +4551,7 @@ static void	dwarf2_emit_insn(int size)
 
 	if (debug_type != DEBUG_DWARF2
 	    ? !dwarf2_loc_directive_seen
-	    : !seen_at_least_1_file())
+	    : physical_input_file == NULL)
 		return;
 
 	dwarf2_where(&loc);
@@ -4687,24 +4631,14 @@ static char    *dwarf2_directive_filename(void)
 			return NULL;
 		}
 	}
-	/*
-	 * FIXME: Should we allow ".file <N>\n" as an expression meaning
-	 * "switch back to the already allocated file <N> as the current file"
-	 * ?
-	 */
-
 	filename = demand_copy_C_string(&filename_len);
 	if (filename == NULL)
-		/*
-		 * demand_copy_C_string will have already generated an error
-		 * message.
-		 */
+		/* demand_copy_C_string will have already generated an error
+		 * message.  */
 		return NULL;
 
-	/*
-	 * For DWARF-5 support we also accept: .file <NUM> ["<dir>"] "<file>"
-	 * [md5 <NUM>]
-	 */
+	/* For DWARF-5 support we also accept: .file <NUM> ["<dir>"] "<file>"
+	 * [md5 <NUM>] */
 	if (DWARF2_LINE_VERSION > 4) {
 		SKIP_WHITESPACE();
 		if (*input_line_pointer == '"') {
@@ -4728,8 +4662,7 @@ static char    *dwarf2_directive_filename(void)
 	}
 	demand_empty_rest_of_line();
 
-	/*
-	 * A .file directive implies compiler generated debug information is
+	/* A .file directive implies compiler generated debug information is
 	 * being supplied.  Turn off gas generated debug info.
 	 */
 	if (debug_type == DEBUG_DWARF2)
@@ -9846,30 +9779,9 @@ static void ** htab_insert(htab_t htab,void *element,int replace)
  * input files (if any) is known.
  */
 
-#define BUFFER_SIZE (32 * 1024)
-
-/* We use static data: the data area is not sharable.  */
-
-static FILE    *f_in;
-static const char *file_name;
-
-/* Struct for saving the state of this module for file includes.  */
-struct saved_file {
-	FILE           *f_in;
-	const char     *file_name;
-	char           *app_save;
-};
-
-/* These hooks accommodate most operating systems.  */
-
 static char    *input_file_give_next_buffer(char *where);
 static void	input_file_close(void);
 static void	input_file_open(const char *filename,int pre);
-static void	input_file_pop(char *arg);
-
-static void	input_file_pop(char *arg ATTRIBUTE_UNUSED)
-{
-}
 
 /* Open the specified file,"" means stdin.  Filename must not be null.  */
 static void	input_file_open(const char *filename, int pre ATTRIBUTE_UNUSED)
@@ -9979,24 +9891,6 @@ static char    *
  * newline. Also looks after line numbers,for e.g. error messages.
  */
 
-/*
- * We don't care how filthy our buffers are,but our callers assume that the
- * following sanitation has already been done.
- * 
- * No comments,reduce a comment to a space. Reduce a tab to a space unless it is
- * 1st char of line. All multiple tabs and spaces collapsed into 1 char. Tab
- * only legal if 1st char of line. # line file statements converted to .line
- * x;.file y; statements. Escaped newlines at end of line: remove them but add
- * as many newlines to end of statement as you removed in the middle,to synch
- * line numbers.
- */
-
-#define BEFORE_STRING ("\n")
-#define AFTER_STRING ("\0")	/* memcpy of 0 chars might choke.  */
-#define BEFORE_SIZE (1)
-#define AFTER_SIZE  (1)
-
-static char    *buffer_start;	/*->1st char of full buffer area.  */
 static char    *partial_where;	/*->after last full line in buffer.  */
 static size_t	partial_size;	/* >=0. Number of chars in partial line in
 				 * buffer.  */
@@ -10013,134 +9907,8 @@ static char	save_source[AFTER_SIZE];
  */
 static size_t	buffer_length;
 
-/* The index into an sb structure we are reading from.  -1 if none.  */
-static size_t	sb_index = -1;
-
-/* If we are reading from an sb structure,this is it.  */
-static sb	from_sb;
-
-/* Should we do a conditional check on from_sb? */
-static enum expansion from_sb_expansion = expanding_none;
-
-/* The number of nested sb structures we have included.  */
-int		macro_nest;
-
-/*
- * We can have more than one source file open at once,though the info for all
- * but the latest one are saved off in a struct input_save.  These files remain
- * open,so we are limited by the number of open files allowed by the
- * underlying OS. We may also sequentially read more than one source file in an
- * assembly.
- */
-
-/*
- * We must track the physical file and line number for error messages. We also
- * track a "logical" file and line number corresponding to (C?)  compiler
- * source line numbers.  Whenever we open a file we must fill in
- * physical_input_file. So if it is NULL we have not opened any files yet.
- */
-
-static const char *physical_input_file;
-static const char *logical_input_file;
-
-/* 1-origin line number in a source file.  */
-/* A line ends in '\n' or eof.  */
-static unsigned int physical_input_line;
-static unsigned int logical_input_line;
-
 /* Indicator whether the origin of an update was a .linefile directive. */
 static bool	is_linefile;
-
-/* Struct used to save the state of the input handler during include files */
-struct input_save {
-	char           *buffer_start;
-	char           *partial_where;
-	size_t		partial_size;
-	char		save_source[AFTER_SIZE];
-	size_t		buffer_length;
-	const char     *physical_input_file;
-	const char     *logical_input_file;
-	unsigned int	physical_input_line;
-	unsigned int	logical_input_line;
-	bool		is_linefile;
-	size_t		sb_index;
-	sb		from_sb;
-	enum expansion	from_sb_expansion;	/* Should we do a conditional
-						 * check?  */
-	struct input_save *next_saved_file;	/* Chain of input_saves.  */
-	char           *input_file_save;	/* Saved state of input
-						 * routines.  */
-	char           *saved_position;	/* Caller's saved position in buf.  */
-};
-
-static char    *input_scrub_pop(struct input_save *arg);
-
-/*
- * Saved information about the file that .include'd this one.  When we hit EOF,
- * we automatically pop to that file.
- */
-static struct input_save *next_saved_file;
-
-/* Initialize input buffering.  */
-
-static void	input_scrub_reinit(void)
-{
-	f_in = 0;	/* Reinitialize! */
-	logical_input_line = -1u;
-	logical_input_file = NULL;
-	sb_index = -1;
-
-	buffer_length = BUFFER_SIZE * 2;
-	buffer_start = XNEWVEC(char,BEFORE_SIZE + AFTER_SIZE + 1 + buffer_length);
-	memcpy(buffer_start,BEFORE_STRING,(int)BEFORE_SIZE);
-}
-
-static char    *input_scrub_pop(struct input_save *saved)
-{
-	char           *saved_position;
-
-	input_scrub_end();	/* Finish off old buffer */
-
-	input_file_pop(saved->input_file_save);
-	saved_position = saved->saved_position;
-	buffer_start = saved->buffer_start;
-	buffer_length = saved->buffer_length;
-	physical_input_file = saved->physical_input_file;
-	logical_input_file = saved->logical_input_file;
-	physical_input_line = saved->physical_input_line;
-	logical_input_line = saved->logical_input_line;
-	is_linefile = saved->is_linefile;
-	sb_index = saved->sb_index;
-	from_sb = saved->from_sb;
-	from_sb_expansion = saved->from_sb_expansion;
-	partial_where = saved->partial_where;
-	partial_size = saved->partial_size;
-	next_saved_file = saved->next_saved_file;
-	memcpy(save_source,saved->save_source,sizeof(save_source));
-
-	free(saved);
-	return saved_position;
-}
-
-static void	input_scrub_begin(void)
-{
-	know(strlen(BEFORE_STRING) == BEFORE_SIZE);
-	know(strlen(AFTER_STRING) == AFTER_SIZE
-	     || (AFTER_STRING[0] == '\0' && AFTER_SIZE == 1));
-
-	physical_input_file = NULL;	/* No file read yet.  */
-	next_saved_file = NULL;	/* At EOF,don't pop to any other file */
-	macro_nest = 0;
-	input_scrub_reinit();
-}
-
-static void	input_scrub_end(void)
-{
-	if (buffer_start) {
-		free(buffer_start);
-		buffer_start = 0;
-	}
-}
 
 /* Start reading input from a new file. Return start of caller's part of
  * buffer.  */
@@ -10165,22 +9933,6 @@ static char    *input_scrub_next_buffer(char **bufp)
 {
 	char           *limit;	/*->just after last char of buffer.  */
 
-	if (sb_index != (size_t) - 1) {
-		if (sb_index >= from_sb.len) {
-			free(from_sb.ptr);
-			--macro_nest;
-			partial_where = NULL;
-			partial_size = 0;
-			if (next_saved_file != NULL)
-				*bufp = input_scrub_pop(next_saved_file);
-			return partial_where;
-		}
-		partial_where = from_sb.ptr + from_sb.len;
-		partial_size = 0;
-		*bufp = from_sb.ptr + sb_index;
-		sb_index = from_sb.len;
-		return partial_where;
-	}
 	if (partial_size) {
 		memmove(buffer_start + BEFORE_SIZE,partial_where,partial_size);
 		memcpy(buffer_start + BEFORE_SIZE,save_source,AFTER_SIZE);
@@ -10242,23 +9994,12 @@ read_more:
 
 	/* If we should pop to another file at EOF,do it.  */
 	partial_where = NULL;
-	if (next_saved_file)
-		*bufp = input_scrub_pop(next_saved_file);
-
 	return partial_where;
-}
-
-/* The remaining part of this file deals with line numbers,error messages and
- * so on.  Return TRUE if we opened any file.  */
-static int	seen_at_least_1_file(void)
-{
-	return (physical_input_file != NULL);
 }
 
 static void	bump_line_counters(void)
 {
-	if (sb_index == (size_t) - 1)
-		++physical_input_line;
+	++physical_input_line;
 
 	if (logical_input_line != -1u)
 		++logical_input_line;
@@ -10287,13 +10028,7 @@ static void	new_logical_line_flags(const char *fname,	/* DON'T destroy it!  We
 	case 1 << 3:
 		if (line_number < 0 || fname != NULL)
 			abort();
-		if (next_saved_file == NULL)
-			fname = physical_input_file;
-		else
-			if (next_saved_file->logical_input_file)
-				fname = next_saved_file->logical_input_file;
-			else
-				fname = next_saved_file->physical_input_file;
+		fname = physical_input_file;
 		break;
 	default:
 		abort();
@@ -10320,33 +10055,6 @@ static void	new_logical_line(const char *fname,int line_number)
 	new_logical_line_flags(fname,line_number,0);
 }
 
-static void	as_report_context(void)
-{
-	const struct input_save *saved = next_saved_file;
-	enum expansion	expansion = from_sb_expansion;
-	int		indent = 1;
-
-	if (!macro_nest)
-		return;
-
-	do {
-		if (expansion != expanding_macro)
-			 /* Nothing.  */ ;
-		else
-			if (saved->logical_input_file != NULL
-			    && saved->logical_input_line != -1u)
-				as_info_where(saved->logical_input_file,saved->logical_input_line,
-					 indent,("macro invoked from here"));
-			else
-				as_info_where(saved->physical_input_file,saved->physical_input_line,
-					 indent,("macro invoked from here"));
-
-		expansion = saved->from_sb_expansion;
-		++indent;
-	}
-	while ((saved = saved->next_saved_file) != NULL);
-}
-
 /* Return the current physical input file name and line number,if known  */
 static const char *as_where_physical(unsigned int *linep)
 {
@@ -10363,37 +10071,6 @@ static const char *as_where_physical(unsigned int *linep)
 /* Return the file name and line number at the top most macro invocation,
  * unless .file / .line were used inside a macro.  */
 static const char *as_where(unsigned int *linep)
-{
-	const char     *file = as_where_top(linep);
-
-	if (macro_nest && is_linefile) {
-		const struct input_save *saved = next_saved_file;
-		enum expansion	expansion = from_sb_expansion;
-
-		do {
-			if (expansion != expanding_macro)
-				 /* Nothing.  */ ;
-			else
-				if (saved->logical_input_file != NULL
-				    && (linep == NULL || saved->logical_input_line != -1u)) {
-					if (linep != NULL)
-						*linep = saved->logical_input_line;
-					file = saved->logical_input_file;
-				} else
-					if (saved->physical_input_file != NULL) {
-						if (linep != NULL)
-							*linep = saved->physical_input_line;
-						file = saved->physical_input_file;
-					}
-			expansion = saved->from_sb_expansion;
-		}
-		while ((saved = saved->next_saved_file) != NULL);
-	}
-	return file;
-}
-
-/* Return the current file name and line number.  */
-static const char *as_where_top(unsigned int *linep)
 {
 	if (logical_input_file != NULL
 	    && (linep == NULL || logical_input_line != -1u)) {
@@ -10493,7 +10170,7 @@ static void	as_show_where(void)
 	const char     *file;
 	unsigned int	line;
 
-	file = as_where_top(&line);
+	file = as_where(&line);
 	identify(file);
 	if (file) {
 		if (line != 0)
@@ -10503,33 +10180,13 @@ static void	as_show_where(void)
 	}
 }
 
-/*
- * Send to stderr a string as information,with location data passed in. Note
- * that for now this is not intended for general use.
- */
-static void	as_info_where(const char *file,unsigned int line,unsigned int indent,
-			  		const		char  *format,...)
-{
-	va_list		args;
-	char		Buffer    [2000];
-
-	va_start(args,format);
-	vsnprintf(Buffer,sizeof(Buffer),format,args);
-	va_end(args);
-	fprintf(stderr,"%s:%u: %*s%s%s\n",
-		file,line,(int)indent,"","Info: ",Buffer);
-}
-
 /* The common portion of as_warn and as_warn_where.  */
 static void	as_warn_internal(const char *file,unsigned int line,char *Buffer)
 {
-	bool		context = false;
-
 	++warning_count;
 
 	if (file == NULL) {
-		file = as_where_top(&line);
-		context = true;
+		file = as_where(&line);
 	}
 	identify(file);
 	if (file) {
@@ -10539,10 +10196,6 @@ static void	as_warn_internal(const char *file,unsigned int line,char *Buffer)
 			fprintf(stderr,"%s: %s%s\n",file,"Warning: ",Buffer);
 	} else
 		fprintf(stderr,"%s%s\n","Warning: ",Buffer);
-
-	if (context)
-		as_report_context();
-
 }
 
 /*
@@ -10585,13 +10238,10 @@ static void	as_warn_where(const char *file,unsigned int line,const char *format,
 /* The common portion of as_bad and as_bad_where.  */
 static void	as_bad_internal(const char *file,unsigned int line,char *Buffer)
 {
-	bool		context = false;
-
 	++error_count;
 
 	if (file == NULL) {
-		file = as_where_top(&line);
-		context = true;
+		file = as_where(&line);
 	}
 	identify(file);
 	if (file) {
@@ -10601,9 +10251,6 @@ static void	as_bad_internal(const char *file,unsigned int line,char *Buffer)
 			fprintf(stderr,"%s: %s%s\n",file,"Error: ",Buffer);
 	} else
 		fprintf(stderr,"%s%s\n","Error: ",Buffer);
-
-	if (context)
-		as_report_context();
 
 }
 
@@ -10651,7 +10298,6 @@ static void	as_fatal(const char *format,...)
 	vfprintf(stderr,format,args);
 	(void)putc('\n',stderr);
 	va_end(args);
-	as_report_context();
 	/* Delete the output file,if it exists.  This will prevent make from
 	 * thinking that a file was created and hence does not need rebuilding.  */
 	if (out_file_name != NULL)
@@ -10673,7 +10319,6 @@ static void	as_abort(const char *file,int line,const char *fn)
 			fprintf(stderr,"Internal error in %s at %s:%d.\n",fn,file,line);
 		else
 			fprintf(stderr,"Internal error at %s:%d.\n",file,line);
-	as_report_context();
 	fprintf(stderr,"Please report this bug.\n");
 	xexit(EXIT_FAILURE);
 }
@@ -11510,7 +11155,7 @@ static void	do_align(unsigned int n,char *fill,unsigned int len,unsigned int max
 #endif
 
 	/* Only make a frag if we HAVE to...  */
-	if ((n > OCTETS_PER_BYTE_POWER) && !need_pass_2) {
+	if ((n > OCTETS_PER_BYTE_POWER)) {
 		if (fill == NULL) {
 			if (subseg_text_p(now_seg))
 				frag_align_code(n,max);
@@ -11702,19 +11347,13 @@ static void	convert_to_bignum(expressionS * exp,int sign)
 }
 
 
-/*
- * Handle the .align pseudo-op.  A positive ARG is a default alignment (in
+/* Handle the .align pseudo-op.  A positive ARG is a default alignment (in
  * bytes).  A negative ARG is the negative of the length of the fill pattern.
  * BYTES_P is non-zero if the alignment value should be interpreted as the byte
- * boundary,rather than the power of 2.
- */
-#ifndef TC_ALIGN_LIMIT
-#define TC_ALIGN_LIMIT (stdoutput->arch_info->bits_per_address - 1)
-#endif
-
+ * boundary,rather than the power of 2.  */
 static void	s_align(signed int arg,int bytes_p)
 {
-	unsigned int	align_limit = TC_ALIGN_LIMIT;
+	unsigned int align_limit=63; //stdoutput->arch_info->bits_per_address-1
 	addressT	align;
 	offsetT		fill = 0;
 	unsigned int	max;
@@ -11728,11 +11367,6 @@ static void	s_align(signed int arg,int bytes_p)
 	} else {
 		align = get_absolute_expression();
 		SKIP_WHITESPACE();
-
-#ifdef TC_ALIGN_ZERO_IS_DEFAULT
-		if (arg > 0 && align == 0)
-			align = arg;
-#endif
 	}
 
 	if (bytes_p) {
@@ -11806,11 +11440,8 @@ static void	s_align(signed int arg,int bytes_p)
 
 }
 
-/*
- * Handle the .align pseudo-op on machines where ".align 4" means align to a 4
- * byte boundary.
- */
-
+/* Handle the .align pseudo-op on machines where ".align 4" means align to a 4
+ * byte boundary.  */
 static void	s_align_bytes(int arg)
 {
 	s_align(arg,1);
@@ -11826,8 +11457,7 @@ static void	s_align_ptwo(int arg)
 	s_align(arg,0);
 }
 
-/*
- * Read a symbol name from input_line_pointer.
+/* Read a symbol name from input_line_pointer.
  * 
  * Stores the symbol name in a buffer and returns a pointer to this buffer. The
  * buffer is xalloc'ed.  It is the caller's responsibility to free this buffer.
@@ -11838,9 +11468,7 @@ static void	s_align_ptwo(int arg)
  * Advances i_l_p to the next non-whitespace character.
  * 
  * If a symbol name could not be read,the routine issues an error messages,skips
- * to the end of the line and returns NULL.
- */
-
+ * to the end of the line and returns NULL.  */
 static char    *read_symbol_name(void)
 {
 	char           *name;
@@ -11855,7 +11483,7 @@ static char    *read_symbol_name(void)
 		char           *name_end;
 		unsigned int	C;
 
-		start = name = XNEWVEC(char,len + 1);
+		start = name = xmalloc(len + 1);
 
 		name_end = name + SYM_NAME_CHUNK_LEN;
 
@@ -11882,22 +11510,20 @@ static char    *read_symbol_name(void)
 		 * therefore we pass 0 rather than 'len' as the third
 		 * parameter.  */
 		if (mbstowcs(NULL,name,0) == (size_t) - 1)
-			as_warn(("symbol name not recognised in the current locale"));
+			as_warn("symbol name not recognised in the current locale");
 	} else
 		if (is_name_beginner(c) || (input_from_string && c == FAKE_LABEL_CHAR)) {
 			ptrdiff_t	len;
 
 			name = input_line_pointer - 1;
 
-			/*
-			 * We accept FAKE_LABEL_CHAR in a name in case this is
-			 * being called with a constructed string.
-			 */
+			/* We accept FAKE_LABEL_CHAR in a name in case this is
+			 * being called with a constructed string.  */
 			while (is_part_of_name(c = *input_line_pointer++)
 			       || (input_from_string && c == FAKE_LABEL_CHAR));
 
 			len = (input_line_pointer - name) - 1;
-			start = XNEWVEC(char,len + 1);
+			start = xmalloc(len + 1);
 
 			memcpy(start,name,len);
 			start[len] = 0;
@@ -11909,32 +11535,28 @@ static char    *read_symbol_name(void)
 			name = start = NULL;
 
 	if (name == start) {
-		as_bad(("expected symbol name"));
+		as_bad("expected symbol name");
 		ignore_rest_of_line();
 		free(start);
 		return NULL;
 	}
 	SKIP_WHITESPACE();
-
 	return start;
 }
 
-
 static symbolS *s_comm_internal(int param,
- 		symbolS *     (*comm_parse_extra) (int,symbolS *,addressT))
+ 		symbolS * (*comm_parse_extra) (int,symbolS *,addressT))
 {
-	char           *name;
-	offsetT		temp  ,size;
-	symbolS        *symbolP = NULL;
+	char   *name;
+	offsetT	temp  ,size;
+	symbolS  *symbolP = NULL;
 	expressionS	exp;
 
 	if ((name = read_symbol_name()) == NULL)
 		goto out;
 
-	/*
-	 * Accept an optional comma after the name.  The comma used to be
-	 * required,but Irix 5 cc does not generate it for .lcomm.
-	 */
+	/* Accept an optional comma after the name.  The comma used to be
+	 * required,but Irix 5 cc does not generate it for .lcomm.  */
 	if (*input_line_pointer == ',')
 		input_line_pointer++;
 
@@ -11960,20 +11582,18 @@ static symbolS *s_comm_internal(int param,
 			ignore_rest_of_line();
 			goto out;
 		}
-#if 1
 		symbolP = symbol_clone(symbolP,1);
 		S_SET_SEGMENT(symbolP,undefined_section);
 		S_SET_VALUE(symbolP,0);
 		symbol_set_frag(symbolP,&zero_address_frag);
 		S_CLEAR_VOLATILE(symbolP);
-#endif
 	}
 	size = S_GET_VALUE(symbolP);
 	if (size == 0)
 		size = temp;
 	else
 		if (size != temp)
-			as_warn(("size of \"%s\" is already %ld; not changing to %ld"),
+			as_warn("size of \"%s\" is already %ld; not changing to %ld",
 				name,(long)size,(long)temp);
 
 	if (comm_parse_extra != NULL)
@@ -12008,19 +11628,7 @@ static void	s_data(int ignore ATTRIBUTE_UNUSED)
 		section = data_section;
 
 	subseg_set(section,(subsegT) temp);
-
 	demand_empty_rest_of_line();
-}
-
-/*
- * Handle the .file pseudo-op.  This default definition may be overridden by
- * the object or CPU specific pseudo-ops.
- */
-static void	s_file_string(char *file)
-{
-#ifdef obj_app_file
-	obj_app_file(file);
-#endif
 }
 
 static void	s_file(int ignore ATTRIBUTE_UNUSED)
@@ -12033,7 +11641,7 @@ static void	s_file(int ignore ATTRIBUTE_UNUSED)
 		new_logical_line_flags(s,-1,1);
 
 		demand_empty_rest_of_line();
-		s_file_string(s);
+		elf_file_symbol(s);
 	}
 }
 
@@ -12056,13 +11664,10 @@ static bool	get_linefile_number(int *flag)
 	if (exp.X_op != O_constant)
 		return false;
 
-#if defined (BFD64) || LONG_MAX > INT_MAX
 	if (exp.X_add_number < INT_MIN || exp.X_add_number > INT_MAX)
 		return false;
-#endif
 
 	*flag = exp.X_add_number;
-
 	return true;
 }
 
@@ -12112,26 +11717,19 @@ static void	s_linefile(int ignore ATTRIBUTE_UNUSED)
 				switch (this_flag) {
 				/* From GCC's cpp documentation: 
 				 * 1: start of a new file. 
-				 * 2: returning to a file after having 
-				 * included another file. 
-				 * 3: following text comes from a
-				 * system header file. 
-				 * 4: following text should be treated 
-				 * as extern "C".
+				 * 2: returning to a file after having included another file. 
+				 * 3: following text comes from a system header file. 
+				 * 4: following text should be treated as extern "C".
 				 * 
-				 * 4 is nonsensical for the assembler; 3,
-				 * we don't care about,so we ignore it
-				 * just in case a system header file is
-				 * included while preprocessing
-				 * assembly.  So 1 and 2 are all we
-				 * care about,and they are mutually
-				 * incompatible.
-				 * new_logical_line_flags() demands * this.  */
+				 * 4 is nonsensical for the assembler; 3, we don't care 
+				 * about,so we ignore it just in case a system header file is
+				 * included while preprocessing assembly.  So 1 and 2 are all we
+				 * care about,and they are mutually * incompatible.
+				 * new_logical_line_flags() demands this.  */
 				case 1:
 				case 2:
 					if (flags && flags != (1 << this_flag))
-						as_warn(("incompatible flag %i in line directive"),
-							this_flag);
+						as_warn("incompatible flag %i in line directive",this_flag);
 					else
 						flags |= 1 << this_flag;
 					break;
@@ -12153,10 +11751,8 @@ static void	s_linefile(int ignore ATTRIBUTE_UNUSED)
 		if (file || flags) {
 			demand_empty_rest_of_line();
 
-			/*
-			 * read_a_source_file() will bump the line number only
-			 * if the line is terminated by '\n'.
-			 */
+			/* read_a_source_file() will bump the line number only
+			 * if the line is terminated by '\n'.  */
 			if (input_line_pointer[-1] == '\n')
 				linenum--;
 
@@ -12200,7 +11796,7 @@ static void	s_fill(int ignore ATTRIBUTE_UNUSED)
 				as_warn(("repeat < 0; .fill ignored"));
 			size = 0;
 		} else
-			if (size && !need_pass_2) {
+			if (size) {
 				if (now_seg == absolute_section && rep_exp.X_op != O_constant) {
 					as_bad(("non-constant fill count for absolute section"));
 					size = 0;
@@ -12217,7 +11813,7 @@ static void	s_fill(int ignore ATTRIBUTE_UNUSED)
 							size = 0;
 						}
 			}
-	if (size && !need_pass_2) {
+	if (size) {
 		if (now_seg == absolute_section)
 			abs_section_offset += rep_exp.X_add_number * size;
 
@@ -12334,9 +11930,6 @@ static void	s_linkonce(int ignore ATTRIBUTE_UNUSED)
 
 		(void)restore_line_pointer(c);
 	}
-#ifdef obj_handle_link_once
-	obj_handle_link_once(type);
-#else				/* ! defined (obj_handle_link_once) */
 	{
 		uint32_t	flags;
 
@@ -12363,8 +11956,6 @@ static void	s_linkonce(int ignore ATTRIBUTE_UNUSED)
 		}
 		now_seg->flags = flags;
 	}
-#endif				/* ! defined (obj_handle_link_once) */
-
 	demand_empty_rest_of_line();
 }
 
@@ -12485,10 +12076,8 @@ static void	s_lsym(int ignore ATTRIBUTE_UNUSED)
 	symbolP = symbol_find_or_make(name);
 
 	if (S_GET_SEGMENT(symbolP) == undefined_section) {
-		/*
-		 * The name might be an undefined .global symbol; be sure to
-		 * keep the "external" bit.
-		 */
+		/* The name might be an undefined .global symbol; be sure to
+		 * keep the "external" bit.  */
 		S_SET_SEGMENT(symbolP,
 			      (exp.X_op == O_constant
 			       ? absolute_section
@@ -12549,8 +12138,7 @@ static void	s_org(int ignore ATTRIBUTE_UNUSED)
 	expressionS	exp;
 	long		temp_fill;
 
-	/*
-	 * Don't believe the documentation of BSD 4.2 AS.  There is no such
+	/* Don't believe the documentation of BSD 4.2 AS.  There is no such
 	 * thing as a sub-segment-relative origin.  Any absolute origin is
 	 * given a warning,then assumed to be segment-relative.  Any segmented
 	 * origin expression ("foo+42") had better be in the right segment or
@@ -12560,8 +12148,10 @@ static void	s_org(int ignore ATTRIBUTE_UNUSED)
 	 * never know sub-segment sizes when we are reading code.  BSD will
 	 * crash trying to emit negative numbers of filler bytes in certain
 	 * .orgs. We don't crash,but see as-write for that code.
-	 * 
-	 * Don't make frag if need_pass_2==1.
+	 *  -------------------
+	 * We should note that 4.2 BSD was developed in year 1983. 40 (!!) years
+	 * later the documentation of 4.2 AS has lost some importance maybe...
+	 * jacob Summer 2023
 	 */
 	segment = get_known_segmented_expression(&exp);
 	if (*input_line_pointer == ',') {
@@ -12570,9 +12160,7 @@ static void	s_org(int ignore ATTRIBUTE_UNUSED)
 	} else
 		temp_fill = 0;
 
-	if (!need_pass_2)
-		do_org(segment,&exp,temp_fill);
-
+	do_org(segment,&exp,temp_fill);
 	demand_empty_rest_of_line();
 }
 
@@ -12587,18 +12175,13 @@ static void	assign_symbol(char *name,int mode)
 
 		segment = get_known_segmented_expression(&exp);
 
-		if (!need_pass_2)
-			do_org(segment,&exp,0);
+		do_org(segment,&exp,0);
 
 		return;
 	}
 	if ((symbolP = symbol_find(name)) == NULL
 	    && (symbolP = md_undefined_symbol(name)) == NULL) {
 		symbolP = symbol_find_or_make(name);
-#if defined (OBJ_COFF) && !defined (TE_PE)
-		/* "set" symbols are local unless otherwise specified.  */
-		SF_SET_LOCAL(symbolP);
-#endif
 	}
 	if (S_IS_DEFINED(symbolP) || symbol_equated_p(symbolP)) {
 		if ((mode != 0 || !S_IS_VOLATILE(symbolP))
@@ -12754,16 +12337,14 @@ static void	s_space(int mult)
 			 * symbol.
 			 */
 
-			if (!need_pass_2)
-				p = frag_var(rs_fill,1,1,(relax_substateT) 0,(symbolS *) 0,
+			p = frag_var(rs_fill,1,1,(relax_substateT) 0,(symbolS *) 0,
 					     (offsetT) total,(char *)0);
 		} else {
 			if (now_seg == absolute_section) {
 				as_bad(("space allocation too complex in absolute section"));
 				subseg_set(text_section,0);
 			}
-			if (!need_pass_2)
-				p = frag_var(rs_space,1,1,(relax_substateT) 0,
+			p = frag_var(rs_space,1,1,(relax_substateT) 0,
 					     make_expr_symbol(&exp),(offsetT) 0,(char *)0);
 		}
 
@@ -12797,32 +12378,24 @@ static void	s_nop(int ignore ATTRIBUTE_UNUSED)
 	start = frag_now;
 	start_off = frag_now_fix();
 	do {
-#ifdef md_emit_single_noop
-		md_emit_single_noop;
-#else
 		char           *nop;
 
 #ifndef md_single_noop_insn
 #define md_single_noop_insn "nop"
 #endif
-		/*
-		 * md_assemble might modify its argument,so we must pass it a
-		 * string that is writable.
-		 */
+		/* md_assemble might modify its argument,so we must pass it a
+		 * string that is writable.  */
 		if (asprintf(&nop,"%s",md_single_noop_insn) < 0)
 			as_fatal("%s",xstrerror(errno));
 
-		/*
-		 * Some targets assume that they can update input_line_pointer
+		/* Some targets assume that they can update input_line_pointer
 		 * inside md_assemble,and,worse,that they can leave it
 		 * assigned to the string pointer that was provided as an
-		 * argument.  So preserve ilp here.
-		 */
+		 * argument.  So preserve ilp here.  */
 		char           *saved_ilp = input_line_pointer;
 		md_assemble(nop);
 		input_line_pointer = saved_ilp;
 		free(nop);
-#endif
 	} while (exp.X_op == O_constant
 		 && exp.X_add_number > 0
 		 && frag_offset_ignore_align_p(start,frag_now,&frag_off)
@@ -12838,11 +12411,8 @@ static void	s_nops(int ignore ATTRIBUTE_UNUSED)
 
 	SKIP_WHITESPACE();
 	expression(&exp);
-	/*
-	 * Note - this expression is tested for an absolute value in
-	 * write.c:relax_segment().
-	 */
-
+	/* Note - this expression is tested for an absolute value in
+	 * write.c:relax_segment().  */
 	SKIP_WHITESPACE();
 	if (*input_line_pointer == ',') {
 		++input_line_pointer;
@@ -12853,22 +12423,15 @@ static void	s_nops(int ignore ATTRIBUTE_UNUSED)
 	}
 
 	if (val.X_op != O_constant) {
-		as_bad(("unsupported variable nop control in .nops directive"));
+		as_bad("unsupported variable nop control in .nops directive");
 		val.X_op = O_constant;
 		val.X_add_number = 0;
 	} else
 		if (val.X_add_number < 0) {
-			as_warn(("negative nop control byte,ignored"));
+			as_warn("negative nop control byte,ignored");
 			val.X_add_number = 0;
 		}
 	demand_empty_rest_of_line();
-
-	if (need_pass_2)
-		/*
-		 * Ignore this directive if we are going to perform a second
-		 * pass.
-		 */
-		return;
 
 	/* Store the no-op instruction control byte in the first byte of frag.  */
 	char           *p;
@@ -12884,29 +12447,13 @@ static int	float_length(int float_type,int *pad_p)
 	int		length    ,pad = 0;
 
 	switch (float_type) {
-	case 'b':
-	case 'B':
-	case 'h':
-	case 'H':
-		length = 2;
-		break;
+	case 'b': case 'B': case 'h': case 'H': length = 2; break;
 
-	case 'f':
-	case 'F':
-	case 's':
-	case 'S':
-		length = 4;
-		break;
+	case 'f': case 'F': case 's': case 'S': length = 4; break;
 
-	case 'd':
-	case 'D':
-	case 'r':
-	case 'R':
-		length = 8;
-		break;
+	case 'd': case 'D': case 'r': case 'R': length = 8; break;
 
-	case 'x':
-	case 'X':
+	case 'x': case 'X':
 #ifdef X_PRECISION
 		length = X_PRECISION * sizeof(LITTLENUM_TYPE);
 		pad = X_PRECISION_PAD * sizeof(LITTLENUM_TYPE);
@@ -12915,8 +12462,7 @@ static int	float_length(int float_type,int *pad_p)
 			length = 12;
 		break;
 
-	case 'p':
-	case 'P':
+	case 'p': case 'P':
 #ifdef P_PRECISION
 		length = P_PRECISION * sizeof(LITTLENUM_TYPE);
 		pad = P_PRECISION_PAD * sizeof(LITTLENUM_TYPE);
@@ -12931,9 +12477,7 @@ static int	float_length(int float_type,int *pad_p)
 		break;
 	}
 
-	if (pad_p)
-		*pad_p = pad;
-
+	if (pad_p) *pad_p = pad;
 	return length;
 }
 
@@ -13265,8 +12809,8 @@ static void	pseudo_set(symbolS * symbolP)
 }
 
 /*
- * cons() CONStruct more frag of .bytes,or .words etc. Should need_pass_2 be 1
- * then emit no frag(s). This understands EXPRESSIONS.
+ * cons() CONStruct more frag of .bytes,or .words etc. 
+ * This understands EXPRESSIONS.
  * 
  * Bug (?)
  * 
@@ -13468,8 +13012,7 @@ err_out:
 	demand_empty_rest_of_line();
 }
 
-/* Put the contents of expression EXP into the object file using NBYTES bytes.
- * If need_pass_2 is 1,this does nothing.  */
+/* Put the contents of expression EXP into the object file using NBYTES bytes. */
 static void	emit_expr(expressionS * exp,unsigned int nbytes)
 {
 	emit_expr_with_reloc(exp,nbytes,TC_PARSE_CONS_RETURN_NONE);
@@ -13482,10 +13025,6 @@ static void	emit_expr_with_reloc(expressionS * exp,
 	operatorT	op;
 	char           *p;
 	valueT		extra_digit = 0;
-
-	/* Don't do anything if we are going to make another pass.  */
-	if (need_pass_2)
-		return;
 
 	frag_grow(nbytes);
 	dot_value = frag_now_fix();
@@ -13528,29 +13067,29 @@ static void	emit_expr_with_reloc(expressionS * exp,
 		op = O_big;
 	}
 	if (op == O_absent || op == O_illegal) {
-		as_warn(("zero assumed for missing expression"));
+		as_warn("zero assumed for missing expression");
 		exp->X_add_number = 0;
 		op = O_constant;
 	} else
 		if (op == O_big && exp->X_add_number <= 0) {
-			as_bad(("floating point number invalid"));
+			as_bad("floating point number invalid");
 			exp->X_add_number = 0;
 			op = O_constant;
 		} else
 			if (op == O_register) {
-				as_warn(("register value used as expression"));
+				as_warn("register value used as expression");
 				op = O_constant;
 			}
 	/* Allow `.word 0' in the absolute section.  */
 	if (now_seg == absolute_section) {
 		if (op != O_constant || exp->X_add_number != 0)
-			as_bad(("attempt to store value in absolute section"));
+			as_bad("attempt to store value in absolute section");
 		abs_section_offset += nbytes;
 		return;
 	}
 	/* Allow `.word 0' in BSS style sections.  */
 	if ((op != O_constant || exp->X_add_number != 0) && in_bss())
-		as_bad(("attempt to store non-zero value in section `%s'"),
+		as_bad("attempt to store non-zero value in section `%s'",
 		       segment_name(now_seg));
 
 	p = frag_more((int)nbytes);
@@ -13559,10 +13098,8 @@ static void	emit_expr_with_reloc(expressionS * exp,
 		emit_expr_fix(exp,nbytes,frag_now,p,reloc);
 		return;
 	}
-	/*
-	 * If we have an integer,but the number of bytes is too large to pass
-	 * to md_number_to_chars,handle it as a bignum.
-	 */
+	/* If we have an integer,but the number of bytes is too large to pass
+	 * to md_number_to_chars,handle it as a bignum.  */
 	if (op == O_constant && nbytes > sizeof(valueT)) {
 		extra_digit = exp->X_unsigned ? 0 : -1;
 		convert_to_bignum(exp,!exp->X_unsigned);
@@ -13574,10 +13111,8 @@ static void	emit_expr_with_reloc(expressionS * exp,
 		valueT		mask;
 		valueT		unmask;
 
-		/*
-		 * JF << of >= number of bits in the object is undefined.  In
-		 * particular SPARC (Sun 4) has problems.
-		 */
+		/* JF << of >= number of bits in the object is undefined.  In
+		 * particular SPARC (Sun 4) has problems.  */
 		if (nbytes >= sizeof(valueT)) {
 			know(nbytes == sizeof(valueT));
 			mask = 0;
@@ -13693,9 +13228,6 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 
 	/* Generate a fixS to record the symbol value.  */
 
-#ifdef TC_CONS_FIX_NEW
-	TC_CONS_FIX_NEW(frag,p - frag->fr_literal + offset,size,exp,r);
-#else
 	if (r != TC_PARSE_CONS_RETURN_NONE) {
 		reloc_howto_type *reloc_howto;
 
@@ -13734,13 +13266,10 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 		}
 	fix_new_exp(frag,p - frag->fr_literal + offset,size,
 		    exp,0,r);
-#endif
 }
 
-/*
- * Parse a floating point number represented as a hex constant.  This permits
- * users to specify the exact bits they want in the floating point number.
- */
+/* Parse a floating point number represented as a hex constant.  This permits
+ * users to specify the exact bits they want in the floating point number.  */
 static int	hex_float(int float_type,char *bytes)
 {
 	int		pad       ,length = float_length(float_type,&pad);
@@ -13793,7 +13322,7 @@ static int	hex_float(int float_type,char *bytes)
 }
 
 /* CONStruct some more frag chars of .floats .ffloats etc. Makes 0
- * or more new frags. If need_pass_2 == 1,no frags are emitted. This
+ * or more new frags. This
  * understands only floating literals,not expressions. Sorry.
  * Defined in gas/read.c:4907
  * A floating constant is defined by atof_generic(),except it is preceded by 0d
@@ -13836,7 +13365,7 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 		if (length < 0)
 			return;
 
-		if (!need_pass_2) {
+		{
 			int		count;
 
 			count = 1;
@@ -14215,8 +13744,7 @@ static void	stringer_append_char(int c,int bitsize)
 }
 
 /* Worker to do .ascii etc statements. Reads 0 or more ',' separated,
- * double-quoted strings. Caller should have checked need_pass_2 is FALSE
- * because we don't check it. Checks for end-of-line. BITS_APPENDZERO says how
+ * double-quoted strings. Checks for end-of-line. BITS_APPENDZERO says how
  * many bits are in a target char. The bottom bit is set if a NUL char should
  * be appended to the strings.
  */
@@ -15420,7 +14948,7 @@ static struct obstack frchains;
 static fragS	dummy_frag;
 static void	subsegs_begin(void)
 {
-	obstack_begin(&frchains,chunksize);
+	obstack_begin(&frchains,CHUNKSIZE);
 #if __GNUC__ >= 2
 	obstack_alignment_mask(&frchains) = __alignof__(frchainS) - 1;
 #endif
@@ -15504,7 +15032,7 @@ static void	subseg_set_rest(segT seg,subsegT subseg)
 		newP->frch_subseg = subseg;
 		newP->fix_root = NULL;
 		newP->fix_tail = NULL;
-		obstack_begin(&newP->frch_obstack,chunksize);
+		obstack_begin(&newP->frch_obstack,CHUNKSIZE);
 #if __GNUC__ >= 2
 		obstack_alignment_mask(&newP->frch_obstack) = __alignof__(fragS) - 1;
 #endif
@@ -18458,31 +17986,6 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 	if (fixP != NULL && abs_section_sym == NULL)
 		abs_section_sym = section_symbol(absolute_section);
 
-	/*
-	 * If the linker is doing the relaxing,we must not do any fixups.
-	 * 
-	 * Well,strictly speaking that's not true -- we could do any that are
-	 * PC-relative and don't cross regions that could change size.
-	 */
-	if (linkrelax && TC_LINKRELAX_FIXUP(this_segment)) {
-		for (; fixP; fixP = fixP->fx_next)
-			if (!fixP->fx_done) {
-				if (fixP->fx_addsy == NULL) {
-					/*
-					 * There was no symbol required by this
-					 * relocation. However,BFD doesn't
-					 * really handle relocations without
-					 * symbols well. So fake up a local
-					 * symbol in the absolute section.
-					 */
-					fixP->fx_addsy = abs_section_sym;
-				}
-				symbol_mark_used_in_reloc(fixP->fx_addsy);
-				if (fixP->fx_subsy != NULL)
-					symbol_mark_used_in_reloc(fixP->fx_subsy);
-			}
-		return;
-	}
 	for (; fixP; fixP = fixP->fx_next) {
 		segT		add_symbol_segment = absolute_section;
 
@@ -20670,87 +20173,6 @@ static bool	scan_for_multibyte_characters(const unsigned char *start,
 }
 
 /* =======================================================**** elf64-riscv.c */
-/*
- * RISC-V-specific support for 64-bit ELF. This file handles RISC-V ELF
- * targets.
- * RISC-V ELF specific backend routines. */
-enum riscv_spec_class {
-	/* ISA spec.  */
-	ISA_SPEC_CLASS_NONE = 0,ISA_SPEC_CLASS_2P2,ISA_SPEC_CLASS_20190608,
-	ISA_SPEC_CLASS_20191213,ISA_SPEC_CLASS_DRAFT,
-
-	/* Privileged spec.  */
-	PRIV_SPEC_CLASS_NONE,PRIV_SPEC_CLASS_1P9P1,PRIV_SPEC_CLASS_1P10,
-	PRIV_SPEC_CLASS_1P11,PRIV_SPEC_CLASS_1P12,PRIV_SPEC_CLASS_DRAFT,
-};
-
-struct riscv_spec {
-	const char     *name;
-	enum riscv_spec_class spec_class;
-};
-
-
-#define RISCV_GET_SPEC_CLASS(UTYPE,LTYPE,NAME,CLASS)			\
-  do									\
-    {									\
-      if (NAME == NULL)							\
-	break;								\
-									\
-      int i_spec = UTYPE##_SPEC_CLASS_NONE + 1;				\
-      for (; i_spec < UTYPE##_SPEC_CLASS_DRAFT; i_spec++)		\
-	{								\
-	  int j_spec = i_spec - UTYPE##_SPEC_CLASS_NONE -1;		\
-	  if (riscv_##LTYPE##_specs[j_spec].name			\
-	      && strcmp (riscv_##LTYPE##_specs[j_spec].name,NAME) == 0)\
-	  {								\
-	    CLASS = riscv_##LTYPE##_specs[j_spec].spec_class;		\
-	    break;							\
-	  }								\
-	}								\
-    }									\
-  while (0)
-
-#define RISCV_GET_SPEC_NAME(UTYPE,LTYPE,NAME,CLASS)			\
-  (NAME) = riscv_##LTYPE##_specs[(CLASS) - UTYPE##_SPEC_CLASS_NONE - 1].name
-
-#define RISCV_GET_ISA_SPEC_CLASS(NAME,CLASS)	\
-  RISCV_GET_SPEC_CLASS(ISA,isa,NAME,CLASS)
-#define RISCV_GET_PRIV_SPEC_CLASS(NAME,CLASS)	\
-  RISCV_GET_SPEC_CLASS(PRIV,priv,NAME,CLASS)
-#define RISCV_GET_PRIV_SPEC_NAME(NAME,CLASS)	\
-  RISCV_GET_SPEC_NAME(PRIV,priv,NAME,CLASS)
-
-static void	riscv_get_priv_spec_class_from_numbers(unsigned int,
-			      		unsigned	int ,unsigned int,
-			     		enum		riscv_spec_class *);
-
-#define RISCV_UNKNOWN_VERSION -1
-
-struct riscv_elf_params {
-	/* Whether to relax code sequences to GP-relative addressing.  */
-	bool		relax_gp;
-};
-
-static reloc_howto_type *
-		riscv_reloc_name_lookup(bfd *,const char *);
-
-static reloc_howto_type *riscv_reloc_type_lookup(bfd *,bfd_reloc_code_real_type);
-
-/* The information of architecture attribute.  */
-typedef struct riscv_subset_t {
-	const char     *name;
-	int		major_version;
-	int		minor_version;
-	struct riscv_subset_t *next;
-} riscv_subset_t;
-
-typedef struct {
-	riscv_subset_t *head;
-	riscv_subset_t *tail;
-	const char     *arch_str;
-}	riscv_subset_list_t;
-
-
 static void	riscv_release_subset_list(riscv_subset_list_t *);
 static void	riscv_add_subset(riscv_subset_list_t *,
 			     		const		char  *,int,int);
@@ -21828,233 +21250,9 @@ static bool	riscv_subset_supports(riscv_parse_subset_t * rps,
 	return riscv_lookup_subset(rps->subset_list,feature,&subset);
 }
 
-static bool	riscv_multi_subset_supports(riscv_parse_subset_t *,enum riscv_insn_class);
 
-/* Each instuction belongs to an instruction class INSN_CLASS_*. Call
- * riscv_subset_supports_ext to determine the missing extension.  */
-static const char *riscv_multi_subset_supports_ext(riscv_parse_subset_t * rps,
-		     		enum		riscv_insn_class insn_class)
-{
-	switch (insn_class) {
-	case INSN_CLASS_I: return "i";
-	case INSN_CLASS_ZICBOM: return "zicbom";
-	case INSN_CLASS_ZICBOP: return "zicbop";
-	case INSN_CLASS_ZICBOZ: return "zicboz";
-	case INSN_CLASS_ZICSR: return "zicsr";
-	case INSN_CLASS_ZIFENCEI: return "zifencei";
-	case INSN_CLASS_ZIHINTPAUSE: return "zihintpause";
-	case INSN_CLASS_M: return "m";
-	case INSN_CLASS_ZMMUL: return _("m' or `zmmul");
-	case INSN_CLASS_A: return "a";
-	case INSN_CLASS_ZAWRS: return "zawrs";
-	case INSN_CLASS_F: return "f";
-	case INSN_CLASS_D: return "d";
-	case INSN_CLASS_Q: return "q";
-	case INSN_CLASS_C: return "c";
-	case INSN_CLASS_F_AND_C:
-		if (!riscv_subset_supports(rps,"f")
-		    && !riscv_subset_supports(rps,"c"))
-			return ("f' and `c");
-		else
-			if (!riscv_subset_supports(rps,"f"))
-				return "f";
-			else
-				return "c";
-	case INSN_CLASS_D_AND_C:
-		if (!riscv_subset_supports(rps,"d")
-		    && !riscv_subset_supports(rps,"c"))
-			return ("d' and `c");
-		else
-			if (!riscv_subset_supports(rps,"d"))
-				return "d";
-			else
-				return "c";
-	case INSN_CLASS_F_INX: return ("f' or `zfinx");
-	case INSN_CLASS_D_INX: return ("d' or `zdinx");
-	case INSN_CLASS_Q_INX: return ("q' or `zqinx");
-	case INSN_CLASS_ZFH_INX: return ("zfh' or `zhinx");
-	case INSN_CLASS_ZFHMIN: return "zfhmin";
-	case INSN_CLASS_ZFHMIN_INX: return ("zfhmin' or `zhinxmin");
-	case INSN_CLASS_ZFHMIN_AND_D_INX:
-		if (riscv_subset_supports(rps,"zfhmin"))
-			return "d";
-		else
-			if (riscv_subset_supports(rps,"d"))
-				return "zfhmin";
-			else
-				if (riscv_subset_supports(rps,"zhinxmin"))
-					return "zdinx";
-				else
-					if (riscv_subset_supports(rps,"zdinx"))
-						return "zhinxmin";
-					else
-						return ("zfhmin' and `d',or `zhinxmin' and `zdinx");
-	case INSN_CLASS_ZFHMIN_AND_Q_INX:
-		if (riscv_subset_supports(rps,"zfhmin"))
-			return "q";
-		else
-			if (riscv_subset_supports(rps,"q"))
-				return "zfhmin";
-			else
-				if (riscv_subset_supports(rps,"zhinxmin"))
-					return "zqinx";
-				else
-					if (riscv_subset_supports(rps,"zqinx"))
-						return "zhinxmin";
-					else
-						return ("zfhmin' and `q',or `zhinxmin' and `zqinx");
-	case INSN_CLASS_ZBA: return "zba";
-	case INSN_CLASS_ZBB: return "zbb";
-	case INSN_CLASS_ZBC: return "zbc";
-	case INSN_CLASS_ZBS: return "zbs";
-	case INSN_CLASS_ZBKB: return "zbkb";
-	case INSN_CLASS_ZBKC: return "zbkc";
-	case INSN_CLASS_ZBKX: return "zbkx";
-	case INSN_CLASS_ZBB_OR_ZBKB: return ("zbb' or `zbkb");
-	case INSN_CLASS_ZBC_OR_ZBKC: return ("zbc' or `zbkc");
-	case INSN_CLASS_ZKND: return "zknd";
-	case INSN_CLASS_ZKNE: return "zkne";
-	case INSN_CLASS_ZKNH: return "zknh";
-	case INSN_CLASS_ZKND_OR_ZKNE: return ("zknd' or `zkne");
-	case INSN_CLASS_ZKSED: return "zksed";
-	case INSN_CLASS_ZKSH: return "zksh";
-	case INSN_CLASS_V: return ("v' or `zve64x' or `zve32x");
-	case INSN_CLASS_ZVEF: return ("v' or `zve64d' or `zve64f' or `zve32f");
-	case INSN_CLASS_SVINVAL: return "svinval";
-	case INSN_CLASS_H: return ("h");
-	case INSN_CLASS_XTHEADBA: return "xtheadba";
-	case INSN_CLASS_XTHEADBB: return "xtheadbb";
-	case INSN_CLASS_XTHEADBS: return "xtheadbs";
-	case INSN_CLASS_XTHEADCMO: return "xtheadcmo";
-	case INSN_CLASS_XTHEADCONDMOV: return "xtheadcondmov";
-	case INSN_CLASS_XTHEADFMEMIDX: return "xtheadfmemidx";
-	case INSN_CLASS_XTHEADFMV: return "xtheadfmv";
-	case INSN_CLASS_XTHEADINT: return "xtheadint";
-	case INSN_CLASS_XTHEADMAC: return "xtheadmac";
-	case INSN_CLASS_XTHEADMEMIDX: return "xtheadmemidx";
-	case INSN_CLASS_XTHEADMEMPAIR: return "xtheadmempair";
-	case INSN_CLASS_XTHEADSYNC: return "xtheadsync";
-	default:
-		rps->error_handler
-			(("internal: unreachable INSN_CLASS_*"));
-		return NULL;
-	}
-}
 //---------------------------------------------include "elf/riscv.h"
 /* RISC-V ELF support for BFD. */
-#ifndef _ELF_RISCV_H
-#define _ELF_RISCV_H
-/* Generic relocation support for BFD. */
-/*
- * These macros are used by the various *.h target specific header files to
- * either generate an enum containing all the known relocations for that
- * target,or if RELOC_MACROS_GEN_FUNC is defined,a recognition function is
- * generated instead.  (This is used by binutils/readelf.c)
- * 
- * Given a header file like this:
- * 
- * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
- * (R_foo_32,     1) EMPTY_RELOC  (R_foo_good) FAKE_RELOC   (R_foo_illegal,9)
- * END_RELOC_NUMBERS (R_foo_count)
- * 
- * Then the following will be produced by default (ie if RELOC_MACROS_GEN_FUNC is
- * *not* defined).
- * 
- * enum foo { R_foo_NONE = 0,R_foo_32 = 1,R_foo_good,R_foo_illegal = 9,
- * R_foo_count };
- * 
- * Note: The value of the symbol defined in the END_RELOC_NUMBERS macro
- * (R_foo_count in the case of the example above) will be set to the value of
- * the whichever *_RELOC macro precedes it plus one.  Therefore if you intend
- * to use the symbol as a sentinel for the highest valid macro value you should
- * make sure that the preceding *_RELOC macro is the highest valid number.  ie
- * a declaration like this:
- * 
- * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
- * (R_foo_32,     1) FAKE_RELOC   (R_foo_illegal,9) FAKE_RELOC
- * (R_foo_synonym,0) END_RELOC_NUMBERS (R_foo_count)
- * 
- * will result in R_foo_count having a value of 1 (R_foo_synonym + 1) rather than
- * 10 or 2 as might be expected.
- * 
- * Alternatively you can assign a value to END_RELOC_NUMBERS symbol explicitly,
- * like this:
- * 
- * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
- * (R_foo_32,     1) FAKE_RELOC   (R_foo_illegal,9) FAKE_RELOC
- * (R_foo_synonym,0) END_RELOC_NUMBERS (R_foo_count = 2)
- * 
- * If RELOC_MACROS_GEN_FUNC *is* defined,then instead the following function will
- * be generated:
- * 
- * static const char *foo (unsigned long rtype); static const char * foo (unsigned
- * long rtype) { switch (rtype) { case 0: return "R_foo_NONE"; case 1: return
- * "R_foo_32"; default: return NULL; } }
- */
-
-/* Relocation types.  */
-enum elf_riscv_reloc_type {
-	R_RISCV_NONE = 0,R_RISCV_32 = 1,R_RISCV_64 = 2,R_RISCV_RELATIVE = 3,R_RISCV_COPY = 4,
-	R_RISCV_JUMP_SLOT = 5,R_RISCV_TLS_DTPMOD32 = 6,R_RISCV_TLS_DTPMOD64 = 7,
-	R_RISCV_TLS_DTPREL32 = 8,R_RISCV_TLS_DTPREL64 = 9,R_RISCV_TLS_TPREL32 = 10,
-	R_RISCV_TLS_TPREL64 = 11,
-
-	/* Relocation types not used by the dynamic linker.  */
-	R_RISCV_BRANCH = 16,R_RISCV_JAL = 17,R_RISCV_CALL = 18,R_RISCV_CALL_PLT = 19,
-	R_RISCV_GOT_HI20 = 20,R_RISCV_TLS_GOT_HI20 = 21,R_RISCV_TLS_GD_HI20 = 22,
-	R_RISCV_PCREL_HI20 = 23,R_RISCV_PCREL_LO12_I = 24,R_RISCV_PCREL_LO12_S = 25,
-	R_RISCV_HI20 = 26,R_RISCV_LO12_I = 27,R_RISCV_LO12_S = 28,
-	R_RISCV_TPREL_HI20 = 29,R_RISCV_TPREL_LO12_I = 30,R_RISCV_TPREL_LO12_S = 31,
-	R_RISCV_TPREL_ADD = 32,R_RISCV_ADD8 = 33,R_RISCV_ADD16 = 34,
-	R_RISCV_ADD32 = 35,R_RISCV_ADD64 = 36,R_RISCV_SUB8 = 37,R_RISCV_SUB16 = 38,
-	R_RISCV_SUB32 = 39,R_RISCV_SUB64 = 40,R_RISCV_ALIGN = 43,
-	R_RISCV_RVC_BRANCH = 44,R_RISCV_RVC_JUMP = 45,R_RISCV_RVC_LUI = 46,
-	R_RISCV_GPREL_I = 47,R_RISCV_GPREL_S = 48,R_RISCV_TPREL_I = 49,
-	R_RISCV_TPREL_S = 50,R_RISCV_RELAX = 51,R_RISCV_SUB6 = 52,R_RISCV_SET6 = 53,
-	R_RISCV_SET8 = 54,R_RISCV_SET16 = 55,R_RISCV_SET32 = 56,R_RISCV_32_PCREL = 57,
-	R_RISCV_IRELATIVE = 58,
-	/* Reserved 59 for R_RISCV_PLT32.  */
-	R_RISCV_SET_ULEB128 = 60,R_RISCV_SUB_ULEB128 = 61,R_RISCV_max
-};
-/* Processor specific flags for the ELF header e_flags field.  */
-
-/* File may contain compressed instructions.  */
-#define EF_RISCV_RVC 0x0001
-/* Which floating-point ABI a file uses.  */
-#define EF_RISCV_FLOAT_ABI 0x0006
-/* File uses the soft-float ABI.  */
-#define EF_RISCV_FLOAT_ABI_SOFT 0x0000
-/* File uses the single-float ABI.  */
-#define EF_RISCV_FLOAT_ABI_SINGLE 0x0002
-/* File uses the double-float ABI.  */
-#define EF_RISCV_FLOAT_ABI_DOUBLE 0x0004
-/* File uses the quad-float ABI.  */
-#define EF_RISCV_FLOAT_ABI_QUAD 0x0006
-/* File uses the 32E base integer instruction.  */
-#define EF_RISCV_RVE 0x0008
-/* The name of the global pointer symbol.  */
-#define RISCV_GP_SYMBOL "__global_pointer$"
-/* Processor specific dynamic array tags.  */
-#define DT_RISCV_VARIANT_CC (DT_LOPROC + 1)
-/* RISC-V specific values for st_other.  */
-#define STO_RISCV_VARIANT_CC 0x80
-/* File uses the TSO model. */
-#define EF_RISCV_TSO 0x0010
-/* Additional section types.  */
-#define SHT_RISCV_ATTRIBUTES 0x70000003	/* Section holds attributes.  */
-/* Processor specific program header types.  */
-
-/* Location of RISC-V ELF attribute section. */
-#define PT_RISCV_ATTRIBUTES 0x70000003
-
-/* Object attributes.  */
-enum {
-	/* 0-3 are generic.  */
-	Tag_RISCV_stack_align = 4,Tag_RISCV_arch = 5,Tag_RISCV_unaligned_access = 6,
-	Tag_RISCV_priv_spec = 8,Tag_RISCV_priv_spec_minor = 10,
-	Tag_RISCV_priv_spec_revision = 12
-};
-#endif				/* _ELF_RISCV_H */
 
 #define ELF_MACHINE_CODE		EM_RISCV
 #define ELF_MAXPAGESIZE			0x1000
@@ -22082,91 +21280,6 @@ struct _bfd_riscv_elf_obj_tdata {
 #define USE_REL 0
 /* ================================================================= tc-riscv.c */
 /* tc-riscv.c -- RISC-V assembler */
-/* Information about an instruction,including its format,operands and fixups.  */
-struct riscv_cl_insn {
-	/* The opcode's entry in riscv_opcodes.  */
-	const struct riscv_opcode *insn_mo;
-	/* The encoded instruction bits (first bits enough to extract
-	 * instruction length on a long opcode).  */
-	insn_t		insn_opcode;
-	/* The long encoded instruction bits ([0] is non-zero on a long
-	 * opcode).  */
-	char		insn_long_opcode[RISCV_MAX_INSN_LEN];
-	/* The frag that contains the instruction.  */
-	struct frag    *frag;
-	/* The offset into FRAG of the first instruction byte.  */
-	long		where;
-	/* The relocs associated with the instruction,if any.  */
-	fixS           *fixp;
-};
-
-/* All RISC-V CSR belong to one of these classes.  */
-enum riscv_csr_class {
-	CSR_CLASS_NONE,
-	CSR_CLASS_I,
-	CSR_CLASS_I_32,		/* rv32 only */
-	CSR_CLASS_F,		/* f-ext only */
-	CSR_CLASS_ZKR,		/* zkr only */
-	CSR_CLASS_V,		/* rvv only */
-	CSR_CLASS_DEBUG,	/* debug CSR */
-	CSR_CLASS_H,		/* hypervisor */
-	CSR_CLASS_H_32,		/* hypervisor,rv32 only */
-	CSR_CLASS_SMAIA,	/* Smaia */
-	CSR_CLASS_SMAIA_32,	/* Smaia,rv32 only */
-	CSR_CLASS_SMSTATEEN,	/* Smstateen only */
-	CSR_CLASS_SMSTATEEN_32,	/* Smstateen RV32 only */
-	CSR_CLASS_SSAIA,	/* Ssaia */
-	CSR_CLASS_SSAIA_AND_H,	/* Ssaia with H */
-	CSR_CLASS_SSAIA_32,	/* Ssaia,rv32 only */
-	CSR_CLASS_SSAIA_AND_H_32,	/* Ssaia with H,rv32 only */
-	CSR_CLASS_SSSTATEEN,	/* S[ms]stateen only */
-	CSR_CLASS_SSSTATEEN_AND_H,	/* S[ms]stateen only (with H) */
-	CSR_CLASS_SSSTATEEN_AND_H_32,	/* S[ms]stateen RV32 only (with H) */
-	CSR_CLASS_SSCOFPMF,	/* Sscofpmf only */
-	CSR_CLASS_SSCOFPMF_32,	/* Sscofpmf RV32 only */
-	CSR_CLASS_SSTC,		/* Sstc only */
-	CSR_CLASS_SSTC_AND_H,	/* Sstc only (with H) */
-	CSR_CLASS_SSTC_32,	/* Sstc RV32 only */
-	CSR_CLASS_SSTC_AND_H_32,/* Sstc RV32 only (with H) */
-};
-
-/* This structure holds all restricted conditions for a CSR.  */
-struct riscv_csr_extra {
-	/* Class to which this CSR belongs.  Used to decide whether or not this
-	 * CSR is legal in the current -march context.  */
-	enum riscv_csr_class csr_class;
-	/* CSR may have differnet numbers in the previous priv spec.  */
-	unsigned	address;
-	/* Record the CSR is defined/valid in which versions.  */
-	enum riscv_spec_class define_version;
-	/* Record the CSR is aborted/invalid from which versions.  If it isn't
-	 * aborted in the current version,then it should be
-	 * PRIV_SPEC_CLASS_DRAFT.  */
-	enum riscv_spec_class abort_version;
-	/* The CSR may have more than one setting.  */
-	struct riscv_csr_extra *next;
-};
-
-/* This structure contains information about errors that occur within the
- * riscv_ip function */
-struct riscv_ip_error {
-	/* General error message */
-	const char     *msg;
-	/* Statement that caused the error */
-	char           *statement;
-	/* Missing extension that needs to be enabled */
-	const char     *missing_ext;
-};
-
-/* Need to sync the version with RISC-V compiler.  */
-#ifndef DEFAULT_RISCV_ISA_SPEC
-#define DEFAULT_RISCV_ISA_SPEC "20191213"
-#endif
-
-#ifndef DEFAULT_RISCV_PRIV_SPEC
-#define DEFAULT_RISCV_PRIV_SPEC "1.11"
-#endif
-
 static const char *default_arch_with_ext = NULL;
 static enum riscv_spec_class default_isa_spec = ISA_SPEC_CLASS_NONE;
 static enum riscv_spec_class default_priv_spec = PRIV_SPEC_CLASS_NONE;
@@ -23542,8 +22655,8 @@ static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 	}
 
 	if (used_bits != required_bits) {
-		as_bad(("internal: bad RISC-V opcode "
-			"(bits %#llx undefined or invalid): %s %s"),
+		as_bad("internal: bad opcode "
+			"(bits %#llx undefined or invalid): %s %s",
 		       (unsigned long long)(used_bits ^ required_bits),
 		       opc->name,opc->args);
 		return false;
@@ -24186,10 +23299,8 @@ static void	macro_build(expressionS * ep,const char *name,const char *fmt,...)
 	mo = (struct riscv_opcode *)str_hash_find(op_hash,name);
 	gas_assert(mo);
 
-	/*
-	 * Find a non-RVC variant of the instruction.  append_insn will
-	 * compress it if possible.
-	 */
+	/* Find a non-RVC variant of the instruction.  append_insn will
+	 * compress it if possible.  */
 	while (riscv_insn_length(mo->match) < 4)
 		mo++;
 	gas_assert(strcmp(name,mo->name) == 0);
@@ -24273,7 +23384,7 @@ static void	md_assemblef(const char *format,...)
 	r = vasprintf(&buf,format,ap);
 
 	if (r < 0)
-		as_fatal(("internal: vasprintf failed"));
+		as_fatal("internal: vasprintf failed");
 
 	md_assemble(buf);
 	free(buf);
@@ -24281,10 +23392,8 @@ static void	md_assemblef(const char *format,...)
 	va_end(ap);
 }
 
-/*
- * Sign-extend 32-bit mode constants that have bit 31 set and all higher bits
- * unset.
- */
+/* Sign-extend 32-bit mode constants that have bit 31 set and all higher bits
+ * unset.  */
 static void	normalize_constant_expr(expressionS * ex)
 {
 	if (xlen > 32)
@@ -24295,10 +23404,8 @@ static void	normalize_constant_expr(expressionS * ex)
 				    - 0x80000000);
 }
 
-/*
- * Fail if an expression EX is not a constant.  IP is the instruction using EX.
- * MAYBE_CSR is true if the symbol may be an unrecognized CSR name.
- */
+/* Fail if an expression EX is not a constant.  IP is the instruction using EX.
+ * MAYBE_CSR is true if the symbol may be an unrecognized CSR name.  */
 static void	check_absolute_expr(struct riscv_cl_insn *ip,expressionS * ex,
 						bool		maybe_csr)
 {
@@ -24373,7 +23480,7 @@ static void	load_const(int reg,expressionS * ep)
 	upper.X_add_number -= lower.X_add_number;
 
 	if (ep->X_op != O_constant) {
-		as_bad(("unsupported large constant"));
+		as_bad("unsupported large constant");
 		return;
 	}
 	if (xlen > 32 && !IS_SEXT_32BIT_NUM(ep->X_add_number)) {
@@ -24389,10 +23496,8 @@ static void	load_const(int reg,expressionS * ep)
 			md_assemblef("addi x%d,x%d,%" PRId64,reg,reg,
 				     (int64_t) lower.X_add_number);
 	} else {
-		/*
-		 * Simply emit LUI and/or ADDI to build a 32-bit signed
-		 * constant.
-		 */
+		/* Simply emit LUI and/or ADDI to build a 32-bit signed
+		 * constant.  */
 		int		hi_reg = 0;
 
 		if (upper.X_add_number != 0) {
@@ -24894,12 +23999,7 @@ static bool	riscv_handle_implicit_zero_offset(expressionS * ep,const char *s)
 }
 
 /* All RISC-V CSR instructions belong to one of these classes.  */
-enum csr_insn_type {
-	INSN_NOT_CSR,
-	INSN_CSRRW,
-	INSN_CSRRS,
-	INSN_CSRRC
-};
+enum csr_insn_type { INSN_NOT_CSR, INSN_CSRRW, INSN_CSRRS, INSN_CSRRC };
 
 /* Return which CSR instruction is checking.  */
 static enum csr_insn_type riscv_csr_insn_type(insn_t insn)
@@ -25004,6 +24104,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 
 	asargStart = asarg;
 	for (; insn && insn->name && strcmp(insn->name,str) == 0; insn++) {
+#if 0
 		if ((insn->xlen_requirement != 0) && (xlen != insn->xlen_requirement))
 			continue;
 
@@ -25012,6 +24113,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 							    insn->insn_class);
 			continue;
 		}
+#endif
 		/* Reset error message of the previous round.  */
 		error.msg = ("illegal operands");
 		error.missing_ext = NULL;
@@ -37085,110 +36187,6 @@ static void	error_handler(const char *fmt,...)
 	va_end(ap);
 }
 
-/* Each instruction belongs to an instruction class INSN_CLASS_*. Call
- * riscv_subset_supports to make sure that the instuction is valid.  */
-static	bool riscv_multi_subset_supports(riscv_parse_subset_t * rps,
-					enum		riscv_insn_class insn_class)
-{
-	switch (insn_class) {
-	case INSN_CLASS_I: return riscv_subset_supports(rps,"i");
-	case INSN_CLASS_ZICBOM: return riscv_subset_supports(rps,"zicbom");
-	case INSN_CLASS_ZICBOP: return riscv_subset_supports(rps,"zicbop");
-	case INSN_CLASS_ZICBOZ: return riscv_subset_supports(rps,"zicboz");
-	case INSN_CLASS_ZICSR: return riscv_subset_supports(rps,"zicsr");
-	case INSN_CLASS_ZIFENCEI: return riscv_subset_supports(rps,"zifencei");
-	case INSN_CLASS_ZIHINTPAUSE: return riscv_subset_supports(rps,"zihintpause");
-	case INSN_CLASS_M: return riscv_subset_supports(rps,"m");
-	case INSN_CLASS_ZMMUL: return riscv_subset_supports(rps,"zmmul");
-	case INSN_CLASS_A: return riscv_subset_supports(rps,"a");
-	case INSN_CLASS_ZAWRS: return riscv_subset_supports(rps,"zawrs");
-	case INSN_CLASS_F: return riscv_subset_supports(rps,"f");
-	case INSN_CLASS_D: return riscv_subset_supports(rps,"d");
-	case INSN_CLASS_Q: return riscv_subset_supports(rps,"q");
-	case INSN_CLASS_C: return riscv_subset_supports(rps,"c");
-	case INSN_CLASS_F_AND_C:
-		return (riscv_subset_supports(rps,"f")
-			&& riscv_subset_supports(rps,"c"));
-	case INSN_CLASS_D_AND_C:
-		return (riscv_subset_supports(rps,"d")
-			&& riscv_subset_supports(rps,"c"));
-	case INSN_CLASS_F_INX:
-		return (riscv_subset_supports(rps,"f")
-			|| riscv_subset_supports(rps,"zfinx"));
-	case INSN_CLASS_D_INX:
-		return (riscv_subset_supports(rps,"d")
-			|| riscv_subset_supports(rps,"zdinx"));
-	case INSN_CLASS_Q_INX:
-		return (riscv_subset_supports(rps,"q")
-			|| riscv_subset_supports(rps,"zqinx"));
-	case INSN_CLASS_ZFH_INX:
-		return (riscv_subset_supports(rps,"zfh")
-			|| riscv_subset_supports(rps,"zhinx"));
-	case INSN_CLASS_ZFHMIN:
-		return riscv_subset_supports(rps,"zfhmin");
-	case INSN_CLASS_ZFHMIN_INX:
-		return (riscv_subset_supports(rps,"zfhmin")
-			|| riscv_subset_supports(rps,"zhinxmin"));
-	case INSN_CLASS_ZFHMIN_AND_D_INX:
-		return ((riscv_subset_supports(rps,"zfhmin")
-			 && riscv_subset_supports(rps,"d"))
-			|| (riscv_subset_supports(rps,"zhinxmin")
-			    && riscv_subset_supports(rps,"zdinx")));
-	case INSN_CLASS_ZFHMIN_AND_Q_INX:
-		return ((riscv_subset_supports(rps,"zfhmin")
-			 && riscv_subset_supports(rps,"q"))
-			|| (riscv_subset_supports(rps,"zhinxmin")
-			    && riscv_subset_supports(rps,"zqinx")));
-	case INSN_CLASS_ZBA: return riscv_subset_supports(rps,"zba");
-	case INSN_CLASS_ZBB: return riscv_subset_supports(rps,"zbb");
-	case INSN_CLASS_ZBC: return riscv_subset_supports(rps,"zbc");
-	case INSN_CLASS_ZBS: return riscv_subset_supports(rps,"zbs");
-	case INSN_CLASS_ZBKB: return riscv_subset_supports(rps,"zbkb");
-	case INSN_CLASS_ZBKC: return riscv_subset_supports(rps,"zbkc");
-	case INSN_CLASS_ZBKX: return riscv_subset_supports(rps,"zbkx");
-	case INSN_CLASS_ZBB_OR_ZBKB:
-		return (riscv_subset_supports(rps,"zbb")
-			|| riscv_subset_supports(rps,"zbkb"));
-	case INSN_CLASS_ZBC_OR_ZBKC:
-		return (riscv_subset_supports(rps,"zbc")
-			|| riscv_subset_supports(rps,"zbkc"));
-	case INSN_CLASS_ZKND: return riscv_subset_supports(rps,"zknd");
-	case INSN_CLASS_ZKNE: return riscv_subset_supports(rps,"zkne");
-	case INSN_CLASS_ZKNH: return riscv_subset_supports(rps,"zknh");
-	case INSN_CLASS_ZKND_OR_ZKNE:
-		return (riscv_subset_supports(rps,"zknd")
-			|| riscv_subset_supports(rps,"zkne"));
-	case INSN_CLASS_ZKSED: return riscv_subset_supports(rps,"zksed");
-	case INSN_CLASS_ZKSH: return riscv_subset_supports(rps,"zksh");
-	case INSN_CLASS_V:
-		return (riscv_subset_supports(rps,"v")
-			|| riscv_subset_supports(rps,"zve64x")
-			|| riscv_subset_supports(rps,"zve32x"));
-	case INSN_CLASS_ZVEF:
-		return (riscv_subset_supports(rps,"v")
-			|| riscv_subset_supports(rps,"zve64d")
-			|| riscv_subset_supports(rps,"zve64f")
-			|| riscv_subset_supports(rps,"zve32f"));
-	case INSN_CLASS_SVINVAL: return riscv_subset_supports(rps,"svinval");
-	case INSN_CLASS_H: return riscv_subset_supports(rps,"h");
-	case INSN_CLASS_XTHEADBA: return riscv_subset_supports(rps,"xtheadba");
-	case INSN_CLASS_XTHEADBB: return riscv_subset_supports(rps,"xtheadbb");
-	case INSN_CLASS_XTHEADBS: return riscv_subset_supports(rps,"xtheadbs");
-	case INSN_CLASS_XTHEADCMO: return riscv_subset_supports(rps,"xtheadcmo");
-	case INSN_CLASS_XTHEADCONDMOV: return riscv_subset_supports(rps,"xtheadcondmov");
-	case INSN_CLASS_XTHEADFMEMIDX: return riscv_subset_supports(rps,"xtheadfmemidx");
-	case INSN_CLASS_XTHEADFMV: return riscv_subset_supports(rps,"xtheadfmv");
-	case INSN_CLASS_XTHEADINT: return riscv_subset_supports(rps,"xtheadint");
-	case INSN_CLASS_XTHEADMAC: return riscv_subset_supports(rps,"xtheadmac");
-	case INSN_CLASS_XTHEADMEMIDX: return riscv_subset_supports(rps,"xtheadmemidx");
-	case INSN_CLASS_XTHEADMEMPAIR: return riscv_subset_supports(rps,"xtheadmempair");
-	case INSN_CLASS_XTHEADSYNC: return riscv_subset_supports(rps,"xtheadsync");
-	case INSN_CLASS_XVENTANACONDOPS: return riscv_subset_supports(rps,"xventanacondops");
-	default:
-		rps->error_handler("internal: unreachable INSN_CLASS_*");
-		return false;
-	}
-}
 static void	bfd_putl8(bfd_vma data,void *p)
 {
 	bfd_byte       *addr = (bfd_byte *) p;

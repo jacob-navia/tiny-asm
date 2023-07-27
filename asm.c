@@ -24800,8 +24800,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 			case 'B':
 				my_getExpression(imm_expr,asarg);
 				normalize_constant_expr(imm_expr);
-				/* The 'B' format specifier must be a symbol or
-				 * a constant. */
+				/* The 'B' format specifier must be a symbol or * a constant. */
 				if (imm_expr->X_op != O_symbol && imm_expr->X_op != O_constant)
 					break;
 				if (imm_expr->X_op == O_symbol)
@@ -24822,8 +24821,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				*imm_reloc = BFD_RELOC_RISCV_LO12_I;
 				goto load_store;
 			case '1':
-				/* This is used for TLS,where the fourth
-				 * operand is %tprel_add,to get a relocation
+				/* This is used for TLS,where the fourth operand is %tprel_add,to get a relocation
 				 * applied to an add instruction,for
 				 * relaxation to use.  */
 				p = percent_op_rtype;

@@ -99,7 +99,7 @@
 #include <wchar.h>
 #include <zlib.h>
 
-#include "getopt.h"
+#include <getopt.h>
 /* Compiler compatibility macros */
 /* For ease of writing code which uses GCC extensions but needs to be
    portable to other compilers, we provide the GCC_VERSION macro that
@@ -276,7 +276,23 @@ static inline bool startswith (const char *str, const char *prefix)
 {
   return strncmp (str, prefix, strlen (prefix)) == 0;
 }
+/* We must track the physical file and line number for error messages. We also
+ * track a "logical" file and line number corresponding to (C?)  compiler
+ * source line numbers.  Whenever we open a file we must fill in
+ * physical_input_file. So if it is NULL we have not opened any files yet. */
 
+static const char *logical_input_file;
+#define BUFFER_SIZE (256 * 1024)
+#define BEFORE_STRING ("\n")
+#define AFTER_STRING ("\0")	/* memcpy of 0 chars might choke.  */
+#define BEFORE_SIZE (1)
+#define AFTER_SIZE  (1)
+static size_t buffer_length;
+static char *buffer_start; /* First char of full buffer area */
+static unsigned int physical_input_line;
+static unsigned int logical_input_line;
+static FILE    *f_in;
+static const char *file_name;
 /* Extracted from libbfd.c.  */
 static void *bfd_alloc (bfd *abfd, size_t wanted);
 static void *bfd_zalloc (bfd *abfd, size_t wanted);
@@ -2492,26 +2508,15 @@ static int flag_execstack;
 /* TRUE if .note.GNU-stack section with SEC_CODE should be created */
 static int flag_noexecstack;
 
-/* TRUE if .sframe section should be created.  */
-static int flag_gen_sframe;
-
 /* name of emitted object file */
 static const char *out_file_name;
 
 /* Keep the output file.  */
 static int keep_it;
 
-/* TRUE if we need a second pass.  */
-static int need_pass_2;
-
-/* TRUE if we should do no relaxing, and
-   leave lots of padding.  */
-static int linkrelax;
-
 static int do_not_pad_sections_to_alignment;
 
-enum multibyte_input_handling
-{
+enum multibyte_input_handling {
   multibyte_allow = 0,
   multibyte_warn,
   multibyte_warn_syms
@@ -2526,14 +2531,9 @@ static enum multibyte_input_handling multibyte_handling;
    This is especially relevant to DWARF2, since the compiler may emit line
    number directives that the assembler resolves.  */
 
-enum debug_info_type
-{
-  DEBUG_UNSPECIFIED,
-  DEBUG_NONE,
-  DEBUG_STABS,
-  DEBUG_ECOFF,
-  DEBUG_DWARF,
-  DEBUG_DWARF2,
+enum debug_info_type {
+  DEBUG_UNSPECIFIED, DEBUG_NONE, DEBUG_STABS, DEBUG_ECOFF,
+  DEBUG_DWARF, DEBUG_DWARF2,
 };
 
 static enum debug_info_type debug_type;
@@ -2542,16 +2542,7 @@ static bool flag_dwarf_sections;
 static int flag_dwarf_cie_version;
 static unsigned int dwarf_level;
 
-/* Verbosity level.  */
-static int verbose;
-
-
-/* Obstack chunk size.  Keep large for efficient space use, make small to
-   increase malloc calls for monitoring memory allocation.  */
-static int chunksize;
-
-struct _pseudo_type
-{
+struct _pseudo_type {
   /* assembler mnemonic, lower case, no '.' */
   const char *poc_name;
   /* Do the work */
@@ -2601,7 +2592,6 @@ static PRINTF_LIKE (as_fatal) ATTRIBUTE_NORETURN;
 static PRINTF_LIKE (as_warn);
 static PRINTF_WHERE_LIKE (as_bad_where);
 static PRINTF_WHERE_LIKE (as_warn_where);
-static PRINTF_INDENT_LIKE (as_info_where);
 
 static void   as_abort (const char *, int, const char *) ATTRIBUTE_NORETURN;
 static void   signal_init (void);
@@ -2622,15 +2612,10 @@ static char * input_scrub_new_file (const char *);
 static char * input_scrub_next_buffer (char **bufp);
 static bool   scan_for_multibyte_characters (const unsigned char *, const unsigned char *, bool);
 static int    gen_to_words (LITTLENUM_TYPE *, int, long);
-static int    seen_at_least_1_file (void);
-static void   as_report_context (void);
 static const char * as_where (unsigned int *);
-static const char * as_where_top (unsigned int *);
 static const char * as_where_physical (unsigned int *);
 static void   bump_line_counters (void);
-static void   input_scrub_begin (void);
 static void   input_scrub_close (void);
-static void   input_scrub_end (void);
 static void   new_logical_line (const char *, int);
 static void   new_logical_line_flags (const char *, int, int);
 static void   subsegs_begin (void);
@@ -6162,7 +6147,7 @@ static int riscv_relax_frag (asection *, struct frag *, long);
 
 static bool riscv_frag_align_code (int);
 #define md_do_align(N, FILL, LEN, MAX, LABEL)				\
-  if ((N) != 0 && !(FILL) && !need_pass_2 && subseg_text_p (now_seg))	\
+  if ((N) != 0 && !(FILL) && subseg_text_p (now_seg))	\
     {									\
       if (riscv_frag_align_code (N))					\
 	goto LABEL;							\
@@ -6962,7 +6947,6 @@ static void bss_alloc (symbolS *, addressT, unsigned);
 static offsetT parse_align (int);
 static symbolS *s_comm_internal (int, symbolS *(*) (int, symbolS *, addressT));
 static symbolS *s_lcomm_internal (int, symbolS *, addressT);
-static void s_file_string (char *);
 static void s_file (int);
 static void s_linefile (int);
 static void s_comm (int);
@@ -8611,5 +8595,283 @@ enum dwarf_location_atom { DW_OP_addr = 0x03 , DW_OP_GNU_encoded_addr = 0xf1,DW_
 DW_RLE_end_of_list=0,DW_FORM_sec_offset=0x17,DW_FORM_ref_udata=0x15,DW_UT_compile=1};
 #define DW_CHILDREN_no   0
 #define	DW_CHILDREN_yes  1
+#ifndef _ELF_RISCV_H
+#define _ELF_RISCV_H
+/* Generic relocation support for BFD. */
+/*
+ * These macros are used by the various *.h target specific header files to
+ * either generate an enum containing all the known relocations for that
+ * target,or if RELOC_MACROS_GEN_FUNC is defined,a recognition function is
+ * generated instead.  (This is used by binutils/readelf.c)
+ * 
+ * Given a header file like this:
+ * 
+ * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
+ * (R_foo_32,     1) EMPTY_RELOC  (R_foo_good) FAKE_RELOC   (R_foo_illegal,9)
+ * END_RELOC_NUMBERS (R_foo_count)
+ * 
+ * Then the following will be produced by default (ie if RELOC_MACROS_GEN_FUNC is
+ * *not* defined).
+ * 
+ * enum foo { R_foo_NONE = 0,R_foo_32 = 1,R_foo_good,R_foo_illegal = 9,
+ * R_foo_count };
+ * 
+ * Note: The value of the symbol defined in the END_RELOC_NUMBERS macro
+ * (R_foo_count in the case of the example above) will be set to the value of
+ * the whichever *_RELOC macro precedes it plus one.  Therefore if you intend
+ * to use the symbol as a sentinel for the highest valid macro value you should
+ * make sure that the preceding *_RELOC macro is the highest valid number.  ie
+ * a declaration like this:
+ * 
+ * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
+ * (R_foo_32,     1) FAKE_RELOC   (R_foo_illegal,9) FAKE_RELOC
+ * (R_foo_synonym,0) END_RELOC_NUMBERS (R_foo_count)
+ * 
+ * will result in R_foo_count having a value of 1 (R_foo_synonym + 1) rather than
+ * 10 or 2 as might be expected.
+ * 
+ * Alternatively you can assign a value to END_RELOC_NUMBERS symbol explicitly,
+ * like this:
+ * 
+ * START_RELOC_NUMBERS (foo) RELOC_NUMBER (R_foo_NONE,   0) RELOC_NUMBER
+ * (R_foo_32,     1) FAKE_RELOC   (R_foo_illegal,9) FAKE_RELOC
+ * (R_foo_synonym,0) END_RELOC_NUMBERS (R_foo_count = 2)
+ * 
+ * If RELOC_MACROS_GEN_FUNC *is* defined,then instead the following function will
+ * be generated:
+ * 
+ * static const char *foo (unsigned long rtype); static const char * foo (unsigned
+ * long rtype) { switch (rtype) { case 0: return "R_foo_NONE"; case 1: return
+ * "R_foo_32"; default: return NULL; } }
+ */
+
+/* Relocation types.  */
+enum elf_riscv_reloc_type {
+	R_RISCV_NONE = 0,R_RISCV_32 = 1,R_RISCV_64 = 2,R_RISCV_RELATIVE = 3,R_RISCV_COPY = 4,
+	R_RISCV_JUMP_SLOT = 5,R_RISCV_TLS_DTPMOD32 = 6,R_RISCV_TLS_DTPMOD64 = 7,
+	R_RISCV_TLS_DTPREL32 = 8,R_RISCV_TLS_DTPREL64 = 9,R_RISCV_TLS_TPREL32 = 10,
+	R_RISCV_TLS_TPREL64 = 11,
+
+	/* Relocation types not used by the dynamic linker.  */
+	R_RISCV_BRANCH = 16,R_RISCV_JAL = 17,R_RISCV_CALL = 18,R_RISCV_CALL_PLT = 19,
+	R_RISCV_GOT_HI20 = 20,R_RISCV_TLS_GOT_HI20 = 21,R_RISCV_TLS_GD_HI20 = 22,
+	R_RISCV_PCREL_HI20 = 23,R_RISCV_PCREL_LO12_I = 24,R_RISCV_PCREL_LO12_S = 25,
+	R_RISCV_HI20 = 26,R_RISCV_LO12_I = 27,R_RISCV_LO12_S = 28,
+	R_RISCV_TPREL_HI20 = 29,R_RISCV_TPREL_LO12_I = 30,R_RISCV_TPREL_LO12_S = 31,
+	R_RISCV_TPREL_ADD = 32,R_RISCV_ADD8 = 33,R_RISCV_ADD16 = 34,
+	R_RISCV_ADD32 = 35,R_RISCV_ADD64 = 36,R_RISCV_SUB8 = 37,R_RISCV_SUB16 = 38,
+	R_RISCV_SUB32 = 39,R_RISCV_SUB64 = 40,R_RISCV_ALIGN = 43,
+	R_RISCV_RVC_BRANCH = 44,R_RISCV_RVC_JUMP = 45,R_RISCV_RVC_LUI = 46,
+	R_RISCV_GPREL_I = 47,R_RISCV_GPREL_S = 48,R_RISCV_TPREL_I = 49,
+	R_RISCV_TPREL_S = 50,R_RISCV_RELAX = 51,R_RISCV_SUB6 = 52,R_RISCV_SET6 = 53,
+	R_RISCV_SET8 = 54,R_RISCV_SET16 = 55,R_RISCV_SET32 = 56,R_RISCV_32_PCREL = 57,
+	R_RISCV_IRELATIVE = 58,
+	/* Reserved 59 for R_RISCV_PLT32.  */
+	R_RISCV_SET_ULEB128 = 60,R_RISCV_SUB_ULEB128 = 61,R_RISCV_max
+};
+/* Processor specific flags for the ELF header e_flags field.  */
+
+/* File may contain compressed instructions.  */
+#define EF_RISCV_RVC 0x0001
+/* Which floating-point ABI a file uses.  */
+#define EF_RISCV_FLOAT_ABI 0x0006
+/* File uses the soft-float ABI.  */
+#define EF_RISCV_FLOAT_ABI_SOFT 0x0000
+/* File uses the single-float ABI.  */
+#define EF_RISCV_FLOAT_ABI_SINGLE 0x0002
+/* File uses the double-float ABI.  */
+#define EF_RISCV_FLOAT_ABI_DOUBLE 0x0004
+/* File uses the quad-float ABI.  */
+#define EF_RISCV_FLOAT_ABI_QUAD 0x0006
+/* File uses the 32E base integer instruction.  */
+#define EF_RISCV_RVE 0x0008
+/* The name of the global pointer symbol.  */
+#define RISCV_GP_SYMBOL "__global_pointer$"
+/* Processor specific dynamic array tags.  */
+#define DT_RISCV_VARIANT_CC (DT_LOPROC + 1)
+/* RISC-V specific values for st_other.  */
+#define STO_RISCV_VARIANT_CC 0x80
+/* File uses the TSO model. */
+#define EF_RISCV_TSO 0x0010
+/* Additional section types.  */
+#define SHT_RISCV_ATTRIBUTES 0x70000003	/* Section holds attributes.  */
+/* Processor specific program header types.  */
+
+/* Location of RISC-V ELF attribute section. */
+#define PT_RISCV_ATTRIBUTES 0x70000003
+
+/* Object attributes.  */
+enum {
+	/* 0-3 are generic.  */
+	Tag_RISCV_stack_align = 4,Tag_RISCV_arch = 5,Tag_RISCV_unaligned_access = 6,
+	Tag_RISCV_priv_spec = 8,Tag_RISCV_priv_spec_minor = 10,
+	Tag_RISCV_priv_spec_revision = 12
+};
+#endif				/* _ELF_RISCV_H */
+ /* RISC-V-specific support for 64-bit ELF. This file handles RISC-V ELF
+ * targets.
+ * RISC-V ELF specific backend routines. */
+enum riscv_spec_class {
+	/* ISA spec.  */
+	ISA_SPEC_CLASS_NONE = 0,ISA_SPEC_CLASS_2P2,ISA_SPEC_CLASS_20190608,
+	ISA_SPEC_CLASS_20191213,ISA_SPEC_CLASS_DRAFT,
+
+	/* Privileged spec.  */
+	PRIV_SPEC_CLASS_NONE,PRIV_SPEC_CLASS_1P9P1,PRIV_SPEC_CLASS_1P10,
+	PRIV_SPEC_CLASS_1P11,PRIV_SPEC_CLASS_1P12,PRIV_SPEC_CLASS_DRAFT,
+};
+
+struct riscv_spec {
+	const char     *name;
+	enum riscv_spec_class spec_class;
+};
+
+
+#define RISCV_GET_SPEC_CLASS(UTYPE,LTYPE,NAME,CLASS)			\
+  do									\
+    {									\
+      if (NAME == NULL)							\
+	break;								\
+									\
+      int i_spec = UTYPE##_SPEC_CLASS_NONE + 1;				\
+      for (; i_spec < UTYPE##_SPEC_CLASS_DRAFT; i_spec++)		\
+	{								\
+	  int j_spec = i_spec - UTYPE##_SPEC_CLASS_NONE -1;		\
+	  if (riscv_##LTYPE##_specs[j_spec].name			\
+	      && strcmp (riscv_##LTYPE##_specs[j_spec].name,NAME) == 0)\
+	  {								\
+	    CLASS = riscv_##LTYPE##_specs[j_spec].spec_class;		\
+	    break;							\
+	  }								\
+	}								\
+    }									\
+  while (0)
+
+#define RISCV_GET_SPEC_NAME(UTYPE,LTYPE,NAME,CLASS)			\
+  (NAME) = riscv_##LTYPE##_specs[(CLASS) - UTYPE##_SPEC_CLASS_NONE - 1].name
+
+#define RISCV_GET_ISA_SPEC_CLASS(NAME,CLASS)	\
+  RISCV_GET_SPEC_CLASS(ISA,isa,NAME,CLASS)
+#define RISCV_GET_PRIV_SPEC_CLASS(NAME,CLASS)	\
+  RISCV_GET_SPEC_CLASS(PRIV,priv,NAME,CLASS)
+#define RISCV_GET_PRIV_SPEC_NAME(NAME,CLASS)	\
+  RISCV_GET_SPEC_NAME(PRIV,priv,NAME,CLASS)
+
+static void	riscv_get_priv_spec_class_from_numbers(unsigned int,
+			      		unsigned	int ,unsigned int,
+			     		enum		riscv_spec_class *);
+
+#define RISCV_UNKNOWN_VERSION -1
+
+struct riscv_elf_params {
+	/* Whether to relax code sequences to GP-relative addressing.  */
+	bool		relax_gp;
+};
+
+static reloc_howto_type *
+		riscv_reloc_name_lookup(bfd *,const char *);
+
+static reloc_howto_type *riscv_reloc_type_lookup(bfd *,bfd_reloc_code_real_type);
+
+/* The information of architecture attribute.  */
+typedef struct riscv_subset_t {
+	const char     *name;
+	int		major_version;
+	int		minor_version;
+	struct riscv_subset_t *next;
+} riscv_subset_t;
+
+typedef struct {
+	riscv_subset_t *head;
+	riscv_subset_t *tail;
+	const char     *arch_str;
+}	riscv_subset_list_t;
+
+
+/* Information about an instruction,including its format,operands and fixups.  */
+struct riscv_cl_insn {
+	/* The opcode's entry in riscv_opcodes.  */
+	const struct riscv_opcode *insn_mo;
+	/* The encoded instruction bits (first bits enough to extract
+	 * instruction length on a long opcode).  */
+	insn_t		insn_opcode;
+	/* The long encoded instruction bits ([0] is non-zero on a long
+	 * opcode).  */
+	char		insn_long_opcode[RISCV_MAX_INSN_LEN];
+	/* The frag that contains the instruction.  */
+	struct frag    *frag;
+	/* The offset into FRAG of the first instruction byte.  */
+	long		where;
+	/* The relocs associated with the instruction,if any.  */
+	fixS           *fixp;
+};
+
+/* All RISC-V CSR belong to one of these classes.  */
+enum riscv_csr_class {
+	CSR_CLASS_NONE,
+	CSR_CLASS_I,
+	CSR_CLASS_I_32,		/* rv32 only */
+	CSR_CLASS_F,		/* f-ext only */
+	CSR_CLASS_ZKR,		/* zkr only */
+	CSR_CLASS_V,		/* rvv only */
+	CSR_CLASS_DEBUG,	/* debug CSR */
+	CSR_CLASS_H,		/* hypervisor */
+	CSR_CLASS_H_32,		/* hypervisor,rv32 only */
+	CSR_CLASS_SMAIA,	/* Smaia */
+	CSR_CLASS_SMAIA_32,	/* Smaia,rv32 only */
+	CSR_CLASS_SMSTATEEN,	/* Smstateen only */
+	CSR_CLASS_SMSTATEEN_32,	/* Smstateen RV32 only */
+	CSR_CLASS_SSAIA,	/* Ssaia */
+	CSR_CLASS_SSAIA_AND_H,	/* Ssaia with H */
+	CSR_CLASS_SSAIA_32,	/* Ssaia,rv32 only */
+	CSR_CLASS_SSAIA_AND_H_32,	/* Ssaia with H,rv32 only */
+	CSR_CLASS_SSSTATEEN,	/* S[ms]stateen only */
+	CSR_CLASS_SSSTATEEN_AND_H,	/* S[ms]stateen only (with H) */
+	CSR_CLASS_SSSTATEEN_AND_H_32,	/* S[ms]stateen RV32 only (with H) */
+	CSR_CLASS_SSCOFPMF,	/* Sscofpmf only */
+	CSR_CLASS_SSCOFPMF_32,	/* Sscofpmf RV32 only */
+	CSR_CLASS_SSTC,		/* Sstc only */
+	CSR_CLASS_SSTC_AND_H,	/* Sstc only (with H) */
+	CSR_CLASS_SSTC_32,	/* Sstc RV32 only */
+	CSR_CLASS_SSTC_AND_H_32,/* Sstc RV32 only (with H) */
+};
+
+/* This structure holds all restricted conditions for a CSR.  */
+struct riscv_csr_extra {
+	/* Class to which this CSR belongs.  Used to decide whether or not this
+	 * CSR is legal in the current -march context.  */
+	enum riscv_csr_class csr_class;
+	/* CSR may have differnet numbers in the previous priv spec.  */
+	unsigned	address;
+	/* Record the CSR is defined/valid in which versions.  */
+	enum riscv_spec_class define_version;
+	/* Record the CSR is aborted/invalid from which versions.  If it isn't
+	 * aborted in the current version,then it should be
+	 * PRIV_SPEC_CLASS_DRAFT.  */
+	enum riscv_spec_class abort_version;
+	/* The CSR may have more than one setting.  */
+	struct riscv_csr_extra *next;
+};
+
+/* This structure contains information about errors that occur within the
+ * riscv_ip function */
+struct riscv_ip_error {
+	/* General error message */
+	const char     *msg;
+	/* Statement that caused the error */
+	char           *statement;
+	/* Missing extension that needs to be enabled */
+	const char     *missing_ext;
+};
+
+/* Need to sync the version with RISC-V compiler.  */
+#ifndef DEFAULT_RISCV_ISA_SPEC
+#define DEFAULT_RISCV_ISA_SPEC "20191213"
+#endif
+
+#ifndef DEFAULT_RISCV_PRIV_SPEC
+#define DEFAULT_RISCV_PRIV_SPEC "1.11"
+#endif
+
 #endif /* GAS */
 

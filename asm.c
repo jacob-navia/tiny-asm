@@ -6443,7 +6443,7 @@ static void	dwarf2dbg_final_check(void)
 		symbolS        *sym;
 		offsetT		failed;
 
-		gas_assert(!symbol_resolved_p(view_assert_failed));
+		gas_assert(!symbol_resolved_p( view_assert_failed));
 
 		exp = symbol_get_value_expression(view_assert_failed);
 		sym = view_assert_failed;
@@ -10798,8 +10798,6 @@ static void	read_begin(void)
 	const char     *p;
 
 	pobegin();
-	obj_read_begin_hook();
-
 
 #ifndef tc_line_separator_chars
 #define tc_line_separator_chars line_separator_chars
@@ -18020,80 +18018,67 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 				fixP->fx_offset = add_number;
 				fixP->fx_addsy = NULL;
 				fixP->fx_subsy = NULL;
-			} else
-				if (sub_symbol_segment == absolute_section
+			} else if (sub_symbol_segment == absolute_section
 				    && !S_FORCE_RELOC(fixP->fx_subsy,0)
 				    && !TC_FORCE_RELOCATION_SUB_ABS(fixP,add_symbol_segment)) {
 					add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
 					fixP->fx_offset = add_number;
 					fixP->fx_subsy = NULL;
-				} else
-					if (sub_symbol_segment == this_segment
-					  && !S_FORCE_RELOC(fixP->fx_subsy,0)
-					    && !TC_FORCE_RELOCATION_SUB_LOCAL(fixP,add_symbol_segment)) {
-						add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
-						fixP->fx_offset = (add_number + fixP->fx_dot_value
-								   + fixP->fx_dot_frag->fr_address);
+			} else if (sub_symbol_segment == this_segment
+				  && !S_FORCE_RELOC(fixP->fx_subsy,0)
+				    && !TC_FORCE_RELOCATION_SUB_LOCAL(fixP,add_symbol_segment)) {
+					add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
+					fixP->fx_offset = (add_number + fixP->fx_dot_value
+						   + fixP->fx_dot_frag->fr_address);
 
-						/* Make it pc-relative.  If the back-end code has not
-						 * selected a pc-relative reloc,cancel the adjustment
-						 * we do later on all pc-relative relocs.  */
-						if (!fixP->fx_pcrel)
-							add_number += MD_PCREL_FROM_SECTION(fixP,this_segment);
-						fixP->fx_subsy = NULL;
-						fixP->fx_pcrel = 1;
-					} else
-						if (!TC_VALIDATE_FIX_SUB(fixP,add_symbol_segment)) {
-							if (!md_register_arithmetic
-							    && (add_symbol_segment == reg_section
-								|| sub_symbol_segment == reg_section))
-								as_bad_where(fixP->fx_file,fixP->fx_line,
-									     ("register value used as expression"));
-							else
-								as_bad_subtract(fixP);
-						} else
-							if (sub_symbol_segment != undefined_section
-							    && !bfd_is_com_section(sub_symbol_segment)
-							    && MD_APPLY_SYM_VALUE(fixP))
-								add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
+					/* Make it pc-relative.  If the back-end code has not
+					 * selected a pc-relative reloc,cancel the adjustment
+					 * we do later on all pc-relative relocs.  */
+					if (!fixP->fx_pcrel)
+						add_number += MD_PCREL_FROM_SECTION(fixP,this_segment);
+					fixP->fx_subsy = NULL;
+					fixP->fx_pcrel = 1;
+			} else if (!TC_VALIDATE_FIX_SUB(fixP,add_symbol_segment)) {
+					if (!md_register_arithmetic
+					    && (add_symbol_segment == reg_section
+						|| sub_symbol_segment == reg_section))
+							as_bad_where(fixP->fx_file,fixP->fx_line,
+									     "register value used as expression");
+						else as_bad_subtract(fixP);
+			} else if (sub_symbol_segment != undefined_section
+				    && !bfd_is_com_section(sub_symbol_segment)
+				    && MD_APPLY_SYM_VALUE(fixP))
+						add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
 		}
 		if (fixP->fx_addsy) {
 			if (add_symbol_segment == this_segment
 			    && !S_FORCE_RELOC(fixP->fx_addsy,0)
 			    && !TC_FORCE_RELOCATION_LOCAL(fixP)) {
-				/*
-				 * This fixup was made when the symbol's
-				 * segment was SEG_UNKNOWN,but it is now in
-				 * the local segment. So we know how to do the
-				 * address without relocation.
-				 */
+			/* This fixup was made when the symbol's segment was SEG_UNKNOWN,but it is now in
+			 * the local segment. So we know how to do the * address without relocation.  */
 				add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
 				fixP->fx_offset = add_number;
 				if (fixP->fx_pcrel)
 					add_number -= MD_PCREL_FROM_SECTION(fixP,this_segment);
 				fixP->fx_addsy = NULL;
 				fixP->fx_pcrel = 0;
-			} else
-				if (add_symbol_segment == absolute_section
-				    && !S_FORCE_RELOC(fixP->fx_addsy,0)
-				    && !TC_FORCE_RELOCATION_ABS(fixP)) {
+			} else if (add_symbol_segment == absolute_section
+			    && !S_FORCE_RELOC(fixP->fx_addsy,0)
+			    && !TC_FORCE_RELOCATION_ABS(fixP)) {
 					add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
 					fixP->fx_offset = add_number;
 					fixP->fx_addsy = NULL;
-				} else
-					if (add_symbol_segment != undefined_section
-					    && !bfd_is_com_section(add_symbol_segment)
-					    && MD_APPLY_SYM_VALUE(fixP))
+			} else if (add_symbol_segment != undefined_section
+				    && !bfd_is_com_section(add_symbol_segment)
+				    && MD_APPLY_SYM_VALUE(fixP))
 						add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
 		}
 		if (fixP->fx_pcrel) {
 			add_number -= MD_PCREL_FROM_SECTION(fixP,this_segment);
 			if (!fixP->fx_done && fixP->fx_addsy == NULL) {
-				/* There was no symbol required by this
-				 * relocation. However,BFD doesn't really
-				 * handle relocations without symbols well. So
-				 * fake up a local symbol in the absolute
-				 * section.  */
+			/* There was no symbol required by this relocation. However,BFD doesn't really
+			 * handle relocations without symbols well. So fake up a local symbol 
+			 * in the absolute section.  */
 				fixP->fx_addsy = abs_section_sym;
 			}
 		}
@@ -18118,7 +18103,7 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 				    && (fixP->fx_signed
 					? (add_number & mask) != mask
 					: (-add_number & mask) != 0)) {
-					char		buf       [50],buf2[50];
+					char	buf[50],buf2[50];
 					bfd_sprintf_vma(stdoutput,buf,fragP->fr_address + fixP->fx_where);
 					if (add_number > 1000)
 						bfd_sprintf_vma(stdoutput,buf2,add_number);
@@ -18950,7 +18935,7 @@ static void	merge_data_into_text(void)
 	seg_info(data_section)->frchainP = 0;
 }
 
-bool		bfd_set_symtab(bfd * abfd,asymbol ** location,unsigned int symcount)
+static bool		bfd_set_symtab(bfd * abfd,asymbol ** location,unsigned int symcount)
 {
 	abfd->outsymbols = location;
 	abfd->symcount = symcount;
@@ -18961,7 +18946,6 @@ static void	set_symtab(void)
 	int		nsyms;
 	asymbol       **asympp;
 	symbolS        *symp;
-	bool		result;
 
 	/* Count symbols.  We can't rely on a count made by the loop in
 	 * write_object_file,because *_frob_file may add a new symbol or two.
@@ -18998,8 +18982,8 @@ static void	set_symtab(void)
 			}
 	} else
 		asympp = 0;
-	result = bfd_set_symtab(stdoutput,asympp,nsyms);
-	gas_assert(result);
+	stdoutput->outsymbols = asympp;
+	stdoutput->symcount = nsyms;
 	symbol_table_frozen = 1;
 }
 
@@ -19424,7 +19408,7 @@ static void	write_object_file(void)
 	}
 
 	/* Note - Most ports will use the default value of
-	 * TC_FINALIZE_SYMS_BEFORE_SIZE_SEG,which 1.  This will force local
+	 * TC_FINALIZE_SYMS_BEFORE_SIZE_SEG,which is 1.  This will force local
 	 * symbols to be resolved,removing their frag information. Some ports
 	 * however,will not have finished relaxing all of their frags and will
 	 * still need the local symbol frag information.  These ports can set
@@ -19486,25 +19470,19 @@ static void	write_object_file(void)
 			if (name) {
 				const char     *name2 =
 				decode_local_label_name((char *)S_GET_NAME(symp));
-				/*
-				 * They only differ if `name' is a fb or dollar
-				 * local label name.
-				 */
+				/* They only differ if `name' is a fb or dollar
+				 * local label name.  */
 				if (name2 != name && !S_IS_DEFINED(symp))
-					as_bad(("local label `%s' is not defined"),name2);
+					as_bad("local label `%s' is not defined",name2);
 			}
-			/*
-			 * Do it again,because adjust_reloc_syms might
+			/* Do it again,because adjust_reloc_syms might
 			 * introduce more symbols.  They'll probably only be
 			 * section symbols,but they'll still need to have the
-			 * values computed.
-			 */
+			 * values computed.  */
 			resolve_symbol_value(symp);
 
-			/*
-			 * Skip symbols which were equated to undefined or
-			 * common symbols.
-			 */
+			/* Skip symbols which were equated to undefined or
+			 * common symbols.  */
 			if (symbol_equated_reloc_p(symp)
 			    || S_IS_WEAKREFR(symp)) {
 				const char     *sname = S_GET_NAME(symp);
@@ -19518,13 +19496,9 @@ static void	write_object_file(void)
 					  sname,S_GET_NAME(e->X_add_symbol));
 				}
 				if (S_GET_SEGMENT(symp) == reg_section) {
-					/*
-					 * Report error only if we know the
-					 * symbol name.
-					 */
+					/* Report error only if we know the symbol name. */
 					if (S_GET_NAME(symp) != reg_section->name)
-						as_bad(("can't make global register symbol `%s'"),
-						       sname);
+						as_bad("can't make global register symbol `%s'",sname);
 				}
 				symbol_remove(symp,&symbol_rootP,&symbol_lastP);
 				continue;
@@ -19535,8 +19509,7 @@ static void	write_object_file(void)
 				tc_frob_symbol(symp,punt);
 #endif
 
-			/*
-			 * If we don't want to keep this symbol,splice it out
+			/* If we don't want to keep this symbol,splice it out
 			 * of the chain now.  If EMIT_SECTION_SYMBOLS is 0,we
 			 * never want section symbols.  Otherwise,we skip
 			 * local symbols and symbols that the frob_symbol
@@ -19546,19 +19519,16 @@ static void	write_object_file(void)
 			if (symp == abs_section_sym
 			    || (!EMIT_SECTION_SYMBOLS
 				&& symbol_section_p(symp))
-			/*
-			 * Note that S_IS_EXTERNAL and S_IS_LOCAL are not
+			/* Note that S_IS_EXTERNAL and S_IS_LOCAL are not
 			 * always opposites.  Sometimes the former checks flags
-			 * and the latter examines the name...
-			 */
+			 * and the latter examines the name...  */
 			    || (!S_IS_EXTERNAL(symp)
 				&& (punt || S_IS_LOCAL(symp) ||
 				(S_IS_WEAKREFD(symp) && !symbol_used_p(symp)))
 				&& !symbol_used_in_reloc_p(symp))) {
 				symbol_remove(symp,&symbol_rootP,&symbol_lastP);
 
-				/*
-				 * After symbol_remove,symbol_next(symp) still
+				/* After symbol_remove,symbol_next(symp) still
 				 * returns the one that came after it in the
 				 * chain.  So we don't need to do any extra
 				 * cleanup work here.
@@ -19571,18 +19541,14 @@ static void	write_object_file(void)
 				       S_GET_NAME(symp));
 				symbol_mark_resolved(symp);
 			}
-			/*
-			 * Set the value into the BFD symbol.  Up til now the
-			 * value has only been kept in the gas symbolS struct.
-			 */
+			/* Set the value into the BFD symbol.  Up til now the
+			 * value has only been kept in the gas symbolS struct.  */
 			symbol_get_bfdsym(symp)->value = S_GET_VALUE(symp);
 
-			/*
-			 * A warning construct is a warning symbol followed by
+			/* A warning construct is a warning symbol followed by
 			 * the symbol warned about.  Don't let anything
 			 * object-format or target-specific muck with it; it's
-			 * ready for output.
-			 */
+			 * ready for output.  */
 			if (symbol_get_bfdsym(symp)->flags & BSF_WARNING)
 				skip_next_symbol = true;
 		}
@@ -19597,18 +19563,14 @@ static void	write_object_file(void)
 	if (!flag_always_generate_output && had_errors())
 		return;
 
-	/*
-	 * Now that all the sizes are known,and contents correct,we can start
-	 * writing to the file.
-	 */
+	/* Now that all the sizes are known,and contents correct,we can start
+	 * writing to the file.  */
 	set_symtab();
 
-	/*
-	 * If *_frob_file changes the symbol value at this point,it is
+	/* If *_frob_file changes the symbol value at this point,it is
 	 * responsible for moving the changed value into symp->bsym->value as
 	 * well.  Hopefully all symbol value changing can be done in
-	 * _frob_symbol.
-	 */
+	 * _frob_symbol.  */
 	elf_frob_file();
 	map_over_sections(write_relocs,(char *)0);
 	elf_frob_file_after_relocs();
@@ -21538,36 +21500,28 @@ static void	riscv_set_abi_by_arch(void)
 	if (!explicit_mabi) {
 		if (riscv_subset_supports(&riscv_rps_as,"q"))
 			riscv_set_abi(xlen,FLOAT_ABI_QUAD,false);
-		else
-			if (riscv_subset_supports(&riscv_rps_as,"d"))
-				riscv_set_abi(xlen,FLOAT_ABI_DOUBLE,false);
-			else
-				if (riscv_subset_supports(&riscv_rps_as,"e"))
-					riscv_set_abi(xlen,FLOAT_ABI_SOFT,true);
-				else
-					riscv_set_abi(xlen,FLOAT_ABI_SOFT,false);
+		else if (riscv_subset_supports(&riscv_rps_as,"d"))
+			riscv_set_abi(xlen,FLOAT_ABI_DOUBLE,false);
+		else if (riscv_subset_supports(&riscv_rps_as,"e"))
+			riscv_set_abi(xlen,FLOAT_ABI_SOFT,true);
+		else riscv_set_abi(xlen,FLOAT_ABI_SOFT,false);
 	} else {
 		gas_assert(abi_xlen != 0 && xlen != 0 && float_abi != FLOAT_ABI_DEFAULT);
 		if (abi_xlen > xlen)
 			as_bad("can't have %d-bit ABI on %d-bit ISA",abi_xlen,xlen);
-		else
-			if (abi_xlen < xlen)
-				as_bad("%d-bit ABI not yet supported on %d-bit ISA",abi_xlen,xlen);
+		else if (abi_xlen < xlen)
+			as_bad("%d-bit ABI not yet supported on %d-bit ISA",abi_xlen,xlen);
 
 		if (riscv_subset_supports(&riscv_rps_as,"e") && !rve_abi)
 			as_bad("only the ilp32e ABI is supported for e extension");
 
 		if (float_abi == FLOAT_ABI_SINGLE
 		    && !riscv_subset_supports(&riscv_rps_as,"f"))
-			as_bad("ilp32f/lp64f ABI can't be used when f extension "
-			       "isn't supported");
-		else
-			if (float_abi == FLOAT_ABI_DOUBLE
-			    && !riscv_subset_supports(&riscv_rps_as,"d"))
-				as_bad("ilp32d/lp64d ABI can't be used when d extension "
-				       "isn't supported");
-			else
-				if (float_abi == FLOAT_ABI_QUAD
+			as_bad("ilp32f/lp64f ABI can't be used when f extension isn't supported");
+		else if (float_abi == FLOAT_ABI_DOUBLE
+			&& !riscv_subset_supports(&riscv_rps_as,"d"))
+				as_bad("ilp32d/lp64d ABI can't be used when d extension isn't supported");
+		else if (float_abi == FLOAT_ABI_QUAD
 				&& !riscv_subset_supports(&riscv_rps_as,"q"))
 					as_bad("ilp32q/lp64q ABI can't be used when q extension "
 					       "isn't supported");
@@ -30059,10 +30013,6 @@ bad:
 static void	obj_elf_gnu_attribute(int ignored ATTRIBUTE_UNUSED)
 {
 	obj_elf_vendor_attribute(OBJ_ATTR_GNU);
-}
-
-static void	elf_obj_read_begin_hook(void)
-{
 }
 
 static void	elf_obj_symbol_new_hook(symbolS * symbolP)

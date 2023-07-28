@@ -6463,11 +6463,6 @@ static struct fix * obj_elf_get_vtable_entry (void);
 #define obj_sec_sym_ok_for_reloc(SEC)	((SEC)->owner != 0)
 #endif
 
-static void elf_obj_read_begin_hook (void);
-#ifndef obj_read_begin_hook
-#define obj_read_begin_hook	elf_obj_read_begin_hook
-#endif
-
 static void elf_obj_symbol_new_hook (symbolS *);
 #ifndef obj_symbol_new_hook
 #define obj_symbol_new_hook	elf_obj_symbol_new_hook

@@ -9,6 +9,8 @@ If that is the case in your system, the command should be:
    gcc -o asm asm.c obstack.c -lz
 There is no Makefile. You can write one if you want.
 
+The documentation is in riscv-doc.pdf
+
 ENJOY!
 
 jacob

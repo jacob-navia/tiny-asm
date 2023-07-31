@@ -481,7 +481,7 @@ This program has absolutely no warranty.\n");
 
 		case OPTION_DUMPCONFIG:
 			fprintf(stderr,"alias = %s\n",TARGET_ALIAS);
-			fprintf(stderr,"canonical = %s\n",TARGET_CANONICAL);
+			fprintf(stderr,"canonical = %s\n",TARGET_ALIAS);
 			fprintf(stderr,("cpu-type = %s\n"),TARGET_CPU);
 #ifdef TARGET_OBJ_FORMAT
 			fprintf(stderr,("format = %s\n"),TARGET_OBJ_FORMAT);
@@ -10824,7 +10824,10 @@ static void	read_end(void)
 	stabs_end();
 	poend();
 }
-
+static void    s_ignore(int arg ATTRIBUTE_UNUSED)
+{
+       ignore_rest_of_line();
+}
 #ifndef TC_ADDRESS_BYTES
 #define TC_ADDRESS_BYTES address_bytes
 
@@ -10875,7 +10878,6 @@ static const pseudo_typeS potable[] = {
 	{"ds.s",s_space,4},
 	{"ds.w",s_space,2},
 	{"ds.x",s_space,'x'},
-	{"debug",s_ignore,0},
 	/* dim  */
 	{"double",float_cons,'d'},
 	/* dsect  */
@@ -10885,26 +10887,22 @@ static const pseudo_typeS potable[] = {
 	{"equiv",s_set,1},
 	{"eqv",s_set,-1},
 	/* extend  */
-	{"extern",s_ignore,0},/* We treat all undef as ext.  */
 	{"file",s_file,0},
 	{"fill",s_fill,0},
 	{"float",float_cons,'f'},
-	{"format",s_ignore,0},
 	{"func",s_func,0},
 	{"global",s_globl,0},
 	{"globl",s_globl,0},
+	{"extern",s_ignore,0},
 	{"hword",cons,2},
 	{"incbin",s_incbin,0},
 	{"int",cons,4},
 	{"lcomm",s_lcomm,0},
-	{"lflags",s_ignore,0},/* Listing flags.  */
 	{"linefile",s_linefile,0},
 	{"linkonce",s_linkonce,0},
 	{"long",cons,4},
 	{"lsym",s_lsym,0},
 	//{"macro",s_macro,0},
-	{"name",s_ignore,0},
-	{"noformat",s_ignore,0},
 	{"nop",s_nop,0},
 	{"nops",s_nops,0},
 	{"octa",cons,16},
@@ -10925,7 +10923,6 @@ static const pseudo_typeS potable[] = {
 	{"space",s_space,0},
 	{"skip",s_space,0},
 	{"sleb128",s_leb128,1},
-	{"spc",s_ignore,0},
 	{"stabd",s_stab,'d'},
 	{"stabn",s_stab,'n'},
 	{"stabs",s_stab,'s'},
@@ -10944,7 +10941,6 @@ static const pseudo_typeS potable[] = {
 	/* val  */
 	{"xcom",s_comm,0},
 	{"xdef",s_globl,0},
-	{"xref",s_ignore,0},
 	{"xstabs",s_xstab,'s'},
 	{"weakref",s_weakref,0},
 	{"word",cons,2},
@@ -11269,7 +11265,7 @@ static void	read_a_source_file(const char *name)
 									char           *end = input_line_pointer;
 
 									(void)restore_line_pointer(nul_char);
-									s_ignore(0);
+									ignore_rest_of_line();
 									nul_char = next_char = *--input_line_pointer;
 									*input_line_pointer = '\0';
 									*end = '\0';
@@ -12843,7 +12839,7 @@ static void
 #endif
 #endif
 
-void		do_parse_cons_expression(expressionS * exp,
+static void	do_parse_cons_expression(expressionS * exp,
 			    		int		nbytes	ATTRIBUTE_UNUSED)
 {
 	(void)TC_PARSE_CONS_EXPRESSION(exp,nbytes);
@@ -12868,7 +12864,7 @@ static void	cons_worker(int nbytes,	/* 1=.byte,2=.word,4=.long.  */
 	riscv_mapping_state (MAP_DATA, 0, 0);
 	c = 0;
 	do {
-		TC_PARSE_CONS_RETURN_TYPE ret = TC_PARSE_CONS_RETURN_NONE;
+		bfd_reloc_code_real_type ret = BFD_RELOC_NONE;
 		ret = TC_PARSE_CONS_EXPRESSION(&exp,(unsigned int)nbytes);
 
 		if (rva) {
@@ -14225,11 +14221,6 @@ static void	do_s_func(int end_p,const char *default_prefix)
 	demand_empty_rest_of_line();
 }
 
-
-static void	s_ignore(int arg ATTRIBUTE_UNUSED)
-{
-	ignore_rest_of_line();
-}
 
 /* Find the end of a line,considering quotation and escaping of quotes.  */
 #if !defined(TC_SINGLE_QUOTE_STRINGS) && defined(SINGLE_QUOTE_STRINGS)
@@ -21666,10 +21657,8 @@ static void	make_mapping_symbol(enum riscv_seg_mstate State,
 		return;
 
 	if (odd_data_padding) {
-		/*
-		 * If the removed mapping symbol is $x+arch,then add it back
-		 * to the next $x.
-		 */
+		/* If the removed mapping symbol is $x+arch,then add it back
+		 * to the next $x.  */
 		const char     *str = strncmp(S_GET_NAME(removed),"$xrv",4) == 0
 		? S_GET_NAME(removed) + 2 : NULL;
 		make_mapping_symbol(MAP_INSN,frag->fr_fix + 1,frag,str,
@@ -21680,26 +21669,21 @@ static void	make_mapping_symbol(enum riscv_seg_mstate State,
 
 /* Set the mapping state for frag_now.  */
 static void	riscv_mapping_state(enum riscv_seg_mstate to_state,
-						int		max_chars,
-						bool		fr_align_code)
+					int	max_chars, bool	fr_align_code)
 {
 	enum riscv_seg_mstate from_state =
 	seg_info(now_seg)->tc_segment_info_data.map_state;
 	bool		reset_seg_arch_str = false;
 
 	if (!SEG_NORMAL(now_seg)
-	/*
-	 * For now we only add the mapping symbols to text sections. Therefore,
+	/* For now we only add the mapping symbols to text sections. Therefore,
 	 * the dis-assembler only show the actual contents distribution for
-	 * text.  Other sections will be shown as data without the details.
-	 */
+	 * text.  Other sections will be shown as data without the details.  */
 	    || !subseg_text_p(now_seg))
 		return;
 
-	/*
-	 * The mapping symbol should be emitted if not in the right mapping
-	 * state.
-	 */
+	/* The mapping symbol should be emitted if not in the right mapping
+	 * state.  */
 	symbolS        *seg_arch_symbol =
 	seg_info(now_seg)->tc_segment_info_data.arch_map_symbol;
 	if (to_state == MAP_INSN && seg_arch_symbol == 0) {

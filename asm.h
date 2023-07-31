@@ -65,8 +65,6 @@
 #define TARGET_ALIAS "riscv64-unknown-linux-gnu"
 /* Define as 1 if big endian. */
 #define TARGET_BYTES_BIG_ENDIAN 0
-/* Canonical target. */
-#define TARGET_CANONICAL "riscv64-unknown-linux-gnu"
 /* Target CPU. */
 #define TARGET_CPU "riscv64"
 /* Target OS. */
@@ -5684,24 +5682,20 @@ static inline unsigned int riscv_insn_length (insn_t insn)
 #define RV_IMM_SIGN(x) (-(((x) >> 31) & 1))
 #define RV_X_SIGNED(x, s, n) (RV_X(x, s, n) | ((-(RV_X(x, (s + n - 1), 1))) << (n)))
 
-#define EXTRACT_ITYPE_IMM(x) \
-  (RV_X(x, 20, 12) | (RV_IMM_SIGN(x) << 12))
-#define EXTRACT_STYPE_IMM(x) \
-  (RV_X(x, 7, 5) | (RV_X(x, 25, 7) << 5) | (RV_IMM_SIGN(x) << 12))
+#define EXTRACT_ITYPE_IMM(x) (RV_X(x, 20, 12) | (RV_IMM_SIGN(x) << 12))
+#define EXTRACT_STYPE_IMM(x) (RV_X(x,7,5) | (RV_X(x,25,7)<<5) | (RV_IMM_SIGN(x)<<12))
 #define EXTRACT_BTYPE_IMM(x) \
-  ((RV_X(x, 8, 4) << 1) | (RV_X(x, 25, 6) << 5) | (RV_X(x, 7, 1) << 11) | (RV_IMM_SIGN(x) << 12))
-#define EXTRACT_UTYPE_IMM(x) \
-  ((RV_X(x, 12, 20) << 12) | (RV_IMM_SIGN(x) << 32))
+  ((RV_X(x,8,4) << 1) | (RV_X(x,25,6)<<5) | (RV_X(x,7,1)<<11) | (RV_IMM_SIGN(x)<<12))
+#define EXTRACT_UTYPE_IMM(x) ((RV_X(x,12,20)<<12) | (RV_IMM_SIGN(x)<<32))
 #define EXTRACT_JTYPE_IMM(x) \
-  ((RV_X(x, 21, 10) << 1) | (RV_X(x, 20, 1) << 11) | (RV_X(x, 12, 8) << 12) | (RV_IMM_SIGN(x) << 20))
+  ((RV_X(x,21,10)<<1) | (RV_X(x,20,1)<<11) | (RV_X(x,12,8)<<12) | (RV_IMM_SIGN(x)<<20))
 #define EXTRACT_CITYPE_IMM(x) \
   (RV_X(x, 2, 5) | (-RV_X(x, 12, 1) << 5))
 #define EXTRACT_CITYPE_LUI_IMM(x) \
   (EXTRACT_CITYPE_IMM (x) << RISCV_IMM_BITS)
 #define EXTRACT_CITYPE_ADDI16SP_IMM(x) \
-  ((RV_X(x, 6, 1) << 4) | (RV_X(x, 2, 1) << 5) | (RV_X(x, 5, 1) << 6) | (RV_X(x, 3, 2) << 7) | (-RV_X(x, 12, 1) << 9))
-#define EXTRACT_CITYPE_LWSP_IMM(x) \
-  ((RV_X(x, 4, 3) << 2) | (RV_X(x, 12, 1) << 5) | (RV_X(x, 2, 2) << 6))
+  ((RV_X(x,6,1)<<4) | (RV_X(x,2,1)<<5)|(RV_X(x,5,1)<<6)|(RV_X(x,3,2)<<7)|(-RV_X(x,12,1)<<9))
+#define EXTRACT_CITYPE_LWSP_IMM(x) ((RV_X(x,4,3)<<2)|(RV_X(x,12,1)<<5)|(RV_X(x,2,2)<<6))
 #define EXTRACT_CITYPE_LDSP_IMM(x) \
   ((RV_X(x, 5, 2) << 3) | (RV_X(x, 12, 1) << 5) | (RV_X(x, 2, 3) << 6))
 #define EXTRACT_CSSTYPE_IMM(x) \
@@ -6949,7 +6943,6 @@ static void s_data (int);
 static void s_fill (int);
 static void s_func (int);
 static void s_globl (int arg);
-static void s_ignore (int arg);
 static void s_lcomm (int needs_align);
 static void s_leb128 (int sign);
 static void s_linkonce (int);

@@ -10824,10 +10824,7 @@ static void	read_end(void)
 	stabs_end();
 	poend();
 }
-static void    s_ignore(int arg ATTRIBUTE_UNUSED)
-{
-       ignore_rest_of_line();
-}
+
 #ifndef TC_ADDRESS_BYTES
 #define TC_ADDRESS_BYTES address_bytes
 
@@ -10878,6 +10875,7 @@ static const pseudo_typeS potable[] = {
 	{"ds.s",s_space,4},
 	{"ds.w",s_space,2},
 	{"ds.x",s_space,'x'},
+	{"debug",s_ignore,0},
 	/* dim  */
 	{"double",float_cons,'d'},
 	/* dsect  */
@@ -10887,22 +10885,26 @@ static const pseudo_typeS potable[] = {
 	{"equiv",s_set,1},
 	{"eqv",s_set,-1},
 	/* extend  */
+	{"extern",s_ignore,0},/* We treat all undef as ext.  */
 	{"file",s_file,0},
 	{"fill",s_fill,0},
 	{"float",float_cons,'f'},
+	{"format",s_ignore,0},
 	{"func",s_func,0},
 	{"global",s_globl,0},
 	{"globl",s_globl,0},
-	{"extern",s_ignore,0},
 	{"hword",cons,2},
 	{"incbin",s_incbin,0},
 	{"int",cons,4},
 	{"lcomm",s_lcomm,0},
+	{"lflags",s_ignore,0},/* Listing flags.  */
 	{"linefile",s_linefile,0},
 	{"linkonce",s_linkonce,0},
 	{"long",cons,4},
 	{"lsym",s_lsym,0},
 	//{"macro",s_macro,0},
+	{"name",s_ignore,0},
+	{"noformat",s_ignore,0},
 	{"nop",s_nop,0},
 	{"nops",s_nops,0},
 	{"octa",cons,16},
@@ -10923,6 +10925,7 @@ static const pseudo_typeS potable[] = {
 	{"space",s_space,0},
 	{"skip",s_space,0},
 	{"sleb128",s_leb128,1},
+	{"spc",s_ignore,0},
 	{"stabd",s_stab,'d'},
 	{"stabn",s_stab,'n'},
 	{"stabs",s_stab,'s'},
@@ -10941,6 +10944,7 @@ static const pseudo_typeS potable[] = {
 	/* val  */
 	{"xcom",s_comm,0},
 	{"xdef",s_globl,0},
+	{"xref",s_ignore,0},
 	{"xstabs",s_xstab,'s'},
 	{"weakref",s_weakref,0},
 	{"word",cons,2},
@@ -11265,7 +11269,7 @@ static void	read_a_source_file(const char *name)
 									char           *end = input_line_pointer;
 
 									(void)restore_line_pointer(nul_char);
-									ignore_rest_of_line();
+									s_ignore(0);
 									nul_char = next_char = *--input_line_pointer;
 									*input_line_pointer = '\0';
 									*end = '\0';
@@ -13452,43 +13456,33 @@ static inline unsigned int output_sleb128(char *p,offsetT value)
 	char           *orig = p;
 	int		more;
 
-	do {
-		unsigned	byte = (value & 0x7f);
-
+	do { unsigned	byte = (value & 0x7f);
 		/* Sadly,we cannot rely on typical arithmetic right shift
 		 * behaviour. Fortunately,we can structure things so that the
 		 * extra work reduces to a noop on systems that do things
 		 * "properly".  */
 		value = (value >> 7)|~(-(offsetT) 1 >> 7);
-
 		more = !((((value == 0) && ((byte & 0x40) == 0))
 			  || ((value == -1) && ((byte & 0x40) != 0))));
-		if (more)
-			byte |= 0x80;
-
+		if (more) byte |= 0x80;
 		*p++ = byte;
-	}
-	while (more);
-
+	} while (more);
 	return p - orig;
 }
 
-static inline unsigned int output_uleb128(char *p,valueT value)
+static unsigned int output_uleb128(char *p,valueT value)
 {
 	char           *orig = p;
+    unsigned byte;
 
 	do {
-		unsigned	byte = (value & 0x7f);
-
+		byte = (value & 0x7f);
 		value >>= 7;
 		if (value != 0)
 			/* More bytes to follow.  */
 			byte |= 0x80;
-
 		*p++ = byte;
-	}
-	while (value != 0);
-
+	} while (value != 0);
 	return p - orig;
 }
 
@@ -13609,26 +13603,22 @@ static void	emit_leb128_expr(expressionS * exp,int sign)
 		as_warn(("zero assumed for missing expression"));
 		exp->X_add_number = 0;
 		op = O_constant;
-	} else
-		if (op == O_big && exp->X_add_number <= 0) {
-			as_bad(("floating point number invalid"));
-			exp->X_add_number = 0;
-			op = O_constant;
-		} else
-			if (op == O_register) {
-				as_warn(("register value used as expression"));
-				op = O_constant;
-			} else
-				if (op == O_constant
-				    && sign
-				    && (exp->X_add_number < 0) == !exp->X_extrabit) {
-					/* * We're outputting a signed leb128 and the sign of 
-					 * X_add_number doesn't reflect the sign of the original 
-					 * value. Convert EXP to a correctly-extended bignum 
-					 * instead. */
-					convert_to_bignum(exp,exp->X_extrabit);
-					op = O_big;
-				}
+	} else if (op == O_big && exp->X_add_number <= 0) {
+		as_bad(("floating point number invalid"));
+		exp->X_add_number = 0;
+		op = O_constant;
+	} else if (op == O_register) {
+		as_warn(("register value used as expression"));
+		op = O_constant;
+	} else if (op == O_constant
+		    && sign
+		    && (exp->X_add_number < 0) == !exp->X_extrabit) {
+			/* We're outputting a signed leb128 and the sign of X_add_number 
+			 * doesn't reflect the sign of the original value. Convert EXP to a 
+			 * correctly-extended bignum * instead. */
+				convert_to_bignum(exp,exp->X_extrabit);
+				op = O_big;
+	}
 	if (now_seg == absolute_section) {
 		if (op != O_constant || exp->X_add_number != 0)
 			as_bad("attempt to store value in absolute section");
@@ -14221,6 +14211,11 @@ static void	do_s_func(int end_p,const char *default_prefix)
 	demand_empty_rest_of_line();
 }
 
+
+static void	s_ignore(int arg ATTRIBUTE_UNUSED)
+{
+	ignore_rest_of_line();
+}
 
 /* Find the end of a line,considering quotation and escaping of quotes.  */
 #if !defined(TC_SINGLE_QUOTE_STRINGS) && defined(SINGLE_QUOTE_STRINGS)
@@ -25621,71 +25616,59 @@ static void	s_riscv_option(int x ATTRIBUTE_UNUSED)
 		riscv_update_subset(&riscv_rps_as,"+c");
 		riscv_reset_subsets_list_arch_str();
 		riscv_set_rvc(true);
-	} else
-		if (strcmp(name,"norvc") == 0) {
-			riscv_update_subset(&riscv_rps_as,"-c");
-			riscv_reset_subsets_list_arch_str();
-			riscv_set_rvc(false);
-		} else
-			if (strcmp(name,"pic") == 0)
-				riscv_opts.pic = true;
-			else
-				if (strcmp(name,"nopic") == 0)
-					riscv_opts.pic = false;
-				else
-					if (strcmp(name,"relax") == 0)
-						riscv_opts.relax = true;
-					else
-						if (strcmp(name,"norelax") == 0)
-							riscv_opts.relax = false;
-						else
-							if (strcmp(name,"csr-check") == 0)
-								riscv_opts.csr_check = true;
-							else
-								if (strcmp(name,"no-csr-check") == 0)
-									riscv_opts.csr_check = false;
-								else
-									if (strncmp(name,"arch,",5) == 0) {
-										name += 5;
-										if (ISSPACE(*name) && *name != '\0')
-											name++;
-										riscv_update_subset(&riscv_rps_as,name);
-										riscv_reset_subsets_list_arch_str();
+	} else if (strcmp(name,"norvc") == 0) {
+		riscv_update_subset(&riscv_rps_as,"-c");
+		riscv_reset_subsets_list_arch_str();
+		riscv_set_rvc(false);
+	} else if (strcmp(name,"pic") == 0)
+		riscv_opts.pic = true;
+	else if (strcmp(name,"nopic") == 0)
+		riscv_opts.pic = false;
+	else if (strcmp(name,"relax") == 0)
+		riscv_opts.relax = true;
+	else if (strcmp(name,"norelax") == 0)
+		riscv_opts.relax = false;
+	else if (strcmp(name,"csr-check") == 0)
+		riscv_opts.csr_check = true;
+	else if (strcmp(name,"no-csr-check") == 0)
+		riscv_opts.csr_check = false;
+	else if (strncmp(name,"arch,",5) == 0) {
+		name += 5;
+		if (ISSPACE(*name) && *name != '\0')
+			name++;
+		riscv_update_subset(&riscv_rps_as,name);
+		riscv_reset_subsets_list_arch_str();
 
-										riscv_set_rvc(false);
-										if (riscv_subset_supports(&riscv_rps_as,"c"))
-											riscv_set_rvc(true);
+		riscv_set_rvc(false);
+		if (riscv_subset_supports(&riscv_rps_as,"c"))
+			riscv_set_rvc(true);
 
-										if (riscv_subset_supports(&riscv_rps_as,"ztso"))
-											riscv_set_tso();
-									} else
-										if (strcmp(name,"push") == 0) {
-											struct riscv_option_stack *s;
+		if (riscv_subset_supports(&riscv_rps_as,"ztso"))
+			riscv_set_tso();
+	} else if (strcmp(name,"push") == 0) {
+		struct riscv_option_stack *s;
 
-											s = XNEW(struct riscv_option_stack);
-											s->next = riscv_opts_stack;
-											s->options = riscv_opts;
-											s->subset_list = riscv_rps_as.subset_list;
-											riscv_opts_stack = s;
-											riscv_rps_as.subset_list = riscv_copy_subset_list(s->subset_list);
-										} else
-											if (strcmp(name,"pop") == 0) {
-												struct riscv_option_stack *s;
+		s = XNEW(struct riscv_option_stack);
+		s->next = riscv_opts_stack;
+		s->options = riscv_opts;
+		s->subset_list = riscv_rps_as.subset_list;
+		riscv_opts_stack = s;
+		riscv_rps_as.subset_list = riscv_copy_subset_list(s->subset_list);
+	} else if (strcmp(name,"pop") == 0) {
+		struct riscv_option_stack *s;
 
-												s = riscv_opts_stack;
-												if (s == NULL)
-													as_bad((".option pop with no .option push"));
-												else {
-													riscv_subset_list_t *release_subsets = riscv_rps_as.subset_list;
-													riscv_opts_stack = s->next;
-													riscv_opts = s->options;
-													riscv_rps_as.subset_list = s->subset_list;
-													riscv_release_subset_list(release_subsets);
-													free(s);
-												}
-											} else {
-												as_warn(("unrecognized .option directive: %s"),name);
-											}
+		s = riscv_opts_stack;
+		if (s == NULL)
+			as_bad((".option pop with no .option push"));
+		else {
+			riscv_subset_list_t *release_subsets = riscv_rps_as.subset_list;
+			riscv_opts_stack = s->next;
+			riscv_opts = s->options;
+			riscv_rps_as.subset_list = s->subset_list;
+			riscv_release_subset_list(release_subsets);
+			free(s);
+		}
+	} else { as_warn(("unrecognized .option directive: %s"),name); }
 	*input_line_pointer = ch;
 	demand_empty_rest_of_line();
 }

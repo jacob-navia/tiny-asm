@@ -2540,16 +2540,16 @@ static bool flag_dwarf_sections;
 static int flag_dwarf_cie_version;
 static unsigned int dwarf_level;
 
-struct _pseudo_type {
+typedef struct _pseudo_type {
   /* assembler mnemonic, lower case, no '.' */
   const char *poc_name;
   /* Do the work */
   void (*poc_handler) (int);
   /* Value to pass to handler */
   int poc_val;
-};
+} pseudo_typeS;
 
-typedef struct _pseudo_type pseudo_typeS;
+static void s_ignore(int arg ATTRIBUTE_UNUSED);
 
 #if (__GNUC__ >= 2) && !defined(VMS)
 /* for use with -Wformat */

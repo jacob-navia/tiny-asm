@@ -8861,5 +8861,101 @@ struct riscv_ip_error {
 #define DEFAULT_RISCV_PRIV_SPEC "1.11"
 #endif
 
+/* symbols.c -symbol table- */
+struct symbol_flags {
+	/* Whether the symbol is a local_symbol.  */
+	unsigned int	local_symbol:1;
+
+	/* Weather symbol has been written.  */
+	unsigned int	written:1;
+
+	/* Whether symbol value has been completely resolved (used during final
+	 * pass over symbol table).  */
+	unsigned int	resolved:1;
+
+	/* Whether the symbol value is currently being resolved (used to detect
+	 * loops in symbol dependencies).  */
+	unsigned int	resolving:1;
+
+	/* Whether the symbol value is used in a reloc.  This is used to ensure
+	 * that symbols used in relocs are written out,even if they are local
+	 * and would otherwise not be.  */
+	unsigned int	used_in_reloc:1;
+
+	/* Whether the symbol is used as an operand or in an expression. NOTE:
+	 * Not all the backends keep this information accurate; backends which
+	 * use this bit are responsible for setting it when a symbol is used in
+	 * backend routines.  */
+	unsigned int	used:1;
+
+	/* Whether the symbol can be re-defined.  */
+	unsigned int	volatil:1;
+
+	/* * Whether the symbol is a forward reference,and whether such has been
+	 * determined.  */
+	unsigned int	forward_ref:1;
+	unsigned int	forward_resolved:1;
+
+	/* This is set if the symbol is set with a .weakref directive.  */
+	unsigned int	weakrefr:1;
+
+	/* This is set when the symbol is referenced as part of a .weakref
+	 * directive,but only if the symbol was not in the symbol table
+	 * before.  It is cleared as soon as any direct reference to the symbol
+	 * is present.  */
+	unsigned int	weakrefd:1;
+
+	/* Whether the symbol has been marked to be removed by a .symver
+	 * directive.  */
+	unsigned int	removed:1;
+
+	/* Set when a warning about the symbol containing multibyte characters
+	 * is generated.  */
+	unsigned int	multibyte_warned:1;
+};
+
+/* A pointer in the symbol may point to either a complete symbol (struct symbol
+ * below) or to a local symbol (struct local_symbol defined here).  The symbol
+ * code can detect the case by examining the first field which is present in
+ * both structs.
+ * 
+ * We do this because we ordinarily only need a small amount of information for a
+ * local symbol.  The symbol table takes up a lot of space,and storing less
+ * information for a local symbol can make a big difference in assembler memory
+ * usage when assembling a large file.  */
+struct local_symbol {
+	/* Symbol flags.  Only local_symbol and resolved are relevant.  */
+	struct symbol_flags flags;
+	/* Hash value calculated from name.  */
+	hashval_t	hash;
+	/* The symbol name.  */
+	const char     *name;
+	/* The symbol frag.  */
+	fragS          *frag;
+	/* The symbol section.  */
+	asection       *section;
+	/* The value of the symbol.  */
+	valueT		value;
+};
+
+/* The information we keep for a symbol.  The symbol table holds pointers both
+ * to this and to local_symbol structures.  The first three fields must be
+ * identical to struct local_symbol,and the size should be the same as or
+ * smaller than struct local_symbol. Fields that don't fit go to an extension
+ * structure.  */
+typedef struct symbol {
+	/* Symbol flags.  */
+	struct symbol_flags flags;
+	/* Hash value calculated from name.  */
+	hashval_t	hash;
+	/* The symbol name.  */
+	const char     *name;
+	/* Pointer to the frag this symbol is attached to,if any. Otherwise, NULL.  */
+	fragS          *frag;
+	/* BFD symbol */
+	asymbol        *bsym;
+	/* Extra symbol fields that won't fit.  */
+	struct xsymbol *x;
+}		symbolS;
 #endif /* GAS */
 

@@ -1394,11 +1394,6 @@ static int	compress_finish(bool use_zstd ATTRIBUTE_UNUSED,
 		return -1;
 	return 1;
 }
-/* =======================================================** dw2gencfi.c */
-/* dw2gencfi.h - Support for generating Dwarf2 CFI information. */
-#ifndef DW2GENCFI_H
-#define DW2GENCFI_H
-//---------------------------------------------------include "dwarf2.h"
 static void	cfi_new_fde(struct symbol *);
 static void	cfi_end_fde(struct symbol *);
 static void	cfi_set_return_column(unsigned);
@@ -1419,210 +1414,6 @@ static void	cfi_add_CFA_remember_state(void);
 static void	cfi_add_CFA_restore_state(void);
 struct symbol;
 
-/* Structures for md_cfi_end.  */
-
-#ifdef tc_cfi_reloc_for_encoding
-#define SUPPORT_COMPACT_EH 1
-#else
-#define SUPPORT_COMPACT_EH 0
-#endif
-
-struct cfi_insn_data {
-	struct cfi_insn_data *next;
-	int		insn;
-	union {
-		struct {
-			unsigned	reg;
-			offsetT		offset;
-		}		ri;
-
-		struct {
-			unsigned	reg1;
-			unsigned	reg2;
-		}		rr;
-
-		unsigned	r;
-		offsetT		i;
-
-		struct {
-			symbolS        *lab1;
-			symbolS        *lab2;
-		}		ll;
-
-		struct cfi_escape_data *esc;
-
-		struct {
-			unsigned	reg   ,encoding;
-			expressionS	exp;
-		}		ea;
-
-		const char     *sym_name;
-	}		u;
-};
-
-/* An enumeration describing the Compact EH header format.  The least
- * significant bit is used to distinguish the entries.
- * 
- * Inline Compact:			Function offset [0] Four chars of unwind data.
- * Out-of-line Compact:			Function offset [1] Compact unwind data
- * offset [0] Legacy:				Function offset [1] Unwind data
- * offset [1]
- * 
- * The header type is initialized to EH_COMPACT_UNKNOWN until the format is
- * discovered by encountering a .fde_data entry. Failure to find a .fde_data
- * entry will cause an EH_COMPACT_LEGACY header to be generated.  */
-enum { EH_COMPACT_UNKNOWN, EH_COMPACT_LEGACY, EH_COMPACT_INLINE,
-	EH_COMPACT_OUTLINE, EH_COMPACT_OUTLINE_DONE,
-	/* Outline if .cfi_inline_lsda used,otherwise legacy FDE.  */
-	EH_COMPACT_HAS_LSDA
-};
-
-/* Stack of old CFI data,for save/restore.  */
-struct cfa_save_data {
-	struct cfa_save_data *next;
-	offsetT		cfa_offset;
-};
-
-/* Current open FDE entry.  */
-struct frch_cfi_data {
-	struct fde_entry *cur_fde_data;
-	symbolS        *last_address;
-	offsetT		cur_cfa_offset;
-	struct cfa_save_data *cfa_save_stack;
-};
-
-struct fde_entry {
-	struct fde_entry *next;
-	symbolS        *start_address;
-	symbolS        *end_address;
-	struct cfi_insn_data *data;
-	struct cfi_insn_data **last;
-	unsigned char	per_encoding;
-	unsigned char	lsda_encoding;
-	int		personality_id;
-	expressionS	personality;
-	expressionS	lsda;
-	unsigned	return_column;
-	unsigned	signal_frame;
-	int		eh_header_type;
-	/* Compact unwinding opcodes,not including the PR byte or LSDA.  */
-	int		eh_data_size;
-	uint8_t        *eh_data;
-	/* For out of line tables and FDEs.  */
-	symbolS        *eh_loc;
-	int		sections;
-};
-
-/* The list of all FDEs that have been collected.  */
-extern struct fde_entry *all_fde_data;
-
-/* Fake CFI type; outside the byte range of any real CFI insn.  */
-#define CFI_adjust_cfa_offset	0x100
-#define CFI_return_column	0x101
-#define CFI_rel_offset		0x102
-#define CFI_escape		0x103
-#define CFI_signal_frame	0x104
-#define CFI_val_encoded_addr	0x105
-#define CFI_label		0x106
-
-/* By default emit .eh_frame only,not .debug_frame.  */
-#define CFI_EMIT_eh_frame               (1 << 0)
-#define CFI_EMIT_debug_frame            (1 << 1)
-#define CFI_EMIT_target                 (1 << 2)
-#define CFI_EMIT_eh_frame_compact       (1 << 3)
-#define CFI_EMIT_sframe                 (1 << 4)
-
-#endif				/* DW2GENCFI_H */
-static void	output_sframe(segT sframe_seg);
-
-
-/* By default,use difference expressions if DIFF_EXPR_OK is defined.  */
-#ifndef CFI_DIFF_EXPR_OK
-#ifdef DIFF_EXPR_OK
-#define CFI_DIFF_EXPR_OK 1
-#else
-#define CFI_DIFF_EXPR_OK 0
-#endif
-#endif
-
-#ifndef CFI_DIFF_LSDA_OK
-#define CFI_DIFF_LSDA_OK CFI_DIFF_EXPR_OK
-#endif
-
-#if CFI_DIFF_EXPR_OK == 1 && CFI_DIFF_LSDA_OK == 0
-#error "CFI_DIFF_EXPR_OK should imply CFI_DIFF_LSDA_OK"
-#endif
-
-/*
- * We re-use DWARF2_LINE_MIN_INSN_LENGTH for the code alignment field of the
- * CIE.  Default to 1 if not otherwise specified.
- */
-#ifndef DWARF2_LINE_MIN_INSN_LENGTH
-#define DWARF2_LINE_MIN_INSN_LENGTH 1
-#endif
-
-/* By default,use 32-bit relocations from .eh_frame into .text.  */
-#ifndef DWARF2_FDE_RELOC_SIZE
-#define DWARF2_FDE_RELOC_SIZE 4
-#endif
-
-/* By default,use a read-only .eh_frame section.  */
-#ifndef DWARF2_EH_FRAME_READ_ONLY
-#define DWARF2_EH_FRAME_READ_ONLY SEC_READONLY
-#endif
-
-#ifndef EH_FRAME_ALIGNMENT
-#define EH_FRAME_ALIGNMENT 3
-#endif
-
-#ifndef tc_cfi_frame_initial_instructions
-#define tc_cfi_frame_initial_instructions() ((void)0)
-#endif
-
-#ifndef tc_cfi_startproc
-#define tc_cfi_startproc() ((void)0)
-#endif
-
-#ifndef tc_cfi_endproc
-#define tc_cfi_endproc(fde) ((void) (fde))
-#endif
-
-#define EH_FRAME_LINKONCE (compact_eh)
-
-#ifndef DWARF2_FORMAT
-#define DWARF2_FORMAT(SEC) dwarf2_format_32bit
-#endif
-
-#ifndef DWARF2_ADDR_SIZE
-#define DWARF2_ADDR_SIZE(x) (x->arch_info->bits_per_address / 8)
-#endif
-
-#define CUR_SEG(structp) NULL
-#define SET_CUR_SEG(structp,seg) (void) (0 && seg)
-#define HANDLED(structp) 0
-#define SET_HANDLED(structp,val) (void) (0 && val)
-
-#ifndef tc_cfi_reloc_for_encoding
-#define tc_cfi_reloc_for_encoding(e) BFD_RELOC_NONE
-#endif
-
-/* Targets which support SFrame format will define this and return true.  */
-#ifndef support_sframe_p
-#define support_sframe_p() false
-#endif
-
-/* Private segment collection list.  */
-struct dwcfi_seg_list {
-	segT		seg;
-	int		subseg;
-	char           *seg_name;
-};
-
-#ifdef SUPPORT_COMPACT_EH
-static bool	compact_eh;
-#else
-#define compact_eh 0
-#endif
 
 static htab_t	dwcfi_hash;
 static htab_t	sy_hash;
@@ -1989,25 +1780,9 @@ static void	generic_dwarf2_emit_offset(symbolS * symbol,unsigned size)
 }
 #endif
 
-struct cfi_escape_data {
-	struct cfi_escape_data *next;
-	expressionS	exp;
-};
-
-struct cie_entry {
-	struct cie_entry *next;
-	symbolS        *start_address;
-	unsigned	return_column;
-	unsigned	signal_frame;
-	unsigned char	fde_encoding;
-	unsigned char	per_encoding;
-	unsigned char	lsda_encoding;
-	expressionS	personality;
-	struct cfi_insn_data *first,*last;
-};
 
 /* List of FDE entries.  */
-struct fde_entry *all_fde_data;
+static struct fde_entry *all_fde_data;
 static struct fde_entry **last_fde_data = &all_fde_data;
 
 /* List of CIEs so that they could be reused.  */
@@ -2297,6 +2072,15 @@ static void	cfi_parse_separator(void)
 	else
 		as_bad(("missing separator"));
 }
+static int cfi_test_startproc(void)
+{
+	if (frchain_now->frch_cfi_data == NULL) {
+		as_bad("CFI instruction used without previous .cfi_startproc");
+		ignore_rest_of_line();
+		return 0;
+	}
+	return 1;
+}
 
 static void	tc_parse_to_dw2regnum(expressionS * exp)
 {
@@ -2347,11 +2131,7 @@ static void	dot_cfi(int arg)
 	offsetT		offset;
 	unsigned	reg1  ,reg2;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	/* If the last address was not at the current PC,advance to current.  */
 	if (symbol_get_frag(frchain_now->frch_cfi_data->last_address) != frag_now
 	    || (S_GET_VALUE(frchain_now->frch_cfi_data->last_address)
@@ -2471,11 +2251,7 @@ static void	dot_cfi_escape(int ignored ATTRIBUTE_UNUSED)
 	struct cfi_escape_data *head,**tail,*e;
 	struct cfi_insn_data *insn;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	/* If the last address was not at the current PC,advance to current.  */
 	if (symbol_get_frag(frchain_now->frch_cfi_data->last_address) != frag_now
 	    || (S_GET_VALUE(frchain_now->frch_cfi_data->last_address)
@@ -2505,11 +2281,7 @@ static void	dot_cfi_personality(int ignored ATTRIBUTE_UNUSED)
 	struct fde_entry *fde;
 	offsetT		encoding;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	fde = frchain_now->frch_cfi_data->cur_fde_data;
 	encoding = cfi_parse_const();
 	if (encoding == DW_EH_PE_omit) {
@@ -2564,11 +2336,7 @@ static void	dot_cfi_lsda(int ignored ATTRIBUTE_UNUSED)
 	struct fde_entry *fde;
 	offsetT		encoding;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	fde = frchain_now->frch_cfi_data->cur_fde_data;
 	encoding = cfi_parse_const();
 	if (encoding == DW_EH_PE_omit) {
@@ -2625,11 +2393,7 @@ static void	dot_cfi_val_encoded_addr(int ignored ATTRIBUTE_UNUSED)
 	struct cfi_insn_data *insn_ptr;
 	offsetT		encoding;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	/* If the last address was not at the current PC,advance to current.  */
 	if (symbol_get_frag(frchain_now->frch_cfi_data->last_address) != frag_now
 	    || (S_GET_VALUE(frchain_now->frch_cfi_data->last_address)
@@ -2682,11 +2446,7 @@ static void	dot_cfi_label(int ignored ATTRIBUTE_UNUSED)
 {
 	char           *name;
 
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad(("CFI instruction used without previous .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	name = read_symbol_name();
 	if (name == NULL)
 		return;
@@ -2800,18 +2560,11 @@ static void	dot_cfi_startproc(int ignored ATTRIBUTE_UNUSED)
 	frchain_now->frch_cfi_data->cur_cfa_offset = 0;
 	if (!simple)
 		tc_cfi_frame_initial_instructions();
-
-	if ((cfi_sections & CFI_EMIT_target) != 0)
-		tc_cfi_startproc();
 }
 
 static void	dot_cfi_endproc(int ignored ATTRIBUTE_UNUSED)
 {
-	if (frchain_now->frch_cfi_data == NULL) {
-		as_bad((".cfi_endproc without corresponding .cfi_startproc"));
-		ignore_rest_of_line();
-		return;
-	}
+	if (!cfi_test_startproc()) return;
 	last_fde = frchain_now->frch_cfi_data->cur_fde_data;
 
 	cfi_end_fde(symbol_temp_new_now());
@@ -3126,9 +2879,6 @@ static void	output_cie(struct cie_entry *cie,bool eh_frame,int align)
 		if (cie->lsda_encoding != DW_EH_PE_omit)
 			out_one('L');
 		out_one('R');
-#ifdef tc_output_cie_extra
-		tc_output_cie_extra(cie);
-#endif
 	}
 	if (cie->signal_frame)
 		out_one('S');
@@ -3347,8 +3097,7 @@ static inline	bool
 	return true;
 }
 
-static struct cie_entry *
-		select_cie_for_fde(struct fde_entry *fde,bool eh_frame,
+static struct cie_entry *select_cie_for_fde(struct fde_entry *fde,bool eh_frame,
 		     		struct	cfi_insn_data **pfirst,int align)
 {
 	struct cfi_insn_data *i,*j;
@@ -3491,7 +3240,7 @@ static void	cfi_finish(void)
 					fde->end_address = fde->start_address;
 				}
 				cie = select_cie_for_fde(fde,true,&first,2);
-				fde->eh_loc = symbol_temp_new_now();
+				//fde->eh_loc = symbol_temp_new_now();
 				output_fde(fde,cie,true,first,
 				  fde->next == NULL ? EH_FRAME_ALIGNMENT : 2);
 			}
@@ -10729,23 +10478,6 @@ static void	read_end(void)
 	poend();
 }
 
-#ifndef TC_ADDRESS_BYTES
-#define TC_ADDRESS_BYTES address_bytes
-
-static inline int address_bytes(void)
-{
-	/*
-	 * Choose smallest of 1,2,4,8 bytes that is large enough to contain
-	 * an address.
-	 */
-	int		n = (stdoutput->arch_info->bits_per_address - 1) / 8;
-	n |= n >> 1;
-	n |= n >> 2;
-	n += 1;
-	return n;
-}
-#endif
-
 /* Set up pseudo-op tables.  */
 
 static htab_t	po_hash;
@@ -12767,7 +12499,7 @@ static void	cons_worker(int nbytes,	/* 1=.byte,2=.word,4=.long.  */
 		return;
 	}
 	if (nbytes == 0)
-		nbytes = TC_ADDRESS_BYTES();
+		nbytes = sizeof(void *);
 
 	riscv_mapping_state (MAP_DATA, 0, 0);
 	c = 0;
@@ -20891,8 +20623,7 @@ static bool	riscv_scan(const struct bfd_arch_info *info,const char *string)
 	if (bfd_default_scan(info,string))
 		return true;
 
-	/*
-	 * The incoming STRING might take the form of riscv:rvXXzzz,where XX
+	/* The incoming STRING might take the form of riscv:rvXXzzz,where XX
 	 * is 32 or 64,and zzz are one or more extension characters.  As we
 	 * currently only have 3 architectures defined,'riscv','riscv:rv32',
 	 * and 'riscv:rv64',we would like to ignore the zzz for the purpose of
@@ -20902,8 +20633,7 @@ static bool	riscv_scan(const struct bfd_arch_info *info,const char *string)
 	 * specific 'riscv:rv32' or 'riscv:rv64',so in the case of the default
 	 * architecture (with the shorter 'riscv' name) we don't allow any
 	 * special matching,but for the 'riscv:rvXX' cases,we allow a match
-	 * with any additional trailing characters being ignored.
-	 */
+	 * with any additional trailing characters being ignored.  */
 	if (!info->the_default
 	    && strncasecmp(string,info->printable_name,
 			   strlen(info->printable_name)) == 0)

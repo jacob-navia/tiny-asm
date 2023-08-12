@@ -8957,5 +8957,223 @@ typedef struct symbol {
 	/* Extra symbol fields that won't fit.  */
 	struct xsymbol *x;
 }		symbolS;
+
+/* =======================================================** dw2gencfi.c */
+/* dw2gencfi.h - Support for generating Dwarf2 CFI information. */
+//---------------------------------------------------include "dwarf2.h"
+struct cfi_escape_data {
+	struct cfi_escape_data *next;
+	expressionS	exp;
+};
+
+struct cie_entry {
+	struct cie_entry *next;
+	symbolS        *start_address;
+	unsigned	return_column;
+	unsigned	signal_frame;
+	unsigned char	fde_encoding;
+	unsigned char	per_encoding;
+	unsigned char	lsda_encoding;
+	expressionS	personality;
+	struct cfi_insn_data *first,*last;
+};
+
+
+/* An enumeration describing the Compact EH header format.  The least
+ * significant bit is used to distinguish the entries.
+ * 
+ * Inline Compact:			Function offset [0] Four chars of unwind data.
+ * Out-of-line Compact:			Function offset [1] Compact unwind data
+ * offset [0] Legacy:				Function offset [1] Unwind data
+ * offset [1]
+ * 
+ * The header type is initialized to EH_COMPACT_UNKNOWN until the format is
+ * discovered by encountering a .fde_data entry. Failure to find a .fde_data
+ * entry will cause an EH_COMPACT_LEGACY header to be generated.  */
+enum { EH_COMPACT_UNKNOWN, EH_COMPACT_LEGACY, EH_COMPACT_INLINE,
+	EH_COMPACT_OUTLINE, EH_COMPACT_OUTLINE_DONE,
+	/* Outline if .cfi_inline_lsda used,otherwise legacy FDE.  */
+	EH_COMPACT_HAS_LSDA
+};
+
+/* Stack of old CFI data,for save/restore.  */
+struct cfa_save_data {
+	struct cfa_save_data *next;
+	offsetT		cfa_offset;
+};
+
+/* Current open FDE entry.  */
+struct frch_cfi_data {
+	struct fde_entry *cur_fde_data;
+	symbolS        *last_address;
+	offsetT		cur_cfa_offset;
+	struct cfa_save_data *cfa_save_stack;
+};
+
+struct fde_entry {
+	struct fde_entry *next;
+	symbolS        *start_address;
+	symbolS        *end_address;
+	struct cfi_insn_data *data;
+	struct cfi_insn_data **last;
+	unsigned char	per_encoding;
+	unsigned char	lsda_encoding;
+	int		personality_id;
+	expressionS	personality;
+	expressionS	lsda;
+	unsigned	return_column;
+	unsigned	signal_frame;
+	int		eh_header_type;
+	/* Compact unwinding opcodes,not including the PR byte or LSDA.  */
+	int		eh_data_size;
+	uint8_t        *eh_data;
+	/* For out of line tables and FDEs.  */
+	//symbolS        *eh_loc;
+	int		sections;
+};
+
+/* Structures for md_cfi_end.  */
+
+#ifdef tc_cfi_reloc_for_encoding
+#define SUPPORT_COMPACT_EH 1
+#else
+#define SUPPORT_COMPACT_EH 0
+#endif
+
+struct cfi_insn_data {
+	struct cfi_insn_data *next;
+	int		insn;
+	union {
+		struct {
+			unsigned	reg;
+			offsetT		offset;
+		}		ri;
+
+		struct {
+			unsigned	reg1;
+			unsigned	reg2;
+		}		rr;
+
+		unsigned	r;
+		offsetT		i;
+
+		struct {
+			symbolS        *lab1;
+			symbolS        *lab2;
+		}		ll;
+
+		struct cfi_escape_data *esc;
+
+		struct {
+			unsigned	reg   ,encoding;
+			expressionS	exp;
+		}		ea;
+
+		const char     *sym_name;
+	}		u;
+};
+/* Fake CFI type; outside the byte range of any real CFI insn.  */
+#define CFI_adjust_cfa_offset	0x100
+#define CFI_return_column	0x101
+#define CFI_rel_offset		0x102
+#define CFI_escape		0x103
+#define CFI_signal_frame	0x104
+#define CFI_val_encoded_addr	0x105
+#define CFI_label		0x106
+
+/* By default emit .eh_frame only,not .debug_frame.  */
+#define CFI_EMIT_eh_frame               (1 << 0)
+#define CFI_EMIT_debug_frame            (1 << 1)
+#define CFI_EMIT_target                 (1 << 2)
+#define CFI_EMIT_eh_frame_compact       (1 << 3)
+#define CFI_EMIT_sframe                 (1 << 4)
+
+static void	output_sframe(segT sframe_seg);
+
+
+/* By default,use difference expressions if DIFF_EXPR_OK is defined.  */
+#ifndef CFI_DIFF_EXPR_OK
+#ifdef DIFF_EXPR_OK
+#define CFI_DIFF_EXPR_OK 1
+#else
+#define CFI_DIFF_EXPR_OK 0
+#endif
+#endif
+
+#ifndef CFI_DIFF_LSDA_OK
+#define CFI_DIFF_LSDA_OK CFI_DIFF_EXPR_OK
+#endif
+
+#if CFI_DIFF_EXPR_OK == 1 && CFI_DIFF_LSDA_OK == 0
+#error "CFI_DIFF_EXPR_OK should imply CFI_DIFF_LSDA_OK"
+#endif
+
+/*
+ * We re-use DWARF2_LINE_MIN_INSN_LENGTH for the code alignment field of the
+ * CIE.  Default to 1 if not otherwise specified.
+ */
+#ifndef DWARF2_LINE_MIN_INSN_LENGTH
+#define DWARF2_LINE_MIN_INSN_LENGTH 1
+#endif
+
+/* By default,use 32-bit relocations from .eh_frame into .text.  */
+#ifndef DWARF2_FDE_RELOC_SIZE
+#define DWARF2_FDE_RELOC_SIZE 4
+#endif
+
+/* By default,use a read-only .eh_frame section.  */
+#ifndef DWARF2_EH_FRAME_READ_ONLY
+#define DWARF2_EH_FRAME_READ_ONLY SEC_READONLY
+#endif
+
+#ifndef EH_FRAME_ALIGNMENT
+#define EH_FRAME_ALIGNMENT 3
+#endif
+
+#ifndef tc_cfi_frame_initial_instructions
+#define tc_cfi_frame_initial_instructions() ((void)0)
+#endif
+
+#ifndef tc_cfi_endproc
+#define tc_cfi_endproc(fde) ((void) (fde))
+#endif
+
+#define EH_FRAME_LINKONCE (compact_eh)
+
+#ifndef DWARF2_FORMAT
+#define DWARF2_FORMAT(SEC) dwarf2_format_32bit
+#endif
+
+#ifndef DWARF2_ADDR_SIZE
+#define DWARF2_ADDR_SIZE(x) (x->arch_info->bits_per_address / 8)
+#endif
+
+#define CUR_SEG(structp) NULL
+#define SET_CUR_SEG(structp,seg) (void) (0 && seg)
+#define HANDLED(structp) 0
+#define SET_HANDLED(structp,val) (void) (0 && val)
+
+#ifndef tc_cfi_reloc_for_encoding
+#define tc_cfi_reloc_for_encoding(e) BFD_RELOC_NONE
+#endif
+
+/* Targets which support SFrame format will define this and return true.  */
+#ifndef support_sframe_p
+#define support_sframe_p() false
+#endif
+
+/* Private segment collection list.  */
+struct dwcfi_seg_list {
+	segT		seg;
+	int		subseg;
+	char           *seg_name;
+};
+
+#ifdef SUPPORT_COMPACT_EH
+static bool	compact_eh;
+#else
+#define compact_eh 0
+#endif
+
 #endif /* GAS */
 

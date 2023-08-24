@@ -6152,10 +6152,6 @@ static void riscv_handle_align (fragS *);
 
 #define MAX_MEM_FOR_RS_ALIGN_CODE (3 + 4)
 
-/* The ISA of the target may change based on command-line arguments.  */
-#define TARGET_FORMAT riscv_target_format ()
-static const char * riscv_target_format (void);
-
 #define md_after_parse_args() riscv_after_parse_args ()
 static void riscv_after_parse_args (void);
 

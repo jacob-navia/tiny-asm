@@ -61,13 +61,10 @@ struct defsym_list {
 static enum debug_info_type debug_type = DEBUG_UNSPECIFIED;
 static int	use_gnu_debug_info_extensions = 0;
 static enum debug_info_type (*md_debug_format_selector) (int *)= NULL;
-/* argv[0]  */
-static char    *myname;
-/*
- * The default obstack chunk size.  If we set this to zero,the obstack code
- * will use whatever will fit in a 4096 byte block.  */
-
-/* To monitor memory allocation more effectively,make this non-zero. Then the
+static char    *myname; /* argv[0] */
+/* The default obstack chunk size.  If we set this to zero,the obstack code
+ * will use whatever will fit in a 4096 byte block.  
+ * To monitor memory allocation more effectively,make this non-zero. Then the
  * chunk sizes for gas and bfd will be reduced.  */
 #define CHUNKSIZE 0
 
@@ -180,7 +177,7 @@ static void	parse_args(int *pargc,char ***pargv)
 	/* Codes used for the long options with no short synonyms.  */
 	enum option_values {
 		OPTION_HELP = OPTION_STD_BASE,OPTION_STATISTICS,OPTION_VERSION,
-		OPTION_DUMPCONFIG,OPTION_VERBOSE,OPTION_EMULATION,OPTION_DEBUG_PREFIX_MAP,
+		OPTION_DUMPCONFIG,OPTION_VERBOSE,OPTION_DEBUG_PREFIX_MAP,
 		OPTION_DEFSYM,OPTION_LISTING_LHS_WIDTH,
 		OPTION_LISTING_LHS_WIDTH2,	/* = STD_BASE + 10 */
 		OPTION_LISTING_RHS_WIDTH,OPTION_LISTING_CONT_LINES,OPTION_DEPFILE,
@@ -217,7 +214,6 @@ static void	parse_args(int *pargc,char ***pargv)
 		,{"debug-prefix-map",required_argument,NULL,OPTION_DEBUG_PREFIX_MAP}
 		,{"defsym",required_argument,NULL,OPTION_DEFSYM}
 		,{"dump-config",no_argument,NULL,OPTION_DUMPCONFIG}
-		,{"emulation",required_argument,NULL,OPTION_EMULATION}
 #if defined OBJ_ELF || defined OBJ_MAYBE_ELF
 		,{"execstack",no_argument,NULL,OPTION_EXECSTACK}
 		,{"noexecstack",no_argument,NULL,OPTION_NOEXECSTACK}
@@ -367,8 +363,7 @@ static void	parse_args(int *pargc,char ***pargv)
 
 		case OPTION_VERSION:
 			/* This output is intended to follow the GNU standards document.  */
-			printf("tiny GNU assembler without BFD\n");
-			printf("Copyright (C) 2023 Free Software Foundation,Inc.\n");
+			printf("tiny GNU assembler without BFD\nCopyright (C) 2023 Free Software Foundation,Inc.\n");
 			printf("Hacked by jacob in the summer of 2023\n");
 			printf("\
 This program is free software; you may redistribute it under the terms of\n\
@@ -379,19 +374,12 @@ This program has absolutely no warranty.\n");
 			       TARGET_ALIAS,"riscv");
 			exit(EXIT_SUCCESS);
 
-		case OPTION_EMULATION:
-			as_fatal("emulations not handled in this configuration");
-			break;
-
 		case OPTION_DUMPCONFIG:
 			fprintf(stderr,"alias = %s\n",TARGET_ALIAS);
 			fprintf(stderr,"canonical = %s\n",TARGET_ALIAS);
 			fprintf(stderr,("cpu-type = %s\n"),TARGET_CPU);
 #ifdef TARGET_OBJ_FORMAT
 			fprintf(stderr,("format = %s\n"),TARGET_OBJ_FORMAT);
-#endif
-#ifdef TARGET_FORMAT
-			fprintf(stderr,("bfd-target = %s\n"),TARGET_FORMAT);
 #endif
 			exit(EXIT_SUCCESS);
 
@@ -10136,7 +10124,7 @@ static bfd     *new_bfd(void)
 	return nbfd;
 }
 
-static bfd     *openw(const char *filename,const char *target ATTRIBUTE_UNUSED)
+static bfd     *openw(const char *filename)
 {
 	bfd            *nbfd;
 	char           *ptr;
@@ -10222,7 +10210,7 @@ static void	output_file_create(const char *name)
 		as_fatal("can't open a bfd on stdout %s",name);
 
 	else
-		if (!(openw(name,TARGET_FORMAT))) {
+		if (!(openw(name))) {
 			fprintf(stderr,"Can't create %s\n",name);
 			exit(1);
 		}
@@ -21416,12 +21404,6 @@ static void	riscv_check_mapping_symbols(asection * sec,
 	}
 }
 
-/* The default target format to use.  */
-static const char *riscv_target_format(void)
-{
-		return  "elf64-littleriscv" ;
-}
-
 /* Return the length of instruction INSN.  */
 static inline unsigned int insn_length(const struct riscv_cl_insn *insn)
 {
@@ -26009,7 +25991,7 @@ static const char *const riscv_fpr_names_abi[NFPR] =
 	"fs8","fs9","fs10","fs11","ft8","ft9","ft10","ft11"
 };
 
-/* Rounding modes.  */
+/* Rounding modes. From opcodes/riscv-opc.c */
 static const char *const riscv_rm[8] =
 {
 	"rne","rtz","rdn","rup","rmm",0,0,"dyn"
@@ -26406,9 +26388,9 @@ static const struct riscv_opcode riscv_opcodes[] =
 	{"rdcycle",0,INSN_CLASS_I,"d",MATCH_RDCYCLE,MASK_RDCYCLE,match_opcode,INSN_ALIAS},
 	{"rdinstret",0,INSN_CLASS_I,"d",MATCH_RDINSTRET,MASK_RDINSTRET,match_opcode,INSN_ALIAS},
 	{"rdtime",0,INSN_CLASS_I,"d",MATCH_RDTIME,MASK_RDTIME,match_opcode,INSN_ALIAS},
-	{"rdcycleh",32,INSN_CLASS_I,"d",MATCH_RDCYCLEH,MASK_RDCYCLEH,match_opcode,INSN_ALIAS},
-	{"rdinstreth",32,INSN_CLASS_I,"d",MATCH_RDINSTRETH,MASK_RDINSTRETH,match_opcode,INSN_ALIAS},
-	{"rdtimeh",32,INSN_CLASS_I,"d",MATCH_RDTIMEH,MASK_RDTIMEH,match_opcode,INSN_ALIAS},
+//	{"rdcycleh",32,INSN_CLASS_I,"d",MATCH_RDCYCLEH,MASK_RDCYCLEH,match_opcode,INSN_ALIAS},
+//	{"rdinstreth",32,INSN_CLASS_I,"d",MATCH_RDINSTRETH,MASK_RDINSTRETH,match_opcode,INSN_ALIAS},
+//	{"rdtimeh",32,INSN_CLASS_I,"d",MATCH_RDTIMEH,MASK_RDTIMEH,match_opcode,INSN_ALIAS},
 	{"ecall",0,INSN_CLASS_I,"",MATCH_SCALL,MASK_SCALL,match_opcode,0},
 	{"scall",0,INSN_CLASS_I,"",MATCH_SCALL,MASK_SCALL,match_opcode,0},
 	{"xor",0,INSN_CLASS_I,"d,s,j",MATCH_XORI,MASK_XORI,match_opcode,INSN_ALIAS},
@@ -28446,64 +28428,27 @@ static void	obj_elf_change_section(const char *name,
 			 * Allow different SHF_MERGE and SHF_STRINGS if we have
 			 * something like .rodata.str.
 			 */
-			else
-				if (ssect->suffix_length == -2
+			else if (ssect->suffix_length == -2
 				    && name[ssect->prefix_length] == '.'
 				    && (generic_attr
 					& ~ssect->attr
 					& ~SHF_MERGE
 					& ~SHF_STRINGS) == 0);
 			/* .interp,.strtab and .symtab can have SHF_ALLOC.  */
-				else
-					if (generic_attr == SHF_ALLOC
-					    && (strcmp(name,".interp") == 0
-						|| strcmp(name,".strtab") == 0
-					     || strcmp(name,".symtab") == 0))
-						override = true;
+			else if (generic_attr == SHF_ALLOC
+				    && (strcmp(name,".interp") == 0
+					|| strcmp(name,".strtab") == 0
+				     || strcmp(name,".symtab") == 0))
+					override = true;
 			/* .note.GNU-stack can have SHF_EXECINSTR.  */
-					else
-						if (generic_attr == SHF_EXECINSTR
-						    && strcmp(name,".note.GNU-stack") == 0)
+			else if (generic_attr == SHF_EXECINSTR
+				    && strcmp(name,".note.GNU-stack") == 0)
+					override = true;
+			else {
+				if (match_p->group_name == NULL)
+					as_warn("setting incorrect section attributes for %s", name);
 							override = true;
-#ifdef TC_ALPHA
-			/* A section on Alpha may have SHF_ALPHA_GPREL.  */
-						else
-							if ((generic_attr & ~ssect->attr) == SHF_ALPHA_GPREL)
-								override = true;
-#endif
-#ifdef TC_RX
-							else
-								if (generic_attr == (SHF_EXECINSTR|SHF_WRITE|SHF_ALLOC)
-								    && (ssect->type == SHT_INIT_ARRAY
-									|| ssect->type == SHT_FINI_ARRAY
-									|| ssect->type == SHT_PREINIT_ARRAY))
-									/*
-									 * RX
-									 * init/
-									 * fini
-									 * array
-									 * s
-									 * can
-									 * and
-									 * shoul
-									 * d
-									 * have
-									 * the
-									 * "awx"
-									 * 
-									 * attri
-									 * butes
-									 * 
-									 * set.
-									 */
-									;
-#endif
-								else {
-									if (match_p->group_name == NULL)
-										as_warn(("setting incorrect section attributes for %s"),
-											name);
-									override = true;
-								}
+			}
 		}
 		if (!override && old_sec == NULL)
 			attr |= ssect->attr;
@@ -35643,58 +35588,58 @@ struct elf_reloc_map {
 };
 static const struct elf_reloc_map riscv_reloc_map[] =
 {
-	{BFD_RELOC_NONE,R_RISCV_NONE},
-	{BFD_RELOC_32,R_RISCV_32},
-	{BFD_RELOC_64,R_RISCV_64},
-	{BFD_RELOC_RISCV_ADD8,R_RISCV_ADD8},
-	{BFD_RELOC_RISCV_ADD16,R_RISCV_ADD16},
-	{BFD_RELOC_RISCV_ADD32,R_RISCV_ADD32},
-	{BFD_RELOC_RISCV_ADD64,R_RISCV_ADD64},
-	{BFD_RELOC_RISCV_SUB8,R_RISCV_SUB8},
-	{BFD_RELOC_RISCV_SUB16,R_RISCV_SUB16},
-	{BFD_RELOC_RISCV_SUB32,R_RISCV_SUB32},
-	{BFD_RELOC_RISCV_SUB64,R_RISCV_SUB64},
-	{BFD_RELOC_CTOR,R_RISCV_64},
-	{BFD_RELOC_12_PCREL,R_RISCV_BRANCH},
-	{BFD_RELOC_RISCV_HI20,R_RISCV_HI20},
-	{BFD_RELOC_RISCV_LO12_I,R_RISCV_LO12_I},
-	{BFD_RELOC_RISCV_LO12_S,R_RISCV_LO12_S},
-	{BFD_RELOC_RISCV_PCREL_LO12_I,R_RISCV_PCREL_LO12_I},
-	{BFD_RELOC_RISCV_PCREL_LO12_S,R_RISCV_PCREL_LO12_S},
-	{BFD_RELOC_RISCV_CALL,R_RISCV_CALL},
-	{BFD_RELOC_RISCV_CALL_PLT,R_RISCV_CALL_PLT},
-	{BFD_RELOC_RISCV_PCREL_HI20,R_RISCV_PCREL_HI20},
-	{BFD_RELOC_RISCV_JMP,R_RISCV_JAL},
-	{BFD_RELOC_RISCV_GOT_HI20,R_RISCV_GOT_HI20},
-	{BFD_RELOC_RISCV_TLS_DTPMOD32,R_RISCV_TLS_DTPMOD32},
-	{BFD_RELOC_RISCV_TLS_DTPREL32,R_RISCV_TLS_DTPREL32},
-	{BFD_RELOC_RISCV_TLS_DTPMOD64,R_RISCV_TLS_DTPMOD64},
-	{BFD_RELOC_RISCV_TLS_DTPREL64,R_RISCV_TLS_DTPREL64},
-	{BFD_RELOC_RISCV_TLS_TPREL32,R_RISCV_TLS_TPREL32},
-	{BFD_RELOC_RISCV_TLS_TPREL64,R_RISCV_TLS_TPREL64},
-	{BFD_RELOC_RISCV_TPREL_HI20,R_RISCV_TPREL_HI20},
-	{BFD_RELOC_RISCV_TPREL_ADD,R_RISCV_TPREL_ADD},
-	{BFD_RELOC_RISCV_TPREL_LO12_S,R_RISCV_TPREL_LO12_S},
-	{BFD_RELOC_RISCV_TPREL_LO12_I,R_RISCV_TPREL_LO12_I},
-	{BFD_RELOC_RISCV_TLS_GOT_HI20,R_RISCV_TLS_GOT_HI20},
-	{BFD_RELOC_RISCV_TLS_GD_HI20,R_RISCV_TLS_GD_HI20},
-	{BFD_RELOC_RISCV_ALIGN,R_RISCV_ALIGN},
-	{BFD_RELOC_RISCV_RVC_BRANCH,R_RISCV_RVC_BRANCH},
-	{BFD_RELOC_RISCV_RVC_JUMP,R_RISCV_RVC_JUMP},
-	{BFD_RELOC_RISCV_RVC_LUI,R_RISCV_RVC_LUI},
-	{BFD_RELOC_RISCV_GPREL_I,R_RISCV_GPREL_I},
-	{BFD_RELOC_RISCV_GPREL_S,R_RISCV_GPREL_S},
-	{BFD_RELOC_RISCV_TPREL_I,R_RISCV_TPREL_I},
-	{BFD_RELOC_RISCV_TPREL_S,R_RISCV_TPREL_S},
-	{BFD_RELOC_RISCV_RELAX,R_RISCV_RELAX},
-	{BFD_RELOC_RISCV_SUB6,R_RISCV_SUB6},
-	{BFD_RELOC_RISCV_SET6,R_RISCV_SET6},
-	{BFD_RELOC_RISCV_SET8,R_RISCV_SET8},
-	{BFD_RELOC_RISCV_SET16,R_RISCV_SET16},
-	{BFD_RELOC_RISCV_SET32,R_RISCV_SET32},
-	{BFD_RELOC_RISCV_32_PCREL,R_RISCV_32_PCREL},
-	{BFD_RELOC_RISCV_SET_ULEB128,R_RISCV_SET_ULEB128},
-	{BFD_RELOC_RISCV_SUB_ULEB128,R_RISCV_SUB_ULEB128},
+	{BFD_RELOC_NONE,                 R_RISCV_NONE},
+	{BFD_RELOC_32,                   R_RISCV_32},
+	{BFD_RELOC_64,                   R_RISCV_64},
+	{BFD_RELOC_RISCV_ADD8,           R_RISCV_ADD8},
+	{BFD_RELOC_RISCV_ADD16,          R_RISCV_ADD16},
+	{BFD_RELOC_RISCV_ADD32,          R_RISCV_ADD32},
+	{BFD_RELOC_RISCV_ADD64,          R_RISCV_ADD64},
+	{BFD_RELOC_RISCV_SUB8,           R_RISCV_SUB8},
+	{BFD_RELOC_RISCV_SUB16,          R_RISCV_SUB16},
+	{BFD_RELOC_RISCV_SUB32,          R_RISCV_SUB32},
+	{BFD_RELOC_RISCV_SUB64,          R_RISCV_SUB64},
+	{BFD_RELOC_CTOR,                 R_RISCV_64},
+	{BFD_RELOC_12_PCREL,             R_RISCV_BRANCH},
+	{BFD_RELOC_RISCV_HI20,           R_RISCV_HI20},
+	{BFD_RELOC_RISCV_LO12_I,         R_RISCV_LO12_I},
+	{BFD_RELOC_RISCV_LO12_S,         R_RISCV_LO12_S},
+	{BFD_RELOC_RISCV_PCREL_LO12_I,   R_RISCV_PCREL_LO12_I},
+	{BFD_RELOC_RISCV_PCREL_LO12_S,   R_RISCV_PCREL_LO12_S},
+	{BFD_RELOC_RISCV_CALL,           R_RISCV_CALL},
+	{BFD_RELOC_RISCV_CALL_PLT,       R_RISCV_CALL_PLT},
+	{BFD_RELOC_RISCV_PCREL_HI20,     R_RISCV_PCREL_HI20},
+	{BFD_RELOC_RISCV_JMP,            R_RISCV_JAL},
+	{BFD_RELOC_RISCV_GOT_HI20,       R_RISCV_GOT_HI20},
+	{BFD_RELOC_RISCV_TLS_DTPMOD32,   R_RISCV_TLS_DTPMOD32},
+	{BFD_RELOC_RISCV_TLS_DTPREL32,   R_RISCV_TLS_DTPREL32},
+	{BFD_RELOC_RISCV_TLS_DTPMOD64,   R_RISCV_TLS_DTPMOD64},
+	{BFD_RELOC_RISCV_TLS_DTPREL64,   R_RISCV_TLS_DTPREL64},
+	{BFD_RELOC_RISCV_TLS_TPREL32,    R_RISCV_TLS_TPREL32},
+	{BFD_RELOC_RISCV_TLS_TPREL64,    R_RISCV_TLS_TPREL64},
+	{BFD_RELOC_RISCV_TPREL_HI20,     R_RISCV_TPREL_HI20},
+	{BFD_RELOC_RISCV_TPREL_ADD,      R_RISCV_TPREL_ADD},
+	{BFD_RELOC_RISCV_TPREL_LO12_S,   R_RISCV_TPREL_LO12_S},
+	{BFD_RELOC_RISCV_TPREL_LO12_I,   R_RISCV_TPREL_LO12_I},
+	{BFD_RELOC_RISCV_TLS_GOT_HI20,   R_RISCV_TLS_GOT_HI20},
+	{BFD_RELOC_RISCV_TLS_GD_HI20,    R_RISCV_TLS_GD_HI20},
+	{BFD_RELOC_RISCV_ALIGN,          R_RISCV_ALIGN},
+	{BFD_RELOC_RISCV_RVC_BRANCH,     R_RISCV_RVC_BRANCH},
+	{BFD_RELOC_RISCV_RVC_JUMP,       R_RISCV_RVC_JUMP},
+	{BFD_RELOC_RISCV_RVC_LUI,        R_RISCV_RVC_LUI},
+	{BFD_RELOC_RISCV_GPREL_I,        R_RISCV_GPREL_I},
+	{BFD_RELOC_RISCV_GPREL_S,        R_RISCV_GPREL_S},
+	{BFD_RELOC_RISCV_TPREL_I,        R_RISCV_TPREL_I},
+	{BFD_RELOC_RISCV_TPREL_S,        R_RISCV_TPREL_S},
+	{BFD_RELOC_RISCV_RELAX,          R_RISCV_RELAX},
+	{BFD_RELOC_RISCV_SUB6,           R_RISCV_SUB6},
+	{BFD_RELOC_RISCV_SET6,           R_RISCV_SET6},
+	{BFD_RELOC_RISCV_SET8,           R_RISCV_SET8},
+	{BFD_RELOC_RISCV_SET16,          R_RISCV_SET16},
+	{BFD_RELOC_RISCV_SET32,          R_RISCV_SET32},
+	{BFD_RELOC_RISCV_32_PCREL,       R_RISCV_32_PCREL},
+	{BFD_RELOC_RISCV_SET_ULEB128,    R_RISCV_SET_ULEB128},
+	{BFD_RELOC_RISCV_SUB_ULEB128,    R_RISCV_SUB_ULEB128},
 };
 /* Given a BFD reloc type,return a howto structure.  */
 static reloc_howto_type *riscv_reloc_type_lookup(bfd * abfd ATTRIBUTE_UNUSED,

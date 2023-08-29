@@ -2443,22 +2443,6 @@ typedef unsigned int relax_substateT;
    Could be a problem, cross-assembling for 64-bit machines.  */
 typedef addressT relax_addressT;
 
-struct relax_type
-{
-  /* Forward reach. Signed number. > 0.  */
-  offsetT rlx_forward;
-  /* Backward reach. Signed number. < 0.  */
-  offsetT rlx_backward;
-
-  /* Bytes length of this address.  */
-  unsigned char rlx_length;
-
-  /* Next longer relax-state.  0 means there is no 'next' relax-state.  */
-  relax_substateT rlx_more;
-};
-
-typedef struct relax_type relax_typeS;
-
 /* main program "as.c" (command arguments etc).  */
 
 static unsigned char flag_no_comments; /* -f */
@@ -6278,7 +6262,6 @@ struct elf_section_match {
   flagword       flags;
 };
 
-#define OBJ_SYMFIELD_TYPE struct elf_obj_sy
 
 static void elf_begin (void);
 
@@ -6630,19 +6613,6 @@ struct fix {
   const char *fx_file;
   unsigned fx_line;
 
-#ifdef USING_CGEN
-  struct {
-    /* CGEN_INSN entry for this instruction.  */
-    const struct cgen_insn *insn;
-    /* Target specific data, usually reloc number.  */
-    int opinfo;
-    /* Which ifield this fixup applies to. */
-    struct cgen_maybe_multi_ifield * field;
-    /* is this field is the MSB field in a set? */
-    int msb_field_p;
-  } fx_cgen;
-#endif
-
 #ifdef TC_FIX_TYPE
   /* Location where a backend can attach additional data
      needed to perform fixups.  */
@@ -6736,10 +6706,6 @@ struct frag {
   const char *fr_file;
   unsigned int fr_line;
 
-#ifndef NO_LISTING
-  struct list_info_struct *line;
-#endif
-
   /* A serial number for a sequence of frags having at most one alignment
      or org frag, and that at the tail of the sequence.  */
   unsigned int region:16;
@@ -6757,24 +6723,7 @@ struct frag {
   relax_stateT fr_type;
   relax_substateT fr_subtype;
 
-#ifdef USING_CGEN
-  /* Don't include this unless using CGEN to keep frag size down.  */
-  struct {
-    /* CGEN_INSN entry for this instruction.  */
-    const struct cgen_insn *insn;
-    /* Index into operand table.  */
-    int opindex;
-    /* Target specific data, usually reloc number.  */
-    int opinfo;
-  } fr_cgen;
-#endif
-
-#ifdef TC_FRAG_TYPE
-  TC_FRAG_TYPE tc_frag_data;
-#endif
-#ifdef OBJ_FRAG_TYPE
-  OBJ_FRAG_TYPE obj_frag_data;
-#endif
+  struct riscv_frag_type tc_frag_data;
 
   /* Data begins here.  */
   char fr_literal[1];
@@ -7085,14 +7034,8 @@ static asymbol *symbol_get_bfdsym (symbolS *);
 static void symbol_set_bfdsym (symbolS *, asymbol *);
 static int symbol_same_p (symbolS *, symbolS *);
 
-#ifdef OBJ_SYMFIELD_TYPE
-static OBJ_SYMFIELD_TYPE *symbol_get_obj (symbolS *);
-#endif
+static struct elf_obj_sy *symbol_get_obj (symbolS *);
 
-#ifdef TC_SYMFIELD_TYPE
-TC_SYMFIELD_TYPE *symbol_get_tc (symbolS *);
-static void symbol_set_tc (symbolS *, TC_SYMFIELD_TYPE *);
-#endif
 /* An expandable hash tables datatype.  */
 /* This package implements basic hash table functionality.  It is possible
    to search for an entry, create an entry and destroy an entry.
@@ -8954,6 +8897,21 @@ typedef struct symbol {
 	struct xsymbol *x;
 }		symbolS;
 
+/* Extra fields to make up a full symbol.  */
+struct xsymbol {
+	/* The value of the symbol.  */
+	expressionS	value;
+
+	/* Forwards and backwards chain pointers.  */
+	struct symbol  *next;
+	struct symbol  *previous;
+	struct elf_obj_sy obj;
+};
+
+typedef union symbol_entry {
+	struct local_symbol lsy;
+	struct symbol	sy;
+}		symbol_entry_t;
 /* =======================================================** dw2gencfi.c */
 /* dw2gencfi.h - Support for generating Dwarf2 CFI information. */
 //---------------------------------------------------include "dwarf2.h"
@@ -9147,7 +9105,6 @@ static void	output_sframe(segT sframe_seg);
 #define CUR_SEG(structp) NULL
 #define SET_CUR_SEG(structp,seg) (void) (0 && seg)
 #define HANDLED(structp) 0
-#define SET_HANDLED(structp,val) (void) (0 && val)
 
 #ifndef tc_cfi_reloc_for_encoding
 #define tc_cfi_reloc_for_encoding(e) BFD_RELOC_NONE

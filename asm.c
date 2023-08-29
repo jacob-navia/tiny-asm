@@ -523,8 +523,7 @@ This program has absolutely no warranty.\n");
 				if (strcasecmp(optarg,"yes") == 0)
 					flag_generate_build_notes = true;
 				else
-					as_fatal(("Invalid --generate-missing-build-notes option: `%s'"),
-						 optarg);
+					as_fatal("Invalid --generate-missing-build-notes option: `%s'",optarg);
 			break;
 
 		case OPTION_SFRAME:
@@ -1786,7 +1785,6 @@ static struct fde_entry *alloc_fde_entry(void)
 	*last_fde_data = fde;
 	last_fde_data = &fde->next;
 	SET_CUR_SEG(fde,is_now_linkonce_segment());
-	SET_HANDLED(fde,0);
 	fde->last = &fde->data;
 	fde->return_column = DWARF2_DEFAULT_RETURN_COLUMN;
 	fde->per_encoding = DW_EH_PE_omit;
@@ -3220,7 +3218,6 @@ static void	cfi_finish(void)
 						(void)cfi_seg;
 						seek_next_seg = 1;
 					}
-					SET_HANDLED(fde,1);
 				}
 				if (fde->end_address == NULL) {
 					as_bad(("open CFI at the end of file; "
@@ -3235,9 +3232,6 @@ static void	cfi_finish(void)
 		}
 		while (EH_FRAME_LINKONCE && seek_next_seg == 2);
 
-		if (EH_FRAME_LINKONCE)
-			for (fde = all_fde_data; fde; fde = fde->next)
-				SET_HANDLED(fde,0);
 		flag_traditional_format = save_flag_traditional_format;
 	}
 	cfi_sections_set = true;
@@ -6529,19 +6523,11 @@ static int	eh_frame_estimate_size_before_relax(fragS * frag)
 
 	gas_assert(ca > 0);
 	diff /= ca;
-	if (diff == 0)
-		ret = -1;
-	else
-		if (diff < 0x40)
-			ret = 0;
-		else
-			if (diff < 0x100)
-				ret = 1;
-			else
-				if (diff < 0x10000)
-					ret = 2;
-				else
-					ret = 4;
+	if (diff == 0) ret = -1;
+	else if (diff < 0x40) ret = 0;
+	else if (diff < 0x100) ret = 1;
+	else if (diff < 0x10000) ret = 2;
+	else ret = 4;
 
 	frag->fr_subtype = (frag->fr_subtype & ~7)|(ret & 7);
 
@@ -7302,13 +7288,7 @@ kkk
 								for (i = 0; i < expressionP->X_add_number; ++i)
 									generic_bignum[i] = ~generic_bignum[i];
 
-								/*
-								 * Extend the
-								 * bignum to at
-								 * least the
-								 * size of
-								 * .octa.
-								 */
+								/* Extend the bignum to at least the size of .octa. */
 								if (expressionP->X_add_number < SIZE_OF_LARGE_NUMBER) {
 									expressionP->X_add_number = SIZE_OF_LARGE_NUMBER;
 									for (; i < expressionP->X_add_number; ++i)
@@ -7337,14 +7317,7 @@ kkk
 									expressionP->X_add_symbol = make_expr_symbol(expressionP);
 									expressionP->X_op = op;
 									expressionP->X_add_number = 0;
-								} else
-									if (!md_register_arithmetic && expressionP->X_op == O_register) {
-										/* Convert to binary  '+ ' . */
-										expressionP->X_op_symbol = make_expr_symbol(expressionP);
-										expressionP->X_add_symbol = make_expr_symbol(&exp_zero);
-										expressionP->X_add_number = 0;
-										expressionP->X_op = O_add;
-									}
+								} 
 							} else
 								as_warn(("Unary operator %c ignored because bad operand follows"),
 									c);
@@ -7932,8 +7905,7 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 				     && !S_FORCE_RELOC(right.X_add_symbol,0))
 				|| right.X_add_symbol == resultP->X_add_symbol)
 				    && frag_offset_fixed_p(symbol_get_frag(resultP->X_add_symbol),
-					  symbol_get_frag(right.X_add_symbol),
-							   &frag_off)) {
+					  symbol_get_frag(right.X_add_symbol), &frag_off)) {
 					offsetT		symval_diff = S_GET_VALUE(resultP->X_add_symbol)
 					- S_GET_VALUE(right.X_add_symbol);
 					subtract_from_result(resultP,right.X_add_number,right.X_extrabit);
@@ -7942,58 +7914,51 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 					resultP->X_op = O_constant;
 					resultP->X_add_symbol = 0;
 					is_unsigned = false;
-				} else
-					if (op_left == O_subtract && right.X_op == O_constant
-					    && (md_register_arithmetic || resultP->X_op != O_register)) {
-						/* X - constant.  */
-						subtract_from_result(resultP,right.X_add_number,right.X_extrabit);
-						is_unsigned = false;
-					} else
-						if (op_left == O_add && resultP->X_op == O_constant
-						    && (md_register_arithmetic || right.X_op != O_register)) {
-							/* Constant + X.  */
-							resultP->X_op = right.X_op;
-							resultP->X_add_symbol = right.X_add_symbol;
-							resultP->X_op_symbol = right.X_op_symbol;
-							add_to_result(resultP,right.X_add_number,right.X_extrabit);
-							retval = rightseg;
-						} else
-							if (resultP->X_op == O_constant && right.X_op == O_constant) {
-								/*
-								 * Constant OP
-								 * constant.
-								 */
-								offsetT		v = right.X_add_number;
-								if (v == 0 && (op_left == O_divide || op_left == O_modulus)) {
-									as_warn(("division by zero"));
-									v = 1;
-								}
-								switch (op_left) {
-								default:
-									goto general;
-								case O_multiply:
-								/*
-								Do the multiply as unsig ned to silence ubsan.
-								The result is of* course the same when we throw
-								away high bits of the result.  */
-									resultP->X_add_number *= (valueT) v;
+				} else if (op_left == O_subtract && right.X_op == O_constant
+				    && (md_register_arithmetic || resultP->X_op != O_register)) {
+					/* X - constant.  */
+					subtract_from_result(resultP,right.X_add_number,right.X_extrabit);
+					is_unsigned = false;
+				} else if (op_left == O_add && resultP->X_op == O_constant
+					&& (md_register_arithmetic || right.X_op != O_register)) {
+						/* Constant + X.  */
+						resultP->X_op = right.X_op;
+						resultP->X_add_symbol = right.X_add_symbol;
+						resultP->X_op_symbol = right.X_op_symbol;
+						add_to_result(resultP,right.X_add_number,right.X_extrabit);
+						retval = rightseg;
+				} else if (resultP->X_op == O_constant && right.X_op == O_constant) {
+					/* Constant OP constant.  */
+					offsetT		v = right.X_add_number;
+					if (v == 0 && (op_left == O_divide || op_left == O_modulus)) {
+						as_warn("division by zero");
+						v = 1;
+					}
+					switch (op_left) {
+					default:
+						goto general;
+					case O_multiply:
+						/* Do the multiply as unsig ned to silence ubsan.
+							The result is of course the same when we throw
+							away high bits of the result.  */
+						resultP->X_add_number *= (valueT) v;
 									break;
-								case O_divide:
-									resultP->X_add_number /= v;
-									break;
-								case O_modulus:
-									resultP->X_add_number %= v;
-									break;
-								case O_left_shift:
-								case O_right_shift:
+					case O_divide:
+						resultP->X_add_number /= v;
+						break;
+					case O_modulus:
+						resultP->X_add_number %= v;
+						break;
+					case O_left_shift:
+					case O_right_shift:
 					          /* We always use unsigned shifts.  According to the ISO
          						C standard, left shift of a signed type having a
          						negative value is undefined behaviour, and right
          						shift of a signed type having negative value is
          						implementation defined.  Left shift of a signed type
          						when the result overflows is also undefined
-         						behaviour.  So don't trigger ubsan warnings or rely
-         						on characteristics of the compiler.  */
+         						behaviour.  So don't trigger ubsan warnings or rely */
+
 									if ((valueT) v >= sizeof(valueT) * CHAR_BIT) {
 										as_warn_value_out_of_range(("shift count"),v,0,
 													   sizeof(valueT) * CHAR_BIT - 1,
@@ -8104,33 +8069,22 @@ static segT	expr(int rankarg,	/* Larger # is higher rank.  */
 
 		if (retval != rightseg) {
 			if (retval == undefined_section);
-			else
-				if (rightseg == undefined_section)
-					retval = rightseg;
-				else
-					if (retval == expr_section);
-					else
-						if (rightseg == expr_section)
-							retval = rightseg;
-						else
-							if (retval == reg_section);
-							else
-								if (rightseg == reg_section)
-									retval = rightseg;
-								else
-									if (rightseg == absolute_section);
-									else
-										if (retval == absolute_section)
-											retval = rightseg;
-#ifdef DIFF_EXPR_OK
-										else
-											if (op_left == O_subtract);
-#endif
-											else
-												as_bad(("operation combines symbols in different segments"));
+			else if (rightseg == undefined_section)
+				retval = rightseg;
+			else if (retval == expr_section);
+			else if (rightseg == expr_section)
+				retval = rightseg;
+			else if (retval == reg_section);
+			else if (rightseg == reg_section)
+				retval = rightseg;
+			else if (rightseg == absolute_section);
+			else if (retval == absolute_section)
+				retval = rightseg;
+			else if (op_left == O_subtract);
+			else as_bad("operation combines symbols in different segments");
 		}
 		op_left = op_right;
-	}			/* While next operator is >= this rank.  */
+	}	/* While next operator is >= this rank.  */
 
 	/* The PA port needs this information.  */
 	if (resultP->X_add_symbol)
@@ -12184,10 +12138,6 @@ static void	s_weakref(int ignore ATTRIBUTE_UNUSED)
 			as_bad(("symbol `%s' is already defined"),name);
 			goto err_out;
 		//}
-#if 0
-		symbolP = symbol_clone(symbolP,1);
-		S_CLEAR_VOLATILE(symbolP);
-#endif
 	}
 	SKIP_WHITESPACE();
 
@@ -14067,8 +14017,6 @@ static unsigned int get_stab_string_offset(const char *string,
 	segT		seg;
 	char           *p;
 
-	if (!SEPARATE_STAB_SECTIONS)
-		abort();
 
 	length = strlen(string);
 
@@ -14809,29 +14757,6 @@ static int	seg_not_empty_p(segT sec ATTRIBUTE_UNUSED)
 /* end of subsegs.c */
 /* =======================================================**** symbols.c */
 typedef struct symbol symbolS;
-/* Extra fields to make up a full symbol.  */
-
-struct xsymbol {
-	/* The value of the symbol.  */
-	expressionS	value;
-
-	/* Forwards and backwards chain pointers.  */
-	struct symbol  *next;
-	struct symbol  *previous;
-
-#ifdef OBJ_SYMFIELD_TYPE
-	OBJ_SYMFIELD_TYPE obj;
-#endif
-
-#ifdef TC_SYMFIELD_TYPE
-	TC_SYMFIELD_TYPE tc;
-#endif
-};
-
-typedef union symbol_entry {
-	struct local_symbol lsy;
-	struct symbol	sy;
-}		symbol_entry_t;
 
 /* Hash function for a symbol_entry.  */
 
@@ -14864,10 +14789,7 @@ static void    *symbol_entry_find(htab_t table,const char *name)
 }
 
 
-/*
- * This is non-zero if symbols are case sensitive,which is the default.
- */
-/* Below are commented in "symbols.h".  */
+/* Below are commented in "asm.h".  */
 static symbolS *symbol_rootP;
 static symbolS *symbol_lastP;
 static symbolS	abs_symbol;
@@ -15688,8 +15610,7 @@ static valueT	resolve_symbol_value(symbolS * symp)
 
 	if (symp->flags.resolving) {
 		if (finalize_syms)
-			as_bad("symbol definition loop encountered at `%s'",
-			       S_GET_NAME(symp));
+			as_bad("symbol definition loop encountered at `%s'", S_GET_NAME(symp));
 		final_val = 0;
 		resolved = 1;
 	}
@@ -16810,7 +16731,7 @@ static void	symbol_set_bfdsym(symbolS * s,asymbol * bsym)
 }
 
 /* Get a pointer to the object format information for a symbol.  */
-static OBJ_SYMFIELD_TYPE *symbol_get_obj(symbolS * s)
+static struct elf_obj_sy *symbol_get_obj(symbolS * s)
 {
 	if (s->flags.local_symbol)
 		s = local_symbol_convert(s);
@@ -16877,14 +16798,6 @@ static void	dot_symbol_init(void)
   (!md_register_arithmetic && (SEG) == reg_section)
 #endif
 
-#ifndef TC_FORCE_RELOCATION_SUB_LOCAL
-#ifdef DIFF_EXPR_OK
-#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX,SEG)	\
-  (!md_register_arithmetic && (SEG) == reg_section)
-#else
-#define TC_FORCE_RELOCATION_SUB_LOCAL(FIX,SEG)	1
-#endif
-#endif
 
 #ifndef TC_VALIDATE_FIX_SUB
 #define TC_VALIDATE_FIX_SUB(FIX,SEG) 0
@@ -16900,10 +16813,6 @@ static void	dot_symbol_init(void)
 
 #ifndef TC_FINALIZE_SYMS_BEFORE_SIZE_SEG
 #define TC_FINALIZE_SYMS_BEFORE_SIZE_SEG 1
-#endif
-
-#ifndef	MD_PCREL_FROM_SECTION
-#define MD_PCREL_FROM_SECTION(FIX,SEC) md_pcrel_from (FIX)
 #endif
 
 #ifndef TC_FAKE_LABEL
@@ -17514,8 +17423,7 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				 * don't attempt to reduce anything that's
 				 * already using one.  */
 				if (symbol_section_p(sym)) {
-					/* Mark the section symbol used in
-					 * relocation so that it will be
+					/* Mark the section symbol used in relocation so that it will be
 					 * included in the symbol table.  */
 					symbol_mark_used_in_reloc(sym);
 					continue;
@@ -17526,8 +17434,7 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 
 				if (bfd_is_abs_section(symsec)
 				    || symsec == reg_section) {
-					/* The fixup_segment routine normally
-					 * will not use this symbol in a
+					/* The fixup_segment routine normally will not use this symbol in a
 					 * relocation.  */
 					continue;
 				}
@@ -17628,63 +17535,19 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 				fixP->fx_offset = add_number;
 				fixP->fx_addsy = NULL;
 				fixP->fx_subsy = NULL;
-			} else if (sub_symbol_segment == absolute_section
-				    && !S_FORCE_RELOC(fixP->fx_subsy,0)
-				    && !TC_FORCE_RELOCATION_SUB_ABS(fixP,add_symbol_segment)) {
-					add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
-					fixP->fx_offset = add_number;
-					fixP->fx_subsy = NULL;
-			} else if (sub_symbol_segment == this_segment
-				  && !S_FORCE_RELOC(fixP->fx_subsy,0)
-				    && !TC_FORCE_RELOCATION_SUB_LOCAL(fixP,add_symbol_segment)) {
-					add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
-					fixP->fx_offset = (add_number + fixP->fx_dot_value
-						   + fixP->fx_dot_frag->fr_address);
-
-					/* Make it pc-relative.  If the back-end code has not
-					 * selected a pc-relative reloc,cancel the adjustment
-					 * we do later on all pc-relative relocs.  */
-					if (!fixP->fx_pcrel)
-						add_number += MD_PCREL_FROM_SECTION(fixP,this_segment);
-					fixP->fx_subsy = NULL;
-					fixP->fx_pcrel = 1;
-			} else if (!TC_VALIDATE_FIX_SUB(fixP,add_symbol_segment)) {
-					if (!md_register_arithmetic
-					    && (add_symbol_segment == reg_section
-						|| sub_symbol_segment == reg_section))
-							as_bad_where(fixP->fx_file,fixP->fx_line,
-									     "register value used as expression");
-						else as_bad_subtract(fixP);
-			} else if (sub_symbol_segment != undefined_section
-				    && !bfd_is_com_section(sub_symbol_segment)
-				    && MD_APPLY_SYM_VALUE(fixP))
-						add_number -= S_GET_VALUE_WHERE(fixP->fx_subsy,fixP->fx_file,fixP->fx_line);
+			} 
 		}
 		if (fixP->fx_addsy) {
-			if (add_symbol_segment == this_segment
-			    && !S_FORCE_RELOC(fixP->fx_addsy,0)
-			    && !TC_FORCE_RELOCATION_LOCAL(fixP)) {
-			/* This fixup was made when the symbol's segment was SEG_UNKNOWN,but it is now in
-			 * the local segment. So we know how to do the * address without relocation.  */
-				add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
-				fixP->fx_offset = add_number;
-				if (fixP->fx_pcrel)
-					add_number -= MD_PCREL_FROM_SECTION(fixP,this_segment);
-				fixP->fx_addsy = NULL;
-				fixP->fx_pcrel = 0;
-			} else if (add_symbol_segment == absolute_section
+			if (add_symbol_segment == absolute_section
 			    && !S_FORCE_RELOC(fixP->fx_addsy,0)
 			    && !TC_FORCE_RELOCATION_ABS(fixP)) {
 					add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
 					fixP->fx_offset = add_number;
 					fixP->fx_addsy = NULL;
-			} else if (add_symbol_segment != undefined_section
-				    && !bfd_is_com_section(add_symbol_segment)
-				    && MD_APPLY_SYM_VALUE(fixP))
-						add_number += S_GET_VALUE_WHERE(fixP->fx_addsy,fixP->fx_file,fixP->fx_line);
+			} 
 		}
 		if (fixP->fx_pcrel) {
-			add_number -= MD_PCREL_FROM_SECTION(fixP,this_segment);
+			add_number -= md_pcrel_from(fixP);
 			if (!fixP->fx_done && fixP->fx_addsy == NULL) {
 			/* There was no symbol required by this relocation. However,BFD doesn't really
 			 * handle relocations without symbols well. So fake up a local symbol 
@@ -18121,7 +17984,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		loc = fixp->fx_where + fx_size;
 		if (slack >= 0 && loc > fixp->fx_frag->fr_fix)
 			as_bad_where(fixp->fx_file,fixp->fx_line,
-			 ("internal error: fixup not contained within frag"));
+			 "internal error: fixup not contained within frag");
 
 		if (fixp->fx_addsy && symbol_removed_p(fixp->fx_addsy))
 			obj_fixup_removed_symbol(&fixp->fx_addsy);
@@ -18161,8 +18024,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				relocs[lo] = *reloc;
 			} else
 				relocs[n++] = *reloc;
-			install_reloc(sec,*reloc,fixp->fx_frag,
-				      fixp->fx_file,fixp->fx_line);
+			install_reloc(sec,*reloc,fixp->fx_frag, fixp->fx_file,fixp->fx_line);
 			break;
 		}
 	}
@@ -18201,9 +18063,6 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		sec->reloc_count = n;
 	}
 	else sec->flags &= ~SEC_RELOC;
-#ifdef SET_SECTION_RELOCS
-	SET_SECTION_RELOCS(sec,relocs,n);
-#endif
 
 #ifdef DEBUG3
 	{
@@ -19426,14 +19285,9 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						}
 						growth = newoff - oldoff;
 
-						/*
-						 * If this align happens to
-						 * follow a leb128 and we have
-						 * determined that the leb128
-						 * is bouncing in size,then
-						 * break the cycle by inserting
-						 * an extra alignment.
-						 */
+						/* If this align happens to follow a leb128 and we have
+						 * determined that the leb128 is bouncing in size,then
+						 * break the cycle by inserting an extra alignment.  */
 						if (growth < 0
 						&& (rs_leb128_fudge & 16) != 0
 						    && (rs_leb128_fudge & 15) >= 2) {
@@ -19458,23 +19312,16 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 								newf->fr_offset = (offsetT) 1 << fragP->fr_offset;
 								newf->fr_var = 1;
 							}
-							/*
-							 * Include size of new
-							 * frag in GROWTH.
-							 */
+							/* Include size of new frag in GROWTH.  */
 							growth += newf->fr_offset * newf->fr_var;
 							/*
-							 * Adjust the new frag
-							 * address for the
-							 * amount we'll add
-							 * when we process the
-							 * new frag.
-							 */
+							 * Adjust the new frag address for the amount we'll add
+							 * when we process the * new frag.  */
 							newf->fr_address -= stretch + growth;
 							newf->relax_marker ^= 1;
 							fragP->fr_next = newf;
 #ifdef DEBUG
-							as_warn(("padding added"));
+							as_warn("padding added");
 #endif
 						}
 					}
@@ -19486,19 +19333,9 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						addressT	after;
 
 						if (symbolP) {
-							/*
-							 * Convert from an
-							 * actual address to an
-							 * octet offset into
-							 * the section.  Here
-							 * it is assumed that
-							 * the section's VMA is
-							 * zero,and can omit
-							 * subtracting it from
-							 * the symbol's value
-							 * to get the address
-							 * offset.
-							 */
+							/* Convert from an actual address to an  offset into the section. Here
+							 * it is assumed that the section's VMA is zero,and can omit subtracting 
+							 * it from the symbol's value to get the address offset. */
 							know(S_GET_SEGMENT(symbolP)->vma == 0);
 							target += S_GET_VALUE(symbolP) * OCTETS_PER_BYTE;
 						}
@@ -19506,45 +19343,20 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						after = fragP->fr_next->fr_address + stretch;
 						growth = target - after;
 
-						/*
-						 * Growth may be negative,but
-						 * variable part of frag cannot
-						 * have fewer than 0 chars.
-						 * That is,we can't .org
-						 * backwards.
-						 */
+						/* Growth may be negative,but variable part of frag cannot have fewer 
+						 * than 0 chars. That is,we can't .org backwards.  */
 						if ((offsetT) (address + fragP->fr_fix) > target) {
 							growth = 0;
 
 							/*
-							 * Don't error on first
-							 * few frag relax
-							 * passes. The symbol
-							 * might be an
-							 * expression involving
-							 * symbol values from
-							 * other sections.  If
-							 * those sections have
-							 * not yet been
-							 * processed their
-							 * frags will all have
-							 * zero addresses,so
-							 * we will calculate
-							 * incorrect values for
-							 * them.  The number of
-							 * passes we allow
-							 * before giving an
-							 * error is somewhat
-							 * arbitrary.  It
-							 * should be at least
-							 * one,with larger
-							 * values requiring
-							 * increasingly
-							 * contrived
-							 * dependencies between
-							 * frags to trigger a
-							 * false error.
-							 */
+							 * Don't error on first few frag relax passes. The symbol might be an
+							 * expression involving symbol values from other sections.  If those 
+							 * sections have not yet been processed their frags will all have
+							 * zero addresses,so we will calculate incorrect values for them.  
+							 * The number of passes we allow before giving an error is somewhat
+							 * arbitrary. It should be at least one,with larger values requiring
+							 * increasingly contrived dependencies between frags to trigger a
+							 * false error.  */
 							if (pass < 2) {
 								/*
 								 * Force
@@ -19554,16 +19366,10 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 								ret = 1;
 								break;
 							}
-							as_bad_where(fragP->fr_file,fragP->fr_line,
-								     ("attempt to move .org backwards"));
+							as_bad_where(fragP->fr_file,fragP->fr_line,"attempt to .org backwards");
 
-							/*
-							 * We've issued an
-							 * error message.
-							 * Change the frag to
-							 * avoid cascading
-							 * errors.
-							 */
+							/* We've issued an error message. Change the frag to avoid cascading
+							 * errors. */
 							fragP->fr_type = rs_align;
 							fragP->fr_subtype = 0;
 							fragP->fr_offset = 0;
@@ -19584,23 +19390,12 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						  || !S_IS_DEFINED(symbolP)) {
 							as_bad_where(fragP->fr_file,fragP->fr_line,
 								     (".space,.nops or .fill specifies non-absolute value"));
-							/*
-							 * Prevent repeat of
-							 * this error message.
-							 */
+							/* Prevent repeat of this error message. */
 							fragP->fr_symbol = 0;
 						} else
 							if (amount < 0) {
-								/*
-								 * Don't error
-								 * on first few
-								 * frag relax
-								 * passes. See
-								 * rs_org
-								 * comment for
-								 * a longer
-								 * explanation.
-								 */
+								/* Don't error on first few frag relax passes. See rs_org
+								 * comment for a longer explanation.  */
 								if (pass < 2) {
 									ret = 1;
 									break;
@@ -21462,10 +21257,8 @@ static void	add_relaxed_insn(struct riscv_cl_insn *insn,int max_chars,int var,
 		 subtype,symbol,offset,NULL);
 }
 
-/*
- * Compute the length of a branch sequence,and adjust the stored length
- * accordingly.  If FRAGP is NULL,the worst-case length is returned.
- */
+/* Compute the length of a branch sequence,and adjust the stored length
+ * accordingly.  If FRAGP is NULL,the worst-case length is returned.  */
 static unsigned	relaxed_branch_length(fragS * fragp,asection * sec,int update)
 {
 	int		jump      ,rvc,length = 8;
@@ -23653,16 +23446,6 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 
 	asargStart = asarg;
 	for (; insn && insn->name && strcmp(insn->name,str) == 0; insn++) {
-#if 0
-		if ((insn->xlen_requirement != 0) && (xlen != insn->xlen_requirement))
-			continue;
-
-		if (!riscv_multi_subset_supports(&riscv_rps_as,insn->insn_class)) {
-			error.missing_ext = riscv_multi_subset_supports_ext(&riscv_rps_as,
-							    insn->insn_class);
-			continue;
-		}
-#endif
 		/* Reset error message of the previous round.  */
 		error.msg = ("illegal operands");
 		error.missing_ext = NULL;
@@ -32945,11 +32728,6 @@ error_return:
 	}
 
 	name_local_sections = 0;
-#if 0
-	= (bed->elf_backend_name_local_section_symbols
-	   && bed->elf_backend_name_local_section_symbols(abfd));
-#endif
-
 	syms = abfd->outsymbols;
 	for (idx = 0; idx < symcount;) {
 		Elf_Internal_Sym sym;
@@ -33109,13 +32887,6 @@ Unable to handle section index %x in ELF symbol.  Using ABS instead."),
 		if (syms[idx]->section->flags & SEC_THREAD_LOCAL)
 			type = STT_TLS;
 
-#if 0
-		/* Processor-specific types.  */
-		if (type_ptr != NULL
-		    && bed->elf_backend_get_symbol_type)
-			type = ((*bed->elf_backend_get_symbol_type)
-				(&type_ptr->internal_elf_sym,type));
-#endif
 		if (flags & BSF_SECTION_SYM) {
 			if (flags & BSF_GLOBAL)
 				sym.st_info = ELF_ST_INFO(STB_GLOBAL,STT_SECTION);
@@ -33519,10 +33290,6 @@ static bool	elf_close_and_cleanup(bfd * abfd)
 	if (tdata != NULL) {
 		if (elf_tdata(abfd)->o != NULL && elf_shstrtab(abfd) != NULL)
 			_bfd_elf_strtab_free(elf_shstrtab(abfd));
-#if 0
-		_bfd_dwarf2_cleanup_debug_info(abfd,&tdata->dwarf2_find_line_info);
-		_bfd_dwarf1_cleanup_debug_info(abfd,&tdata->dwarf1_find_line_info);
-#endif
 		_bfd_stab_cleanup(abfd,&tdata->line_info);
 	}
 	return true;

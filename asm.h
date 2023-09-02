@@ -2204,21 +2204,11 @@ struct obstack;
 # endif
 #else
 # define gettext(Msgid) (Msgid)
-# define dgettext(Domainname, Msgid) (Msgid)
-# define dcgettext(Domainname, Msgid, Category) (Msgid)
-# define ngettext(Msgid1, Msgid2, n) \
-  (n == 1 ? Msgid1 : Msgid2)
-# define dngettext(Domainname, Msgid1, Msgid2, n) \
-  (n == 1 ? Msgid1 : Msgid2)
-# define dcngettext(Domainname, Msgid1, Msgid2, n, Category) \
-  (n == 1 ? Msgid1 : Msgid2)
-# define _(String) (String)
-# define N_(String) (String)
 #endif
 
 #define BAD_CASE(val)							    \
   {									    \
-    as_fatal (_("Case value %ld unexpected at line %d of file \"%s\"\n"),   \
+    as_fatal ("Case value %ld unexpected at line %d of file \"%s\"\n",   \
 	      (long) val, __LINE__, __FILE__);				    \
   }
 
@@ -2467,10 +2457,6 @@ static int flag_no_warnings; /* -W */
 
 /* True if warnings count as errors.  */
 static int flag_fatal_warnings; /* --fatal-warnings */
-
-/* True if we should attempt to generate output even if non-fatal errors
-   are detected.  */
-static unsigned char flag_always_generate_output; /* -Z */
 
 /* This is true if the assembler should output time and space usage.  */
 static unsigned char flag_print_statistics;
@@ -9127,6 +9113,40 @@ static bool	compact_eh;
 #else
 #define compact_eh 0
 #endif
+
+/* Macros for encoding relaxation state for RVC branches and far jumps.  */
+#define RELAX_BRANCH_ENCODE(uncond,rvc,length)	\
+  ((relax_substateT) 					\
+   (0xc0000000						\
+   |((uncond) ? 1 : 0)				\
+   |((rvc) ? 2 : 0)					\
+   |((length) << 2)))
+#define RELAX_BRANCH_P(i) (((i) & 0xf0000000) == 0xc0000000)
+#define RELAX_BRANCH_LENGTH(i) (((i) >> 2) & 0xF)
+#define RELAX_BRANCH_RVC(i) (((i) & 2) != 0)
+#define RELAX_BRANCH_UNCOND(i) (((i) & 1) != 0)
+
+/* Is the given value a sign-extended 32-bit value?  */
+#define IS_SEXT_32BIT_NUM(x)						\
+  (((x) &~ (offsetT) 0x7fffffff) == 0					\
+   || (((x) &~ (offsetT) 0x7fffffff) == ~ (offsetT) 0x7fffffff))
+
+/* Is the given value a zero-extended 32-bit value?  Or a negated one?  */
+#define IS_ZEXT_32BIT_NUM(x)						\
+  (((x) &~ (offsetT) 0xffffffff) == 0					\
+   || (((x) &~ (offsetT) 0xffffffff) == ~ (offsetT) 0xffffffff))
+
+/* Change INSN's opcode so that the operand given by FIELD has value VALUE.
+ * INSN is a riscv_cl_insn structure and VALUE is evaluated exactly once.  */
+#define INSERT_OPERAND(FIELD,INSN,VALUE) \
+  INSERT_BITS ((INSN).insn_opcode,VALUE,OP_MASK_##FIELD,OP_SH_##FIELD)
+
+#define INSERT_IMM(n,s,INSN,VALUE) \
+  INSERT_BITS ((INSN).insn_opcode,VALUE,(1ULL<<n) - 1,s)
+
+/* Determine if an instruction matches an opcode.  */
+#define OPCODE_MATCHES(OPCODE,OP) \
+  (((OPCODE) & MASK_##OP) == MATCH_##OP)
 
 #endif /* GAS */
 

@@ -348,17 +348,13 @@ static void	parse_args(int *pargc,char ***pargv)
 		case OPTION_MULTIBYTE_HANDLING:
 			if (strcmp(optarg,"allow") == 0)
 				multibyte_handling = multibyte_allow;
-			else
-				if (strcmp(optarg,"warn") == 0)
-					multibyte_handling = multibyte_warn;
-				else
-					if (strcmp(optarg,"warn-sym-only") == 0)
-						multibyte_handling = multibyte_warn_syms;
-					else
-						if (strcmp(optarg,"warn_sym_only") == 0)
-							multibyte_handling = multibyte_warn_syms;
-						else
-							as_fatal("unexpected argument to --multibyte-input-option: '%s'",optarg);
+			else if (strcmp(optarg,"warn") == 0)
+				multibyte_handling = multibyte_warn;
+			else if (strcmp(optarg,"warn-sym-only") == 0)
+				multibyte_handling = multibyte_warn_syms;
+			else if (strcmp(optarg,"warn_sym_only") == 0)
+				multibyte_handling = multibyte_warn_syms;
+			else as_fatal("unexpected argument to --multibyte-input-option: '%s'",optarg);
 			break;
 
 		case OPTION_VERSION:
@@ -532,7 +528,6 @@ This program has absolutely no warranty.\n");
 			break;
 #endif				/* OBJ_ELF */
 
-		case 'Z': flag_always_generate_output = 1; break;
 		case OPTION_ALTERNATE:
 			optarg = old_argv[optind - 1];
 			while (*optarg == '-')
@@ -814,26 +809,15 @@ int	main(int argc,char **argv)
 		n_warns = had_warnings();
 		n_errs = had_errors();
 
-		sprintf(warn_msg,
-		     ngettext("%d warning","%d warnings",n_warns),n_warns);
-		sprintf(err_msg,
-			ngettext("%d error","%d errors",n_errs),n_errs);
+		sprintf(warn_msg, "%d warning(s)",n_warns);
+		sprintf(err_msg, "%d error(s)",n_errs);
 		if (flag_fatal_warnings && n_warns != 0) {
 			if (n_errs == 0)
-				as_bad(("%s,treating warnings as errors"),warn_msg);
+				as_bad("%s,treating warnings as errors",warn_msg);
 			n_errs += n_warns;
 		}
 		if (n_errs == 0)
 			keep_it = 1;
-		else
-			if (flag_always_generate_output) {
-				/* The -Z flag indicates that an object file
-				 * should be generated,regardless of warnings
-				 * and errors.  */
-				keep_it = 1;
-				fprintf(stderr,("%s,%s,generating bad object file\n"),
-					err_msg,warn_msg);
-			}
 	}
 	fflush(stderr);
 
@@ -856,40 +840,6 @@ static void	flonum_print(const FLONUM_TYPE *);
 #endif
 
 #define ASSUME_DECIMAL_MARK_IS_DOT
-/* ======================================================================*\ *
- * 
- * Given a string of decimal digits ,with optional decimal	* mark and
- * optional decimal exponent (place value) of the		* lowest_order
- * decimal digit: produce a floating point		* number. The number is
- * 'generic' floating point: our		* caller will encode it for a
- * specific machine architecture.	* *
- * 
- * Assumptions							* uses base
- * (radix) 2					* this machine uses 2's
- * complement binary integers	* target flonums use "      "         "       "		*
- * target flonums exponents fit in a long			* *
- * 
- * \======================================================================
- */
-
-/*
- * Syntax:
- * 
- * <flonum> ::= <optional-sign> <decimal-number> <optional-exponent>
- * <optional-sign> ::= '+'|'-'|{empty} <decimal-number> ::= <integer> |
- * <integer> <radix-character>|<integer> <radix-character> <integer> |
- * <radix-character> <integer>
- * 
- * <optional-exponent> ::= {empty}|<exponent-character> <optional-sign>
- * <integer>
- * 
- * <integer> ::= <digit>|<digit> <integer> <digit> ::= '0'|'1'|'2'|'3' |
- * '4'|'5'|'6'|'7'|'8'|'9' <exponent-character> ::= {one character
- * from "string_of_decimal_exponent_marks"} <radix-character> ::= {one
- * character from "string_of_decimal_marks"}
- * 
- */
-
 static int	atof_generic(	/* return pointer to just AFTER number we read.  */
 		      		char        **address_of_string_pointer,
 /* At most one per number.  */
@@ -2585,19 +2535,19 @@ static	segT get_cfi_seg(segT cseg,const char *base,uint32_t flags,int align)
 
 static void	dot_cfi_inline_lsda(int ignored ATTRIBUTE_UNUSED)
 {
-	as_bad((".cfi_inline_lsda is not supported for this target"));
+	as_bad(".cfi_inline_lsda is not supported for this target");
 	ignore_rest_of_line();
 }
 
 static void	dot_cfi_fde_data(int ignored ATTRIBUTE_UNUSED)
 {
-	as_bad((".cfi_fde_data is not supported for this target"));
+	as_bad(".cfi_fde_data is not supported for this target");
 	ignore_rest_of_line();
 }
 
 static void	dot_cfi_personality_id(int ignored ATTRIBUTE_UNUSED)
 {
-	as_bad((".cfi_personality_id is not supported for this target"));
+	as_bad(".cfi_personality_id is not supported for this target");
 	ignore_rest_of_line();
 }
 
@@ -2616,22 +2566,19 @@ static void	output_cfi_insn(struct cfi_insn_data *insn)
 				addressT	delta = S_GET_VALUE(to) - S_GET_VALUE(from);
 				addressT	scaled = delta / DWARF2_LINE_MIN_INSN_LENGTH;
 
-				if (scaled == 0);
-				else
-					if (scaled <= 0x3F)
-						out_one(DW_CFA_advance_loc + scaled);
-					else
-						if (scaled <= 0xFF) {
-							out_one(DW_CFA_advance_loc1);
-							out_one(scaled);
-						} else
-							if (scaled <= 0xFFFF) {
-								out_one(DW_CFA_advance_loc2);
-								out_two(scaled);
-							} else {
-								out_one(DW_CFA_advance_loc4);
-								out_four(scaled);
-							}
+				if (scaled == 0) ; // Do nothing
+				else if (scaled <= 0x3F)
+					out_one(DW_CFA_advance_loc + scaled);
+				else if (scaled <= 0xFF) {
+					out_one(DW_CFA_advance_loc1);
+					out_one(scaled);
+				} else if (scaled <= 0xFFFF) {
+					out_one(DW_CFA_advance_loc2);
+					out_two(scaled);
+				} else {
+					out_one(DW_CFA_advance_loc4);
+					out_four(scaled);
+				}
 			} else {
 				expressionS	exp;
 
@@ -2640,19 +2587,13 @@ static void	output_cfi_insn(struct cfi_insn_data *insn)
 				exp.X_op_symbol = from;
 				exp.X_add_number = 0;
 
-				/*
-				 * The code in ehopt.c expects that one byte of
-				 * the encoding is already allocated to the
-				 * frag.  This comes from the way that it scans
-				 * the .eh_frame section looking first for the
-				 * .byte DW_CFA_advance_loc4.  Call frag_grow
-				 * with the sum of room needed by frag_more and
-				 * frag_var to preallocate space ensuring that
-				 * the DW_CFA_advance_loc4 is in the fixed part
-				 * of the rs_cfa frag,so that the relax
-				 * machinery can remove the advance_loc should
-				 * it advance by zero.
-				 */
+				/* The code in ehopt.c expects that one byte of the encoding is already 
+				 * allocated to the frag.  This comes from the way that it scans the
+				 * .eh_frame section looking first for the .byte DW_CFA_advance_loc4. 
+				 * Call frag_grow with the sum of room needed by frag_more and
+				 * frag_var to preallocate space ensuring that the DW_CFA_advance_loc4 
+				 * is in the fixed part of the rs_cfa frag,so that the relax
+				 * machinery can remove the advance_loc should it advance by zero.  */
 				frag_grow(5);
 				*frag_more(1) = DW_CFA_advance_loc4;
 
@@ -2787,10 +2728,8 @@ static void	output_cfi_insn(struct cfi_insn_data *insn)
 				abort();
 			}
 
-			/*
-			 * If the user has requested absolute encoding,then
-			 * use the smaller DW_OP_addr encoding.
-			 */
+			/* If the user has requested absolute encoding,then use the smaller 
+			 * DW_OP_addr encoding.  */
 			if (insn->u.ea.encoding == DW_EH_PE_absptr) {
 				out_uleb128(1 + enc_size);
 				out_one(DW_OP_addr);
@@ -3029,11 +2968,8 @@ static void	output_fde(struct fde_entry *fde,struct cie_entry *cie,
 	symbol_set_value_now(end_address);
 }
 
-/*
- * Allow these insns to be put in the initial sequence of a CIE. If J is
- * non-NULL,then compare I and J insns for a match.
- */
-
+/* Allow these insns to be put in the initial sequence of a CIE. If J is
+ * non-NULL,then compare I and J insns for a match.  */
 static inline	bool
 		initial_cie_insn(const struct cfi_insn_data *i,const struct cfi_insn_data *j)
 {
@@ -3414,83 +3350,71 @@ struct line_entry {
  */
 static char	unused[offsetof(struct line_entry,next)? -1 : 1] ATTRIBUTE_UNUSED;
 
-	struct line_subseg {
-		struct line_subseg *next;
-		subsegT		subseg;
-		struct line_entry *head;
-		struct line_entry **ptail;
-		struct line_entry **pmove_tail;
-	};
+struct line_subseg {
+	struct line_subseg *next;
+	subsegT		subseg;
+	struct line_entry *head;
+	struct line_entry **ptail;
+	struct line_entry **pmove_tail;
+};
 
-	struct line_seg {
-		struct line_seg *next;
-		segT		seg;
-		struct line_subseg *head;
-		symbolS        *text_start;
-		symbolS        *text_end;
-	};
+struct line_seg {
+	struct line_seg *next;
+	segT		seg;
+	struct line_subseg *head;
+	symbolS        *text_start;
+	symbolS        *text_end;
+};
 
 /* Collects data for all line table entries during assembly.  */
-	static struct line_seg *all_segs;
-	static struct line_seg **last_seg_ptr;
+static struct line_seg *all_segs;
+static struct line_seg **last_seg_ptr;
 
 #define NUM_MD5_BYTES       16
 
-	struct file_entry {
-		const char     *filename;
-		unsigned int	dir;
-		unsigned char	md5[NUM_MD5_BYTES];
-	};
+struct file_entry {
+	const char     *filename;
+	unsigned int	dir;
+	unsigned char	md5[NUM_MD5_BYTES];
+};
 
 /* Table of files used by .debug_line.  */
-	static struct file_entry *files;
-	static unsigned int files_in_use;
-	static unsigned int files_allocated;
+static struct file_entry *files;
+static unsigned int files_in_use;
+static unsigned int files_allocated;
 
 /* Table of directories used by .debug_line.  */
-	static char   **dirs;
-	static unsigned int dirs_in_use;
-	static unsigned int dirs_allocated;
+static char   **dirs;
+static unsigned int dirs_in_use;
+static unsigned int dirs_allocated;
 
-/*
- * TRUE when we've seen a .loc directive recently.  Used to avoid doing work
- * when there's nothing to do.  Will be reset by dwarf2_consume_line_info.
- */
+/* TRUE when we've seen a .loc directive recently.  Used to avoid doing work
+ * when there's nothing to do.  Will be reset by dwarf2_consume_line_info.  */
 	static bool	dwarf2_loc_directive_seen;
 
-/*
- * TRUE when we've seen any .loc directive at any time during parsing.
+/* TRUE when we've seen any .loc directive at any time during parsing.
  * Indicates the user wants us to generate a .debug_line section. Used in
- * dwarf2_finish as sanity check.
- */
-	static bool	dwarf2_any_loc_directive_seen;
+ * dwarf2_finish as sanity check.  */
+static bool	dwarf2_any_loc_directive_seen;
 
-/*
- * TRUE when we're supposed to set the basic block mark whenever a label is
- * seen.
- */
-	static bool	dwarf2_loc_mark_labels;
+/* TRUE when we're supposed to set the basic block mark whenever a label is seen. */
+static bool	dwarf2_loc_mark_labels;
 
 /* Current location as indicated by the most recent .loc directive.  */
-	static struct dwarf2_line_info current;
+static struct dwarf2_line_info current;
 
-/*
- * This symbol is used to recognize view number forced resets in loc lists.
- */
-	static symbolS *force_reset_view;
+/* This symbol is used to recognize view number forced resets in loc lists.  */
+static symbolS *force_reset_view;
 
-/*
- * This symbol evaluates to an expression that,if nonzero,indicates some view
- * assert check failed.
- */
-	static symbolS *view_assert_failed;
+/* This symbol evaluates to an expression that,if nonzero,indicates some view
+ * assert check failed.  */
+static symbolS *view_assert_failed;
 
 /* The size of an address on the target.  */
-	static unsigned int sizeof_address;
+static unsigned int sizeof_address;
 
 /* Find or create (if CREATE_P) an entry for SEG+SUBSEG in ALL_SEGS.  */
-
-	static struct line_subseg *get_line_subseg(segT seg,subsegT subseg,bool create_p)
+static struct line_subseg *get_line_subseg(segT seg,subsegT subseg,bool create_p)
 {
 	struct line_seg *s = seg_info(seg)->dwarf2_line_seg;
 	struct line_subseg **pss,*lss;
@@ -3628,12 +3552,9 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		incv.X_add_number = 1;
 		p_view = symbol_get_value_expression(p->loc.u.view);
 		if (p_view->X_op == O_constant || p_view->X_op == O_symbol) {
-			/*
-			 * If we can,constant fold increments so that a chain
-			 * of expressions v + 1 + 1 ... + 1 is not created.
-			 * resolve_expression isn't ideal for this purpose.
-			 * The base v might not be resolvable until later.
-			 */
+			/* If we can,constant fold increments so that a chain of expressions 
+			 * v + 1 + 1 ... + 1 is not created. Resolve_expression isn't ideal 
+			 * for this purpose. The base v might not be resolvable until later.  */
 			incv.X_op = p_view->X_op;
 			incv.X_add_symbol = p_view->X_add_symbol;
 			incv.X_add_number = p_view->X_add_number + 1;
@@ -3653,28 +3574,20 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		S_SET_SEGMENT(e->loc.u.view,expr_section);
 		symbol_set_frag(e->loc.u.view,&zero_address_frag);
 	}
-	/*
-	 * Define and attempt to simplify any earlier views needed to compute
-	 * E's.
-	 */
+	/* Define and attempt to simplify any earlier views needed to compute E's.  */
 	if (h && p && p->loc.u.view && !S_IS_DEFINED(p->loc.u.view)) {
 		struct line_entry *h2;
-		/*
-		 * Reverse the list to avoid quadratic behavior going backwards
-		 * in a single-linked list.
-		 */
+		/* Reverse the list to avoid quadratic behavior going backwards
+		 * in a single-linked list.  */
 		struct line_entry *r = reverse_line_entry_list(h);
 
 		gas_assert(r == p);
 		/* Set or check views until we find a defined or absent view.  */
 		do {
-			/*
-			 * Do not define the head of a (sub?)segment view while
-			 * handling others.  It would be defined too early,
-			 * without regard to the last view of other
-			 * subsegments. set_or_check_view will be called for
-			 * every head segment that needs it.
-			 */
+			/* Do not define the head of a (sub?)segment view while handling others.  
+			 * It would be defined too early, without regard to the last view of other
+			 * subsegments. set_or_check_view will be called for every head segment that 
+			 * needs it.  */
 			if (r == h)
 				break;
 			set_or_check_view(r,r->next,NULL);
@@ -3688,16 +3601,12 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		h2 = reverse_line_entry_list(p);
 		gas_assert(h2 == h);
 
-		/*
-		 * Starting from the last view we just defined,attempt to
-		 * simplify the view expressions,until we do so to P.
-		 */
+		/* Starting from the last view we just defined,attempt to simplify the 
+		 * view expressions,until we do so to P.  */
 		do {
-			/*
-			 * The head view of a subsegment may remain undefined
-			 * while handling other elements,before it is linked
-			 * to the last view of the previous subsegment.
-			 */
+			/* The head view of a subsegment may remain undefined while handling 
+			 * other elements,before it is linked to the last view of the previous 
+			 * subsegment. */
 			if (r == h)
 				continue;
 			gas_assert(S_IS_DEFINED(r->loc.u.view));
@@ -3705,10 +3614,8 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		}
 		while (r != p && (r = r->next));
 
-		/*
-		 * Now that we've defined and computed all earlier views that
-		 * might be needed to compute E's,attempt to simplify it.
-		 */
+		/* Now that we've defined and computed all earlier views that
+		 * might be needed to compute E's,attempt to simplify it.  */
 		resolve_expression(symbol_get_value_expression(e->loc.u.view));
 	}
 }
@@ -3720,11 +3627,9 @@ static void	dwarf2_gen_line_info_1(symbolS * label,struct dwarf2_line_info *loc)
 	struct line_entry *e;
 	uint32_t	need_flags = SEC_LOAD|SEC_CODE;
 
-	/*
-	 * PR 26850: Do not record LOCs in non-executable or non-loaded
+	/* PR 26850: Do not record LOCs in non-executable or non-loaded
 	 * sections.  SEC_ALLOC isn't tested for non-ELF because obj-coff.c
-	 * obj_coff_section is careless in setting SEC_ALLOC.
-	 */
+	 * obj_coff_section is careless in setting SEC_ALLOC.  */
 	if (IS_ELF)
 		need_flags |= SEC_ALLOC;
 	if ((now_seg->flags & need_flags) != need_flags) {
@@ -3741,9 +3646,7 @@ static void	dwarf2_gen_line_info_1(symbolS * label,struct dwarf2_line_info *loc)
 
 	lss = get_line_subseg(now_seg,now_subseg,true);
 
-	/*
-	 * Subseg heads are chained to previous subsegs in dwarf2_finish.
-	 */
+	/* Subseg heads are chained to previous subsegs in dwarf2_finish.  */
 	if (loc->filenum != -1u && loc->u.view && lss->head)
 		set_or_check_view(e,(struct line_entry *)lss->ptail,lss->head);
 
@@ -3769,12 +3672,10 @@ static void	dwarf2_gen_line_info(addressT ofs,struct dwarf2_line_info *loc)
 		if (DWARF2_LINE_VERSION < 5)
 			return;
 	}
-	/*
-	 * Don't emit sequences of line symbols for the same line when the
+	/* Don't emit sequences of line symbols for the same line when the
 	 * symbols apply to assembler code.  It is necessary to emit duplicate
 	 * line symbols when a compiler asks for them,because GDB uses them to
-	 * determine the end of the prologue.
-	 */
+	 * determine the end of the prologue. */
 	if (debug_type == DEBUG_DWARF2) {
 		if (dw2_line == loc->line) {
 			if (dw2_filename == loc->u.filename)
@@ -3832,14 +3733,10 @@ static unsigned int get_directory_table_entry(const char *dirname,
 			const char     *pwd = file0_dirname ? file0_dirname : getpwd();
 
 			if (dwarf_level >= 5 && filename_cmp(dirname,pwd) != 0) {
-				/*
-				 * In DWARF-5 the 0 entry in the directory
-				 * table is expected to be the same as the
-				 * DW_AT_comp_dir (which is set to the current
-				 * build directory).  Since we are about to
-				 * create a directory entry that is not the
-				 * same,allocate the current directory first.
-				 */
+				/* In DWARF-5 the 0 entry in the directory table is expected 
+				 * to be the same as the DW_AT_comp_dir (which is set to the current
+				 * build directory).  Since we are about to create a directory entry
+				 * that is not the same,allocate the current directory first.  */
 				(void)get_directory_table_entry(pwd,file0_dirname,
 							   strlen(pwd),true);
 				d = 1;
@@ -3891,12 +3788,10 @@ static bool	assign_file_to_slot(unsigned int i,const char *file,unsigned int dir
 	return true;
 }
 
-/*
- * Get a .debug_line file number for PATHNAME.  If there is a directory
+/* Get a .debug_line file number for PATHNAME.  If there is a directory
  * component to PATHNAME,then this will be stored in the directory table,if
  * it is not already present. Returns the slot number allocated to that
- * filename or -1 if there was a problem.
- */
+ * filename or -1 if there was a problem.  */
 static int	last_used, last_used_dir_len;
 static int	allocate_filenum(const char *pathname)
 {
@@ -3904,10 +3799,7 @@ static int	allocate_filenum(const char *pathname)
 	size_t		dir_len;
 	unsigned int	i ,dir;
 
-	/*
-	 * Short circuit the common case of adding the same pathname as last
-	 * time.
-	 */
+	/* Short circuit the common case of adding the same pathname as last time. */
 	if (last_used != -1) {
 		const char     *dirname = NULL;
 
@@ -4011,10 +3903,8 @@ static bool	allocate_filename_to_slot(const char *dirname,
 	unsigned int	i ,d;
 	const char     *file0_dirname;
 
-	/*
-	 * Short circuit the common case of adding the same pathname as last
-	 * time.
-	 */
+	/* Short circuit the common case of adding the same pathname as last
+	 * time. */
 	if (num < files_allocated && files[num].filename != NULL) {
 		const char     *dir = NULL;
 
@@ -4032,11 +3922,9 @@ static bool	allocate_filename_to_slot(const char *dirname,
 			if (filename_cmp(filename,files[num].filename) != 0)
 				goto fail;
 
-			/*
-			 * If the filenames match,but the directory table
+			/* If the filenames match,but the directory table
 			 * entry was empty,then fill it with the provided
-			 * directory name.
-			 */
+			 * directory name.  */
 			if (dir == NULL) {
 				if (dirs == NULL) {
 					dirs_allocated = files[num].dir + DIR_TABLE_INCREMENT;
@@ -4055,11 +3943,8 @@ static bool	allocate_filename_to_slot(const char *dirname,
 			} else {/* dir == NULL  */
 				file = get_basename(filename);
 				if (filename_cmp(file,files[num].filename) == 0) {
-					/*
-					 * The filenames match,but the
-					 * directory table entry is empty. Fill
-					 * it with the provided directory name.
-					 */
+					/* The filenames match,but the directory table entry is empty. Fill
+					 * it with the provided directory name.  */
 					if (file > filename) {
 						if (dirs == NULL) {
 							dirs_allocated = files[num].dir + DIR_TABLE_INCREMENT;
@@ -4082,10 +3967,8 @@ fail:
 		       filename);
 		return false;
 	}
-	/*
-	 * For file .0,the directory name is the current directory and the
-	 * file may be in another directory contained in the file name.
-	 */
+	/* For file .0,the directory name is the current directory and the
+	 * file may be in another directory contained in the file name.  */
 	if (num == 0) {
 		file0_dirname = dirname;
 
@@ -4327,10 +4210,8 @@ static void	dwarf2_directive_loc(int dummy ATTRIBUTE_UNUSED)
 {
 	offsetT		filenum,line;
 
-	/*
-	 * If we see two .loc directives in a row,force the first one to be
-	 * output now.
-	 */
+	/* If we see two .loc directives in a row,force the first one to be
+	 * output now.  */
 	if (dwarf2_loc_directive_seen)
 		dwarf2_emit_insn(0);
 
@@ -4350,11 +4231,9 @@ static void	dwarf2_directive_loc(int dummy ATTRIBUTE_UNUSED)
 		as_bad(("unassigned file number %ld"),(long)filenum);
 		return;
 	}
-	/*
-	 * debug_type will be turned off by dwarf2_directive_filename,and if
+	/* debug_type will be turned off by dwarf2_directive_filename,and if
 	 * we don't have a dwarf style .file then files_in_use will be zero and
-	 * the above error will trigger.
-	 */
+	 * the above error will trigger. */
 	gas_assert(debug_type == DEBUG_NONE);
 
 	current.filenum = filenum;
@@ -4375,50 +4254,44 @@ static void	dwarf2_directive_loc(int dummy ATTRIBUTE_UNUSED)
 		if (strcmp(p,"basic_block") == 0) {
 			current.flags |= DWARF2_FLAG_BASIC_BLOCK;
 			*input_line_pointer = c;
-		} else
-			if (strcmp(p,"prologue_end") == 0) {
-				if (dwarf_level < 3)
-					dwarf_level = 3;
-				current.flags |= DWARF2_FLAG_PROLOGUE_END;
-				*input_line_pointer = c;
-			} else
-				if (strcmp(p,"epilogue_begin") == 0) {
-					if (dwarf_level < 3)
-						dwarf_level = 3;
-					current.flags |= DWARF2_FLAG_EPILOGUE_BEGIN;
-					*input_line_pointer = c;
-				} else
-					if (strcmp(p,"is_stmt") == 0) {
-						(void)restore_line_pointer(c);
-						value = get_absolute_expression();
-						if (value == 0)
-							current.flags &= ~DWARF2_FLAG_IS_STMT;
-						else
-							if (value == 1)
-								current.flags |= DWARF2_FLAG_IS_STMT;
-							else {
-								as_bad(("is_stmt value not 0 or 1"));
-								return;
-							}
-					} else
-						if (strcmp(p,"isa") == 0) {
-							if (dwarf_level < 3)
-								dwarf_level = 3;
-							(void)restore_line_pointer(c);
-							value = get_absolute_expression();
-							if (value >= 0)
-								current.isa = value;
-							else {
-								as_bad(("isa number less than zero"));
-								return;
-							}
-						} else
-							if (strcmp(p,"discriminator") == 0) {
-								(void)restore_line_pointer(c);
-								value = get_absolute_expression();
-								if (value >= 0)
-									current.discriminator = value;
-								else {
+		} else if (strcmp(p,"prologue_end") == 0) {
+			if (dwarf_level < 3)
+				dwarf_level = 3;
+			current.flags |= DWARF2_FLAG_PROLOGUE_END;
+			*input_line_pointer = c;
+		} else if (strcmp(p,"epilogue_begin") == 0) {
+			if (dwarf_level < 3)
+				dwarf_level = 3;
+			current.flags |= DWARF2_FLAG_EPILOGUE_BEGIN;
+			*input_line_pointer = c;
+		} else if (strcmp(p,"is_stmt") == 0) {
+			(void)restore_line_pointer(c);
+			value = get_absolute_expression();
+			if (value == 0)
+				current.flags &= ~DWARF2_FLAG_IS_STMT;
+			else if (value == 1)
+				current.flags |= DWARF2_FLAG_IS_STMT;
+			else {
+				as_bad("is_stmt value not 0 or 1");
+				return;
+			}
+		} else if (strcmp(p,"isa") == 0) {
+			if (dwarf_level < 3)
+				dwarf_level = 3;
+			(void)restore_line_pointer(c);
+			value = get_absolute_expression();
+			if (value >= 0)
+				current.isa = value;
+			else {
+				as_bad(("isa number less than zero"));
+				return;
+			}
+		} else if (strcmp(p,"discriminator") == 0) {
+			(void)restore_line_pointer(c);
+			value = get_absolute_expression();
+			if (value >= 0)
+				current.discriminator = value;
+			else {
 									as_bad(("discriminator less than zero"));
 									return;
 								}
@@ -4600,11 +4473,9 @@ static int	size_inc_line_addr(int line_delta,addressT addr_delta)
 	/* Scale the address delta by the minimum instruction length.  */
 	scale_addr_delta(line_delta,&addr_delta);
 
-	/*
-	 * INT_MAX is a signal that this is actually a DW_LNE_end_sequence. We
+	 /* INT_MAX is a signal that this is actually a DW_LNE_end_sequence. We
 	 * cannot use special opcodes here,since we want the end_sequence to
-	 * emit the matrix entry.
-	 */
+	 * emit the matrix entry.  */
 	if (line_delta == INT_MAX) {
 		if (addr_delta == MAX_SPECIAL_ADDR_DELTA)
 			len = 1;
@@ -4616,10 +4487,8 @@ static int	size_inc_line_addr(int line_delta,addressT addr_delta)
 	/* Bias the line delta by the base.  */
 	tmp = line_delta - DWARF2_LINE_BASE;
 
-	/*
-	 * If the line increment is out of range of a special opcode,we must
-	 * encode it with DW_LNS_advance_line.
-	 */
+	 /* If the line increment is out of range of a special opcode,we must
+	 * encode it with DW_LNS_advance_line.  */
 	if (tmp >= DWARF2_LINE_RANGE) {
 		len = 1 + sizeof_leb128(line_delta,1);
 		line_delta = 0;
@@ -4656,28 +4525,23 @@ static void	emit_inc_line_addr(int line_delta,addressT addr_delta,
 	int		need_copy = 0;
 	char           *end = p + len;
 
-	/*
-	 * Line number sequences cannot go backward in addresses.  This means
-	 * we've incorrectly ordered the statements in the sequence.
-	 */
+	 /* Line number sequences cannot go backward in addresses.  This means
+	 * we've incorrectly ordered the statements in the sequence.  */
 	gas_assert((offsetT) addr_delta >= 0);
 
 	/* Scale the address delta by the minimum instruction length.  */
 	scale_addr_delta(line_delta,&addr_delta);
 
-	/*
-	 * INT_MAX is a signal that this is actually a DW_LNE_end_sequence. We
+	/* INT_MAX is a signal that this is actually a DW_LNE_end_sequence. We
 	 * cannot use special opcodes here,since we want the end_sequence to
-	 * emit the matrix entry.
-	 */
+	 * emit the matrix entry.  */
 	if (line_delta == INT_MAX) {
 		if (addr_delta == MAX_SPECIAL_ADDR_DELTA)
 			*p++ = DW_LNS_const_add_pc;
-		else
-			if (addr_delta) {
-				*p++ = DW_LNS_advance_pc;
-				p += output_leb128(p,addr_delta,0);
-			}
+		else if (addr_delta) {
+			*p++ = DW_LNS_advance_pc;
+			p += output_leb128(p,addr_delta,0);
+		}
 		*p++ = DW_LNS_extended_op;
 		*p++ = 1;
 		*p++ = DW_LNE_end_sequence;
@@ -4686,10 +4550,8 @@ static void	emit_inc_line_addr(int line_delta,addressT addr_delta,
 	/* Bias the line delta by the base.  */
 	tmp = line_delta - DWARF2_LINE_BASE;
 
-	/*
-	 * If the line increment is out of range of a special opcode,we must
-	 * encode it with DW_LNS_advance_line.
-	 */
+	/* If the line increment is out of range of a special opcode,we must
+	 * encode it with DW_LNS_advance_line.  */
 	if (tmp >= DWARF2_LINE_RANGE) {
 		*p++ = DW_LNS_advance_line;
 		p += output_leb128(p,line_delta,1);
@@ -4698,10 +4560,8 @@ static void	emit_inc_line_addr(int line_delta,addressT addr_delta,
 		tmp = 0 - DWARF2_LINE_BASE;
 		need_copy = 1;
 	}
-	/*
-	 * Prettier,I think,to use DW_LNS_copy instead of a "line +0,addr
-	 * +0" special opcode.
-	 */
+	/* Prettier,I think,to use DW_LNS_copy instead of a "line +0,addr
+	 * +0" special opcode.  */
 	if (line_delta == 0 && addr_delta == 0) {
 		*p++ = DW_LNS_copy;
 		goto done;
@@ -4783,10 +4643,8 @@ static void	emit_fixed_inc_line_addr(int line_delta,addressT addr_delta,
 	expressionS    *pexp;
 	char           *end = p + len;
 
-	/*
-	 * Line number sequences cannot go backward in addresses.  This means
-	 * we've incorrectly ordered the statements in the sequence.
-	 */
+	/* Line number sequences cannot go backward in addresses.  This means
+	 * we've incorrectly ordered the statements in the sequence.  */
 	gas_assert((offsetT) addr_delta >= 0);
 
 	/* Verify that we have kept in sync with size_fixed_inc_line_addr.  */
@@ -4799,13 +4657,11 @@ static void	emit_fixed_inc_line_addr(int line_delta,addressT addr_delta,
 	}
 	pexp = symbol_get_value_expression(frag->fr_symbol);
 
-	/*
-	 * The DW_LNS_fixed_advance_pc opcode has a 2-byte operand so it can
+	/* The DW_LNS_fixed_advance_pc opcode has a 2-byte operand so it can
 	 * advance the address by at most 64K.  Linker relaxation (without
 	 * which this function would not be used) could change the operand by
 	 * an unknown amount.  If the address increment is getting close to the
-	 * limit,just reset the address.
-	 */
+	 * limit,just reset the address.  */
 	if (addr_delta > ADDR_DELTA_LIMIT) {
 		symbolS        *to_sym;
 		expressionS	exp;
@@ -4895,15 +4751,13 @@ static void	dwarf2dbg_convert_frag(fragS * frag)
 	offsetT		addr_diff;
 
 	{ //DWARF2_use_fixed_ADVANCE_PC is 1
-	/* If linker relaxation is enabled then the distance between
-	 * the two symbols in the frag->fr_symbol expression might
-	 * change.  Hence we cannot rely upon the value computed by
-	 * resolve_symbol_value. Instead we leave the expression
-	 * unfinalized and allow emit_fixed_inc_line_addr to create a
-	 * fixup (which later becomes a relocation) that will allow the
-	 * linker to correctly compute the actual address difference.
-	 * We have to use a fixed line advance for this as we cannot
-	 * (easily) relocate leb128 encoded values.  */
+	/* If linker relaxation is enabled then the distance between the two symbols 
+	 * in the frag->fr_symbol expression might change.  Hence we cannot rely 
+	 * upon the value computed by resolve_symbol_value. Instead we leave the 
+	 * expression unfinalized and allow emit_fixed_inc_line_addr to create a
+	 * fixup (which later becomes a relocation) that will allow the linker to 
+	 * correctly compute the actual address difference. We have to use a fixed
+	 * line advance for this as we cannot (easily) relocate leb128 encoded values.*/
 	int		saved_finalize_syms = finalize_syms;
 
 	finalize_syms = 0;
@@ -4911,11 +4765,9 @@ static void	dwarf2dbg_convert_frag(fragS * frag)
 	finalize_syms = saved_finalize_syms;
 	}
 
-	/*
-	 * fr_var carries the max_chars that we created the fragment with.
+	/* fr_var carries the max_chars that we created the fragment with.
 	 * fr_subtype carries the current expected length.  We must,of course,
-	 * have allocated enough memory earlier.
-	 */
+	 * have allocated enough memory earlier.  */
 	gas_assert(frag->fr_var >= (int)frag->fr_subtype);
 
 	emit_fixed_inc_line_addr(frag->fr_offset,addr_diff,frag,
@@ -4927,10 +4779,8 @@ static void	dwarf2dbg_convert_frag(fragS * frag)
 	frag->fr_var = 0;
 	frag->fr_offset = 0;
 }
-/*
- * Generate .debug_line content for the chain of line number entries beginning
- * at E,for segment SEG.
- */
+/* Generate .debug_line content for the chain of line number entries beginning
+ * at E,for segment SEG.  */
 static void	process_entries(segT seg,struct line_entry *e)
 {
 	unsigned	filenum = 1;
@@ -4946,25 +4796,22 @@ static void	process_entries(segT seg,struct line_entry *e)
 		char           *name;
 		const char     *sec_name;
 
-		/* Switch to the relevant sub-section before we start to emit
-		 * the line number table.
+		/* Switch to the relevant sub-section before we start to emit the line number 
+		 * table.
 		 * 
-		 * FIXME: These sub-sections do not have a normal Line Number
-		 * Program Header,thus strictly speaking they are not valid
-		 * DWARF sections.  Unfortunately the DWARF standard assumes a
-		 * one-to-one relationship between compilation units and line
-		 * number tables.  Thus we have to have a .debug_line section,
-		 * as well as our sub-sections,and we have to ensure that all
-		 * of the sub-sections are merged into a proper .debug_line
-		 * section before a debugger sees them.  */
+		 * FIXME: These sub-sections do not have a normal Line Number Program Header,
+		 * thus strictly speaking they are not valid DWARF sections.  Unfortunately 
+		 * the DWARF standard assumes a one-to-one relationship between compilation 
+		 * units and line number tables.  Thus we have to have a .debug_line section,
+		 * as well as our sub-sections,and we have to ensure that all of the sub-sections 
+		 * are merged into a proper .debug_line section before a debugger sees them.  */
 		sec_name = bfd_section_name(seg);
 		if (strcmp(sec_name,".text") != 0) {
 			name = concat(".debug_line",sec_name,(char *)NULL);
 			subseg_set(subseg_get(name,false),0);
 		} else
-			/* Don't create a .debug_line.text section - that is
-			 * redundant.  Instead just switch back to the normal
-			 * .debug_line section.  */
+			/* Don't create a .debug_line.text section - that is redundant.  Instead 
+			 * just switch back to the normal .debug_line section.  */
 			subseg_set(subseg_get(".debug_line",false),0);
 	}
 	do {
@@ -5590,15 +5437,10 @@ static void	out_debug_abbrev(segT abbrev_seg,
 			if (!S_IS_DEFINED(symp) || !S_IS_FUNCTION(symp))
 				continue;
 
-#if defined (OBJ_ELF)		/* || defined (OBJ_MAYBE_ELF) */
 			if (S_GET_SIZE(symp) == 0) {
 				if (!IS_ELF || symbol_get_obj(symp)->size == NULL)
 					continue;
 			}
-#else
-			continue;
-#endif
-
 			if (S_IS_EXTERNAL(symp))
 				have_efunc = true;
 			else
@@ -6099,13 +5941,10 @@ static void	dwarf2dbg_final_check(void)
 	}
 }
 /* ============================================================* ehopt.c */
-/*
- * ehopt.c--optimize gcc exception frame information. We include this ELF file,
+/* ehopt.c--optimize gcc exception frame information. We include this ELF file,
  * even though we may not be assembling for ELF,since the exception frame
- * information is always in a format derived from DWARF.
- */
+ * information is always in a format derived from DWARF.  
 
-/*
  * Try to optimize gcc 2.8 exception frame information. Exception frame
  * information is emitted for every function in the .eh_frame or .debug_frame
  * sections.  Simple information for a function with no exceptions looks like
@@ -6183,13 +6022,9 @@ static int	get_cie_info(struct cie_info *info)
 	fix = seg_info(now_seg)->frchainP->fix_root;
 
 	/* Look through the frags of the section to find the code alignment.  */
-
 	/* First make sure that the CIE Identifier Tag is 0/-1.  */
-
-	if (startswith(segment_name(now_seg),".debug_frame"))
-		CIE_id = (char)0xff;
-	else
-		CIE_id = 0;
+	if (startswith(segment_name(now_seg),".debug_frame")) CIE_id = (char)0xff;
+	else CIE_id = 0;
 
 	offset = 4;
 	while (f != NULL && offset >= f->fr_fix) {
@@ -6205,7 +6040,6 @@ static int	get_cie_info(struct cie_info *info)
 		return 0;
 
 	/* Next make sure the CIE version number is 1.  */
-
 	offset += 4;
 	while (f != NULL && offset >= f->fr_fix) {
 		offset -= f->fr_fix;
@@ -6251,11 +6085,8 @@ static int	get_cie_info(struct cie_info *info)
 		/* No augmentation.  */
 	} else
 		if (strcmp(augmentation,"eh") == 0) {
-			/*
-			 * We have to skip a pointer.  Unfortunately,we don't
-			 * know how large it is.  We find out by looking for a
-			 * matching fixup.
-			 */
+			/* We have to skip a pointer.  Unfortunately,we don't know how large it is.
+			 * We find out by looking for a matching fixup. */
 			while (fix != NULL
 			    && (fix->fx_frag != f || fix->fx_where != offset))
 				fix = fix->fx_next;
@@ -6321,8 +6152,7 @@ static struct eh_state {
  * 
  * This function returns non-zero if it handled the expression and emit_expr
  * should not do anything,or zero otherwise.  It can also change *EXP and
- * *PNBYTES.
- */
+ * *PNBYTES.  */
 static int	check_eh_frame(expressionS * exp,unsigned int *pnbytes)
 {
 	struct frame_data *d;
@@ -6347,11 +6177,9 @@ static int	check_eh_frame(expressionS * exp,unsigned int *pnbytes)
 			return 0;
 
 	if (d->state >= state_saw_size && S_IS_DEFINED(d->size_end_sym)) {
-		/*
-		 * We have come to the end of the CIE or FDE.  See below where
+		/* We have come to the end of the CIE or FDE.  See below where
 		 * we set saw_size.  We must check this first because we may
-		 * now be looking at the next size.
-		 */
+		 * now be looking at the next size.  */
 		d->state = state_idle;
 	}
 	switch (d->state) {
@@ -8930,11 +8758,9 @@ static void	frag_grow(size_t nchars)
 		size_t		oldc;
 		size_t		newc;
 
-		/*
-		 * Try to allocate a bit more than needed right now.  But don't
+		/* Try to allocate a bit more than needed right now.  But don't
 		 * do this if we would waste too much memory.  Especially
-		 * necessary for extremely big (like 2GB initialized) frags.
-		 */
+		 * necessary for extremely big (like 2GB initialized) frags.  */
 		if (nchars < 0x10000)
 			newc = 2 * nchars;
 		else
@@ -8943,22 +8769,16 @@ static void	frag_grow(size_t nchars)
 
 		/* Check for possible overflow.  */
 		if (newc < nchars)
-			as_fatal(ngettext("can't extend frag %lu char",
-					  "can't extend frag %lu chars",
-					  (unsigned long)nchars),
-				 (unsigned long)nchars);
+			as_fatal( "can't extend frag %lu char(s)", (unsigned long)nchars);
 
-		/*
-		 * Force to allocate at least NEWC bytes,but not less than the
-		 * default.
-		 */
+		/* Force to allocate at least NEWC bytes,but not less than the
+		 * default.  */
 		oldc = obstack_chunk_size(&frchain_now->frch_obstack);
 		if (newc > oldc)
 			obstack_chunk_size(&frchain_now->frch_obstack) = newc;
 
 		while (obstack_room(&frchain_now->frch_obstack) < nchars) {
-			/*
-			 * Not enough room in this frag.  Close it and start a
+			/* Not enough room in this frag.  Close it and start a
 			 * new one. This must be done in a loop because the
 			 * created frag may not be big enough if the current
 			 * obstack chunk is used.
@@ -10224,7 +10044,7 @@ static void	output_file_close(void)
 	obs = obstack_finish(&notes);
 
 	/* Close the bfd.  */
-	if (!flag_always_generate_output && had_errors())
+	if (had_errors())
 		res = close_all_done(obfd);
 	else
 		res = bfd_close(obfd);
@@ -12744,10 +12564,7 @@ static void	emit_expr_with_reloc(expressionS * exp,
 						}
 					}
 				if (i < exp->X_add_number)
-					as_warn(ngettext("bignum truncated to %d byte",
-					       "bignum truncated to %d bytes",
-							 nbytes),
-						nbytes);
+					as_warn("bignum truncated to %d byte(s)", nbytes);
 				size = nbytes;
 			}
 			if (nbytes == 1) {
@@ -12807,10 +12624,7 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 		size = bfd_get_reloc_size(reloc_howto);
 
 		if (size > nbytes) {
-			as_bad(ngettext("%s relocations do not fit in %u byte",
-				      "%s relocations do not fit in %u bytes",
-					nbytes),
-			       reloc_howto->name,nbytes);
+			as_bad("%s relocations do not fit in %u byte(s)",reloc_howto->name,nbytes);
 			return;
 		} else
 			if (target_big_endian)
@@ -17583,12 +17397,8 @@ static void	fixup_segment(fixS * fixP,segT this_segment)
 					else
 						sprintf(buf2,"%ld",(long)add_number);
 					as_bad_where(fixP->fx_file,fixP->fx_line,
-						     ngettext("value of %s too large for field "
-							   "of %d byte at %s",
 					    "value of %s too large for field "
-							  "of %d bytes at %s",
-							      fixP->fx_size),
-						     buf2,fixP->fx_size,buf);
+							  "of %d byte(s) at %s", buf2,fixP->fx_size,buf);
 				}	/* Generic error checking.  */
 			}
 #ifdef WARN_SIGNED_OVERFLOW_WORD
@@ -18161,10 +17971,7 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	if (obstack_room(ob) < header_size)
 		first_newf = frag_alloc(ob);
 	if (obstack_room(ob) < header_size)
-		as_fatal(ngettext("can't extend frag %lu char",
-				  "can't extend frag %lu chars",
-				  (unsigned long)header_size),
-			 (unsigned long)header_size);
+		as_fatal("can't extend frag %lu char(s)", (unsigned long)header_size);
 	fragS          *last_newf = first_newf;
 	obstack_blank_fast(ob,header_size);
 	last_newf->fr_type = rs_fill;
@@ -18298,11 +18105,8 @@ static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 					     f->fr_literal,(file_ptr) offset,
 						 (size_t) f->fr_fix);
 			if (!x)
-				as_fatal(ngettext("can't write %ld byte "
-						  "to section %s of %s: '%s'",
-						  "can't write %ld bytes "
-						  "to section %s of %s: '%s'",
-						  (long)f->fr_fix),
+				as_fatal(
+					"can't write %ld byte(s) to section %s of %s: '%s'",
 					 (long)f->fr_fix,
 					 bfd_section_name(sec),bfd_get_filename(stdoutput),
 					 bfd_errmsg(bfd_get_error()));
@@ -18320,11 +18124,7 @@ static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				x = set_section_contents(stdoutput,sec,buf,(file_ptr) offset,
 							 (size_t) count);
 				if (!x)
-					as_fatal(ngettext("can't fill %ld byte "
-						  "in section %s of %s: '%s'",
-						       "can't fill %ld bytes "
-						  "in section %s of %s: '%s'",
-							  (long)count),
+					as_fatal("can't fill %ld byte(s) in section %s of %s: '%s'",
 						 (long)count,
 						 bfd_section_name(sec),
 						 bfd_get_filename(stdoutput),
@@ -18345,11 +18145,8 @@ static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 							    (file_ptr) offset,
 							  (size_t) fill_size);
 					if (!x)
-						as_fatal(ngettext("can't fill %ld byte "
-						  "in section %s of %s: '%s'",
-						       "can't fill %ld bytes "
-						  "in section %s of %s: '%s'",
-							     (long)fill_size),
+						as_fatal(
+							"can't fill %ld byte(s) in section %s of %s: '%s'",
 							 (long)fill_size,
 							 bfd_section_name(sec),
 						  bfd_get_filename(stdoutput),
@@ -18357,12 +18154,9 @@ static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 					offset += fill_size;
 				}
 			} else {
-				/*
-				 * Build a buffer full of fill objects and
-				 * output it as often as necessary. This saves
-				 * on the overhead of potentially lots of
-				 * set_section_contents calls.
-				 */
+				/* Build a buffer full of fill objects and output it as often
+				 * as necessary. This saves on the overhead of potentially lots
+				 * of set_section_contents calls.  */
 				int		n_per_buf ,i;
 				if (fill_size == 1) {
 					n_per_buf = sizeof(buf);
@@ -18379,11 +18173,8 @@ static void	write_contents(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 						(stdoutput,sec,buf,(file_ptr) offset,
 					      (size_t) n_per_buf * fill_size);
 					if (!x)
-						as_fatal(ngettext("can't fill %ld byte "
+						as_fatal("can't fill %ld byte(s) "
 						  "in section %s of %s: '%s'",
-						       "can't fill %ld bytes "
-						  "in section %s of %s: '%s'",
-						(long)(n_per_buf * fill_size)),
 						(long)(n_per_buf * fill_size),
 							 bfd_section_name(sec),
 						  bfd_get_filename(stdoutput),
@@ -18732,7 +18523,7 @@ static void	create_note_reloc(segT sec,
 		as_bad("unable to create reloc for build note");
 		return;
 	}
-	reloc->file = N_("<gnu build note>");
+	reloc->file = "<gnu build note>";
 	reloc->line = 0;
 
 	reloc->next = reloc_list;
@@ -19029,7 +18820,7 @@ static void	write_object_file(void)
 	riscv_adjust_symtab();
 
 	/* Stop if there is an error.  */
-	if (!flag_always_generate_output && had_errors())
+	if (had_errors())
 		return;
 
 	/* Now that all the sizes are known,and contents correct,we can start
@@ -19131,11 +18922,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 
 				if (offset % fragP->fr_var != 0) {
 					as_bad_where(fragP->fr_file,fragP->fr_line,
-						     ngettext("alignment padding (%lu byte) "
-						      "not a multiple of %ld",
-					      "alignment padding (%lu bytes) "
-						      "not a multiple of %ld",
-						       (unsigned long)offset),
+					  "alignment padding (%lu bytes) not a multiple of %ld",
 						     (unsigned long)offset,(long)fragP->fr_var);
 					offset -= (offset % fragP->fr_var);
 				}
@@ -19145,10 +18932,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 			break;
 
 		case rs_org:
-			/*
-			 * Assume .org is nugatory. It will grow with 1st
-			 * relax.
-			 */
+			/* Assume .org is nugatory. It will grow with 1st * relax.  */
 			region += 1;
 			break;
 
@@ -19157,12 +18941,10 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 			break;
 
 		case rs_machine_dependent:
-			/*
-			 * If fr_symbol is an expression,this call to
+			/* If fr_symbol is an expression,this call to
 			 * resolve_symbol_value sets up the correct segment,
 			 * which will likely be needed in
-			 * md_estimate_size_before_relax.
-			 */
+			 * md_estimate_size_before_relax. */
 			if (fragP->fr_symbol)
 				resolve_symbol_value(fragP->fr_symbol);
 
@@ -19170,8 +18952,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 			break;
 
 		case rs_leb128:
-			/*
-			 * Initial guess is always 1; doing otherwise can
+			/* Initial guess is always 1; doing otherwise can
 			 * result in stable solutions that are larger than the
 			 * minimum.
 			 */
@@ -20963,7 +20744,7 @@ static const char EXP_CHARS[] = "eE";
  * 0d1.2345e12.  */
 static const char FLT_CHARS[] = "rRsSfFdDxXpPhH";
 
-/* Indicate we are already assemble any instructions or not.  */
+/* Indicate we have already assembled any instructions or not.  */
 static bool	start_assemble = false;
 
 /* Indicate ELF attributes are explicitly set.  */
@@ -20973,40 +20754,6 @@ static bool	explicit_attr = false;
 static bool	explicit_priv_attr = false;
 
 static char    *expr_parse_end;
-
-/* Macros for encoding relaxation state for RVC branches and far jumps.  */
-#define RELAX_BRANCH_ENCODE(uncond,rvc,length)	\
-  ((relax_substateT) 					\
-   (0xc0000000						\
-   |((uncond) ? 1 : 0)				\
-   |((rvc) ? 2 : 0)					\
-   |((length) << 2)))
-#define RELAX_BRANCH_P(i) (((i) & 0xf0000000) == 0xc0000000)
-#define RELAX_BRANCH_LENGTH(i) (((i) >> 2) & 0xF)
-#define RELAX_BRANCH_RVC(i) (((i) & 2) != 0)
-#define RELAX_BRANCH_UNCOND(i) (((i) & 1) != 0)
-
-/* Is the given value a sign-extended 32-bit value?  */
-#define IS_SEXT_32BIT_NUM(x)						\
-  (((x) &~ (offsetT) 0x7fffffff) == 0					\
-   || (((x) &~ (offsetT) 0x7fffffff) == ~ (offsetT) 0x7fffffff))
-
-/* Is the given value a zero-extended 32-bit value?  Or a negated one?  */
-#define IS_ZEXT_32BIT_NUM(x)						\
-  (((x) &~ (offsetT) 0xffffffff) == 0					\
-   || (((x) &~ (offsetT) 0xffffffff) == ~ (offsetT) 0xffffffff))
-
-/* Change INSN's opcode so that the operand given by FIELD has value VALUE.
- * INSN is a riscv_cl_insn structure and VALUE is evaluated exactly once.  */
-#define INSERT_OPERAND(FIELD,INSN,VALUE) \
-  INSERT_BITS ((INSN).insn_opcode,VALUE,OP_MASK_##FIELD,OP_SH_##FIELD)
-
-#define INSERT_IMM(n,s,INSN,VALUE) \
-  INSERT_BITS ((INSN).insn_opcode,VALUE,(1ULL<<n) - 1,s)
-
-/* Determine if an instruction matches an opcode.  */
-#define OPCODE_MATCHES(OPCODE,OP) \
-  (((OPCODE) & MASK_##OP) == MATCH_##OP)
 
 /* Create a new mapping symbol for the transition to STATE.  */
 static void	make_mapping_symbol(enum riscv_seg_mstate State,
@@ -21226,10 +20973,8 @@ static void	install_insn(const struct riscv_cl_insn *insn)
 		number_to_chars_littleendian(f,insn->insn_opcode,insn_length(insn));
 }
 
-/*
- * Move INSN to offset WHERE in FRAG.  Adjust the fixups accordingly and
- * install the opcode in the new location.
- */
+/* Move INSN to offset WHERE in FRAG.  Adjust the fixups accordingly and
+ * install the opcode in the new location.  */
 static void	move_insn(struct riscv_cl_insn *insn,fragS * frag,long where)
 {
 	insn->frag = frag;
@@ -21258,17 +21003,17 @@ static void	add_relaxed_insn(struct riscv_cl_insn *insn,int max_chars,int var,
 }
 
 /* Compute the length of a branch sequence,and adjust the stored length
- * accordingly.  If FRAGP is NULL,the worst-case length is returned.  */
+ * accordingly.  If FRAGP is NULL,the worst-case length is returned.
+ * binutils/gas/config/tc-riscv.c:786  */
 static unsigned	relaxed_branch_length(fragS * fragp,asection * sec,int update)
 {
-	int		jump      ,rvc,length = 8;
+	int		jump ,rvc, length;
 
 	if (!fragp)
-		return length;
+		return 8;
 
 	jump = RELAX_BRANCH_UNCOND(fragp->fr_subtype);
 	rvc = RELAX_BRANCH_RVC(fragp->fr_subtype);
-	length = RELAX_BRANCH_LENGTH(fragp->fr_subtype);
 
 	/* Assume jumps are in range; the linker will catch any that aren't.  */
 	length = jump ? 4 : 8;
@@ -21283,12 +21028,10 @@ static unsigned	relaxed_branch_length(fragS * fragp,asection * sec,int update)
 
 		if (rvc && (bfd_vma) (val + rvc_range / 2) < rvc_range)
 			length = 2;
-		else
-			if ((bfd_vma) (val + RISCV_BRANCH_REACH / 2) < RISCV_BRANCH_REACH)
-				length = 4;
-			else
-				if (!jump && rvc)
-					length = 6;
+		else if ((bfd_vma) (val + RISCV_BRANCH_REACH / 2) < RISCV_BRANCH_REACH)
+			length = 4;
+		else if (!jump && rvc)
+			length = 6;
 	}
 	if (update)
 		fragp->fr_subtype = RELAX_BRANCH_ENCODE(jump,rvc,length);
@@ -21655,11 +21398,9 @@ static bool	arg_lookup(char **s,const char *const *array,size_t size,unsigned *r
 #define USE_IMM(n,s) \
   (used_bits |= ((insn_t)((1ull<<n)-1) << (s)))
 
-/*
- * For consistency checking,verify that all bits are specified either by the
+/* For consistency checking,verify that all bits are specified either by the
  * match/mask part of the instruction definition,or by the operand list. The
- * `length` could be the actual instruction length or 0 for auto-detection.
- */
+ * `length` could be the actual instruction length or 0 for auto-detection.  */
 static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 {
 	const char     *oparg,*opargStart;
@@ -21710,8 +21451,7 @@ static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 				break;	/* CRS2S,constrained to be x0.  */
 			case '>':	/* CITYPE immediate,compressed shift.  */
 			case 'u':	/* CITYPE immediate,compressed lui.  */
-			case 'v':	/* CITYPE immediate,li to compressed
-					 * lui.  */
+			case 'v':	/* CITYPE immediate,li to compressed lui.  */
 			case 'o':	/* CITYPE immediate,allow zero.  */
 			case 'j':
 				used_bits |= ENCODE_CITYPE_IMM(-1U);
@@ -21740,10 +21480,7 @@ static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 			case 'K':
 				used_bits |= ENCODE_CIWTYPE_ADDI4SPN_IMM(-1U);
 				break;
-				/*
-				 * CLTYPE and CSTYPE have the same immediate
-				 * encoding.
-				 */
+				/* CLTYPE and CSTYPE have the same immediate encoding. */
 			case '5':
 				used_bits |= ENCODE_CLTYPE_IMM(-1U);
 				break;
@@ -21823,11 +21560,9 @@ static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 				USE_BITS(OP_MASK_VMASK,OP_SH_VMASK);
 				break;
 			case 'M':
-				break;	/* Macro operand,must be a mask
-					 * register.  */
+				break;	/* Macro operand,must be a mask register.  */
 			case 'T':
-				break;	/* Macro operand,must be a vector
-					 * register.  */
+				break;	/* Macro operand,must be a vector register.  */
 			default:
 				goto unknown_validate_operand;
 			}
@@ -21989,8 +21724,7 @@ static bool	validate_riscv_insn(const struct riscv_opcode *opc,int length)
 			break;
 		default:
 	unknown_validate_operand:
-			as_bad(("internal: bad RISC-V opcode "
-				"(unknown operand type `%s'): %s %s"),
+			as_bad("internal: bad RISC-V opcode (unknown operand type `%s'): %s %s",
 			       opargStart,opc->name,opc->args);
 			return false;
 		}
@@ -22013,12 +21747,8 @@ struct percent_op_match {
 	bfd_reloc_code_real_type reloc;
 };
 
-/*
- * Common hash table initialization function for instruction and .insn
- * directive.
- */
-static htab_t	init_opcode_hash(const struct riscv_opcode *opcodes,
-			       		bool		insn_directive_p)
+/* Common hash table initialization function for instruction and .insn directive. */
+static htab_t init_opcode_hash(const struct riscv_opcode *opcodes,bool insn_directive_p)
 {
 	int		i = 0;
 	int		length;
@@ -22509,16 +22239,14 @@ static struct init_csr_data csr_data[] = {
 	{"textra64",CSR_TDATA3,CSR_CLASS_DEBUG,PRIV_SPEC_CLASS_NONE,PRIV_SPEC_CLASS_NONE},
 };
 
-/*
- * This function is called once,at assembler startup time.  It should set up
- * all the tables,etc. that the MD part of the assembler will need.
- */
+/* This function is called once,at assembler startup time.  It should set up
+ * all the tables,etc. that the MD part of the assembler will need.  */
 static void	md_begin(void)
 {
 	unsigned long	mach = xlen == 64 ? bfd_mach_riscv64 : bfd_mach_riscv32;
 
 	if (!bfd_default_set_arch_mach(stdoutput,bfd_arch_riscv,mach))
-		as_warn(("could not set architecture and machine"));
+		as_warn("could not set architecture and machine");
 
 	op_hash = init_opcode_hash(riscv_opcodes,false);
 	insn_type_hash = init_opcode_hash(riscv_insn_types,true);
@@ -22547,30 +22275,25 @@ static void	md_begin(void)
 	record_alignment(text_section,riscv_opts.rvc ? 1 : 2);
 }
 
-static insn_t	riscv_apply_const_reloc(bfd_reloc_code_real_type reloc_type,bfd_vma value)
+static insn_t riscv_apply_const_reloc(bfd_reloc_code_real_type reloc_type,bfd_vma value)
 {
 	switch (reloc_type) {
-	case BFD_RELOC_32:
-		return value;
+	case BFD_RELOC_32: return value;
 
-	case BFD_RELOC_RISCV_HI20:
-		return ENCODE_UTYPE_IMM(RISCV_CONST_HIGH_PART(value));
+	case BFD_RELOC_RISCV_HI20: return ENCODE_UTYPE_IMM(RISCV_CONST_HIGH_PART(value));
 
-	case BFD_RELOC_RISCV_LO12_S:
-		return ENCODE_STYPE_IMM(value);
+	case BFD_RELOC_RISCV_LO12_S: return ENCODE_STYPE_IMM(value);
 
-	case BFD_RELOC_RISCV_LO12_I:
-		return ENCODE_ITYPE_IMM(value);
+	case BFD_RELOC_RISCV_LO12_I: return ENCODE_ITYPE_IMM(value);
 
 	default:
 		abort();
 	}
 }
 
-/*
- * Output an instruction.  IP is the instruction information. ADDRESS_EXPR is
- * an operand of the instruction to be used with RELOC_TYPE.
- */
+/* Output an instruction.  IP is the instruction information. ADDRESS_EXPR is
+ * an operand of the instruction to be used with RELOC_TYPE. 
+ * binutils/gas/config/tc-riscv.c:1569 */
 static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 					bfd_reloc_code_real_type reloc_type)
 {
@@ -22584,10 +22307,10 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 		    || reloc_type == BFD_RELOC_RISCV_JMP) {
 			int		j = reloc_type == BFD_RELOC_RISCV_JMP;
 			int		best_case = insn_length(ip);
-			unsigned	worst_case = relaxed_branch_length(NULL,NULL,0);
+			unsigned	worst_case = relaxed_branch_length(NULL,NULL,0); // This is always 8
 
 			if (now_seg == absolute_section) {
-				as_bad(("relaxable branches not supported in absolute section"));
+				as_bad("relaxable branches not supported in absolute section");
 				return;
 			}
 			add_relaxed_insn(ip,worst_case,best_case,
@@ -22598,11 +22321,9 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 		} else {
 			howto = riscv_reloc_type_lookup(stdoutput,reloc_type);
 			if (howto == NULL)
-				as_bad(("internal: unsupported RISC-V relocation number %d"),
-				       reloc_type);
+				as_bad("internal: unsupported RISC-V relocation number %d",reloc_type);
 
-			ip->fixp = fix_new_exp(ip->frag,ip->where,
-					       bfd_get_reloc_size(howto),
+			ip->fixp = fix_new_exp(ip->frag,ip->where, bfd_get_reloc_size(howto),
 					     address_expr,false,reloc_type);
 
 			ip->fixp->fx_tcbit = riscv_opts.relax;
@@ -22610,10 +22331,10 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 	}
 	add_fixed_insn(ip);
 
-	/* We need to start a new frag after any instruction that can be
-	 * optimized away or compressed by the linker during relaxation,to
-	 * prevent the assembler from computing static offsets across such an
-	 * instruction. This is necessary to get correct EH info.  */
+	/* We need to start a new frag after any instruction that can be optimized 
+	 * away or compressed by the linker during relaxation,to prevent the 
+	 * assembler from computing static offsets across such an instruction. 
+	 * This is necessary to get correct EH info.  */
 	if (reloc_type == BFD_RELOC_RISCV_HI20
 	    || reloc_type == BFD_RELOC_RISCV_PCREL_HI20
 	    || reloc_type == BFD_RELOC_RISCV_TPREL_HI20
@@ -22626,7 +22347,6 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 /* Build an instruction created by a macro expansion.  This is passed a pointer
  * to the count of instructions created so far,an expression,the name of the
  * instruction to build,an operand format string,and corresponding arguments. */
-
 static void	macro_build(expressionS * ep,const char *name,const char *fmt,...)
 {
 	const struct riscv_opcode *mo;
@@ -24350,7 +24070,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 						if (((unsigned)(imm_expr->X_add_number) & 0x1fU)
 						    || imm_expr->X_add_number >= RISCV_IMM_REACH / 2
 						    || imm_expr->X_add_number < -RISCV_IMM_REACH / 2)
-							as_bad(_("improper prefetch offset (%ld)"),
+							as_bad("improper prefetch offset (%ld)",
 							       (long)imm_expr->X_add_number);
 						ip->insn_opcode |= ENCODE_STYPE_IMM(
 										    (unsigned)(imm_expr->X_add_number) & ~0x1fU);
@@ -24566,25 +24286,15 @@ static int	md_parse_option(int c,const char *arg)
 		break;
 
 	case OPTION_MABI:
-		if (strcmp(arg,"ilp32") == 0)
-			riscv_set_abi(32,FLOAT_ABI_SOFT,false);
-		else if (strcmp(arg,"ilp32e") == 0)
-				riscv_set_abi(32,FLOAT_ABI_SOFT,true);
-			else if (strcmp(arg,"ilp32f") == 0)
-					riscv_set_abi(32,FLOAT_ABI_SINGLE,false);
-				else if (strcmp(arg,"ilp32d") == 0)
-						riscv_set_abi(32,FLOAT_ABI_DOUBLE,false);
-					else if (strcmp(arg,"ilp32q") == 0)
-							riscv_set_abi(32,FLOAT_ABI_QUAD,false);
-						else if (strcmp(arg,"lp64") == 0)
-								riscv_set_abi(64,FLOAT_ABI_SOFT,false);
-							else if (strcmp(arg,"lp64f") == 0)
-									riscv_set_abi(64,FLOAT_ABI_SINGLE,false);
-								else if (strcmp(arg,"lp64d") == 0)
-										riscv_set_abi(64,FLOAT_ABI_DOUBLE,false);
-									else if (strcmp(arg,"lp64q") == 0)
-											riscv_set_abi(64,FLOAT_ABI_QUAD,false);
-										else return 0;
+		if (strcmp(arg,"lp64") == 0)
+			riscv_set_abi(64,FLOAT_ABI_SOFT,false);
+		else if (strcmp(arg,"lp64f") == 0)
+			riscv_set_abi(64,FLOAT_ABI_SINGLE,false);
+		else if (strcmp(arg,"lp64d") == 0)
+			riscv_set_abi(64,FLOAT_ABI_DOUBLE,false);
+		else if (strcmp(arg,"lp64q") == 0)
+			riscv_set_abi(64,FLOAT_ABI_QUAD,false);
+		else return 0;
 		explicit_mabi = true;
 		break;
 
@@ -25826,16 +25536,14 @@ static const char *const riscv_vma[2] =
 	"mu","ma"
 };
 
-/*
- * The order of overloaded instructions matters.  Label arguments and register
+/* The order of overloaded instructions matters.  Label arguments and register
  * arguments look the same. Instructions that can have either for arguments
  * must apear in the correct order in this table for the assembler to pick the
  * right one. In other words,entries with immediate operands must apear after
  * the same instruction with registers.
  * 
  * Because of the lookup algorithm used,entries with the same opcode name must be
- * contiguous.
- */
+ * contiguous. */
 
 #define MASK_RS1 (OP_MASK_RS1 << OP_SH_RS1)
 #define MASK_RS2 (OP_MASK_RS2 << OP_SH_RS2)

@@ -24037,7 +24037,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				my_getExpression(imm_expr,asarg);
 				check_absolute_expr(ip,imm_expr,FALSE);
 				if ((unsigned long)imm_expr->X_add_number > 10)
-					as_bad(("Improper rnum immediate (%lu)"),
+					as_bad("Improper rnum immediate (%lu)",
 					(unsigned long)imm_expr->X_add_number);
 				INSERT_OPERAND(RNUM,*ip,imm_expr->X_add_number);
 				imm_expr->X_op = O_absent;
@@ -24058,11 +24058,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				case 'i':
 					switch (*++oparg) {
 					case 'f':
-						/*
-						 * Prefetch offset for 'Zicbop'
-						 * extension. pseudo S-type but
-						 * lower 5-bits zero.
-						 */
+						/* Prefetch offset for 'Zicbop' extension. pseudo S-type but
+						 * lower 5-bits zero.  */
 						if (riscv_handle_implicit_zero_offset(imm_expr,asarg))
 							continue;
 						my_getExpression(imm_expr,asarg);

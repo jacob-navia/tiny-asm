@@ -26,18 +26,12 @@
 
 #ifndef GAS
 #define GAS 1
-#define __CONFIG_H__ 1
 /* Default architecture. */
 #define DEFAULT_ARCH "riscv64"
 /* Default compression algorithm for --enable-compressed-debug-sections. */
 #define DEFAULT_COMPRESSED_DEBUG_ALGORITHM COMPRESS_DEBUG_GABI_ZLIB
-/* Define to 1 if you want to generate ELF common symbols with the STT_COMMON
-   type by default. */
-#define DEFAULT_GENERATE_ELF_STT_COMMON 0
 /* Define to 1 if you want to generate RISC-V arch attribute by default. */
 #define DEFAULT_RISCV_ATTR 1
-/* Define if you want run-time sanity checks. */
-#define ENABLE_CHECKING 1
 /* Define to 1 if translation of program messages to the user's native
    language is requested. */
 #define ENABLE_NLS 0
@@ -1189,8 +1183,7 @@ typedef struct bfd_arch_info {
      value is negative then this has to be done for every single
      instruction, regardless of the offset of the reloc.  */
   signed int max_reloc_offset_into_insn;
-}
-bfd_arch_info_type;
+} bfd_arch_info_type;
 
 static bool bfd_default_set_arch_mach (bfd *abfd, 
 				enum bfd_architecture arch, unsigned long mach);
@@ -1536,42 +1529,11 @@ static int elf_get_default_section_type(unsigned);
 static inline const char * bfd_get_filename (const bfd *abfd)
 { return abfd->filename; }
 
-static inline bool bfd_get_cacheable (const bfd *abfd)
-{ return abfd->cacheable; }
-
 static inline enum bfd_format bfd_get_format (const bfd *abfd)
 { return abfd->format; }
 
-static inline flagword bfd_get_file_flags (const bfd *abfd)
-{
-  return abfd->flags;
-}
-static inline bfd_vma bfd_get_start_address (const bfd *abfd)
-{
-  return abfd->start_address;
-}
-static inline unsigned int bfd_get_symcount (const bfd *abfd)
-{
-  return abfd->symcount;
-}
-static inline unsigned int bfd_get_dynamic_symcount (const bfd *abfd)
-{
-  return abfd->dynsymcount;
-}
 static inline struct bfd_symbol ** bfd_get_outsymbols (const bfd *abfd)
 { return abfd->outsymbols; }
-
-static inline unsigned int bfd_count_sections (const bfd *abfd)
-{ return abfd->section_count; }
-
-static inline bool bfd_has_map (const bfd *abfd)
-{ return abfd->has_armap; }
-
-static inline bool bfd_is_thin_archive (const bfd *abfd)
-{ return abfd->is_thin_archive; }
-
-static inline void * bfd_usrdata (const bfd *abfd)
-{ return abfd->usrdata; }
 
 /* See note beside bfd_set_section_userdata.  */
 static inline bool bfd_set_cacheable (bfd * abfd, bool val)
@@ -1874,9 +1836,7 @@ enum complain_overflow {
 };
 
 struct reloc_howto_struct {
-  /* The type field has mainly a documentary use - the back end can
-     do what it wants with it, though normally the back end's idea of
-     an external reloc number is stored in this field.  */
+  /* Contains the relocation type according to the riscv standard */
   unsigned int type;
 
   /* The size of the item to be relocated in bytes.  */
@@ -2193,19 +2153,6 @@ struct obstack;
   ((*res) = (a), (*res) *= (b), (b) != 0 && (*res) / (b) != (a))
 #endif
 
-/* asintl.h - gas-specific header for gettext code. */
-#ifndef ENABLE_NLS
-# include <libintl.h>
-# define _(String) gettext (String)
-# ifdef gettext_noop
-#  define N_(String) gettext_noop (String)
-# else
-#  define N_(String) (String)
-# endif
-#else
-# define gettext(Msgid) (Msgid)
-#endif
-
 #define BAD_CASE(val)							    \
   {									    \
     as_fatal ("Case value %ld unexpected at line %d of file \"%s\"\n",   \
@@ -2318,7 +2265,6 @@ static void flonum_multip (const FLONUM_TYPE * a, const FLONUM_TYPE * b,
  *	Declare error codes.						*
  *									*
  \***********************************************************************/
-
 #define ERROR_EXPONENT_OVERFLOW (2)
 
 /* These are assembler-wide concepts */
@@ -2442,12 +2388,6 @@ static unsigned char flag_signed_overflow_ok; /* -J */
 /* True if local symbols should be retained.  */
 static int flag_keep_locals; /* -L */
 
-/* True if we are assembling in MRI mode.  */
-#define flag_mri 0
-
-/* True if alternate macro mode is in effect.  */
-static bool flag_macro_alternate;
-
 /* Should the data section be made read-only and appended to the text
    section?  */
 static unsigned char flag_readonly_data_in_text; /* -R */
@@ -2457,9 +2397,6 @@ static int flag_no_warnings; /* -W */
 
 /* True if warnings count as errors.  */
 static int flag_fatal_warnings; /* --fatal-warnings */
-
-/* This is true if the assembler should output time and space usage.  */
-static unsigned char flag_print_statistics;
 
 /* True if local absolute symbols are to be stripped.  */
 static int flag_strip_local_absolute;
@@ -2617,8 +2554,7 @@ static bool	set_section_size(asection *,size_t val);
 /* Are we ASCII? */
 #if HOST_CHARSET == HOST_CHARSET_ASCII
 
-static const unsigned char _hex_value[_hex_array_size] =
-{
+static const unsigned char _hex_value[_hex_array_size] = {
   _hex_bad, _hex_bad, _hex_bad, _hex_bad,   /* NUL SOH STX ETX */
   _hex_bad, _hex_bad, _hex_bad, _hex_bad,   /* EOT ENQ ACK BEL */
   _hex_bad, _hex_bad, _hex_bad, _hex_bad,   /* BS  HT  LF  VT  */
@@ -2824,8 +2760,7 @@ typedef enum {
   O_max
 } operatorT;
 
-typedef struct expressionS
-{
+typedef struct expressionS {
   /* The main symbol.  */
   symbolS *X_add_symbol;
   /* The second symbol, if needed.  */
@@ -2860,12 +2795,7 @@ typedef struct expressionS
   unsigned short X_md;
 } expressionS;
 
-enum expr_mode
-{
-  expr_evaluate,
-  expr_normal,
-  expr_defer
-};
+enum expr_mode { expr_evaluate, expr_normal, expr_defer };
 
 /* "result" should be type (expressionS *).  */
 #define expression(result) expr (0, result, expr_normal)
@@ -2882,7 +2812,6 @@ static LITTLENUM_TYPE generic_bignum[];
 #define SIZE_OF_LARGE_NUMBER (20)
 
 typedef char operator_rankT;
-
 static char get_symbol_name (char **);
 static char restore_line_pointer (char);
 static void expr_begin (void);
@@ -2898,10 +2827,7 @@ static void current_location (expressionS *);
 static uint32_t generic_bignum_to_int32 (void);
 static int resolve_expression (expressionS *);
 
-/* This one starts the chain of target dependent headers.  */
-
 /* ELF object file format. */
-
 #ifndef _OBJ_ELF_H
 #define _OBJ_ELF_H
 
@@ -3883,7 +3809,6 @@ typedef struct elf_internal_verdaux {
 } Elf_Internal_Verdaux;
 
 /* This structure appears in a SHT_GNU_verneed section.  */
-
 typedef struct elf_internal_verneed {
   unsigned short vn_version;	/* Version number of structure.  */
   unsigned short vn_cnt;	/* Number of vernaux entries.  */
@@ -3922,8 +3847,7 @@ typedef struct elf_internal_versym {
 } Elf_Internal_Versym;
 
 /* Structure for syminfo section.  */
-typedef struct
-{
+typedef struct {
   unsigned short int 	si_boundto;
   unsigned short int	si_flags;
 } Elf_Internal_Syminfo;
@@ -3939,8 +3863,7 @@ typedef struct
 /* This structure is used to describe how sections should be assigned
    to program segments.  */
 
-struct elf_segment_map
-{
+struct elf_segment_map {
   /* Next program segment.  */
   struct elf_segment_map *next;
   /* Program segment type.  */
@@ -4162,8 +4085,7 @@ struct eh_cie_fde {
   unsigned int *set_loc;
 };
 
-struct eh_frame_sec_info
-{
+struct eh_frame_sec_info {
   unsigned int count;
   struct cie *cies;
   struct eh_cie_fde entry[1];
@@ -4199,17 +4121,14 @@ struct compact_eh_frame_hdr_info {
   asection **entries;
 };
 
-struct eh_frame_hdr_info
-{
+struct eh_frame_hdr_info {
   asection *hdr_sec;
   unsigned int array_count;
   bool frame_hdr_is_compact;
-  union
-    {
+  union {
       struct dwarf_eh_frame_hdr_info dwarf;
       struct compact_eh_frame_hdr_info compact;
-    }
-  u;
+    } u;
 };
 
 /* Enum used to identify target specific extensions to the elf_obj_tdata
@@ -4247,8 +4166,7 @@ enum action_discarded { COMPLAIN = 1, PRETEND = 2 };
 /* Information about reloc sections associated with a bfd_elf_section_data
    structure.  */
 struct bfd_elf_section_reloc_data {
-  /* The ELF header for the reloc section associated with this
-     section, if any.  */
+  /* ELF header for the reloc section associated with this section, if any.*/
   Elf_Internal_Shdr *hdr;
   /* The number of relocations currently assigned to HDR.  */
   unsigned int count;
@@ -4361,8 +4279,7 @@ struct bfd_elf_section_data {
    be no default (i.e. all values must be written to file, even zero), or
    that the value is in error and should not be written to file.  */
 
-typedef struct obj_attribute
-{
+typedef struct obj_attribute {
 #define ATTR_TYPE_FLAG_INT_VAL    (1 << 0)
 #define ATTR_TYPE_FLAG_STR_VAL    (1 << 1)
 #define ATTR_TYPE_FLAG_NO_DEFAULT (1 << 2)
@@ -4395,13 +4312,7 @@ typedef struct obj_attribute_list
 
 /* The following object attribute tags are taken as generic, for all
    targets and for "gnu" where there is no target standard.  */
-enum {
-  Tag_NULL = 0,
-  Tag_File = 1,
-  Tag_Section = 2,
-  Tag_Symbol = 3,
-  Tag_compatibility = 32
-};
+enum {Tag_NULL=0,Tag_File=1,Tag_Section=2,Tag_Symbol=3,Tag_compatibility=32};
 
 /* The following struct stores information about every SystemTap section
    found in the object file.  */
@@ -4420,16 +4331,14 @@ struct output_elf_obj_tdata {
   asymbol **section_syms;
 
   /* NT_GNU_BUILD_ID note type info.  */
-  struct
-  {
+  struct {
     bool (*after_write_object_contents) (bfd *);
     const char *style;
     asection *sec;
   } build_id;
 
   /* FDO_PACKAGING_METADATA note type info.  */
-  struct
-  {
+  struct {
     bool (*after_write_object_contents) (bfd *);
     const char *json;
     asection *sec;
@@ -6130,7 +6039,6 @@ static void riscv_pre_output_hook (void);
 #define GAS_SORT_RELOCS 1
 
 /* Let the linker resolve all the relocs due to relaxation.  */
-#define tc_fix_adjustable(fixp) 0
 #define md_allow_local_subtract(l,r,s) 0
 
 /* Values passed to md_apply_fix don't include symbol values.  */
@@ -6180,8 +6088,7 @@ static void riscv_mapping_state (enum riscv_seg_mstate, int, bool);
 
 /* Define target segment type.  */
 #define TC_SEGMENT_INFO_TYPE struct riscv_segment_info_type
-struct riscv_segment_info_type
-{
+struct riscv_segment_info_type {
   enum riscv_seg_mstate map_state;
   /* The current mapping symbol with architecture string.  */
   symbolS *arch_map_symbol;
@@ -6189,8 +6096,7 @@ struct riscv_segment_info_type
 
 /* Define target fragment type.  */
 #define TC_FRAG_TYPE struct riscv_frag_type
-struct riscv_frag_type
-{
+struct riscv_frag_type {
   symbolS *first_map_symbol, *last_map_symbol;
 };
 
@@ -6250,7 +6156,6 @@ struct elf_section_match {
 
 
 static void elf_begin (void);
-
 static void elf_end (void);
 
 #ifndef LOCAL_LABEL_PREFIX
@@ -6309,8 +6214,7 @@ struct dwarf2_line_info {
   unsigned int flags;
   unsigned int discriminator;
   /* filenum == -1u chooses filename, otherwise view.  */
-  union
-  {
+  union {
     symbolS *view;
     const char *filename;
   } u;
@@ -6365,21 +6269,16 @@ static bool dwarf2_loc_directive_seen;
    is seen.  Unless the target is doing Something Weird, just call
    dwarf2_emit_label.  */
 static bool dwarf2_loc_mark_labels;
-
 static void dwarf2_init (void);
-
 static void dwarf2_finish (void);
-
 static int dwarf2dbg_estimate_size_before_relax (fragS *);
 static int dwarf2dbg_relax_frag (fragS *);
 static void dwarf2dbg_convert_frag (fragS *);
-
 static void dwarf2dbg_final_check (void);
 
 /* An enumeration which describes the sizes of offsets (to DWARF sections)
    and the mechanism by which the size is indicated.  */
-enum dwarf2_format
-{
+enum dwarf2_format {
   /* 32-bit format: the initial length field is 4 bytes long.  */
   dwarf2_format_32bit,
   /* DWARF3 64-bit format: the representation of the initial length
@@ -6397,9 +6296,7 @@ enum dwarf2_format
 #define obj_app_file elf_file_symbol
 #endif
 static void elf_file_symbol (const char *);
-
 static void obj_elf_section_change_hook (void);
-
 static void obj_elf_section (int);
 static const char * obj_elf_section_name (void);
 static void obj_elf_previous (int);
@@ -6518,9 +6415,7 @@ static symbolS * elf_common_parse (int ignore ATTRIBUTE_UNUSED, symbolS *symbolP
 #define FAKE_LABEL_CHAR '\001'
 #endif
 
-/*
- * FixSs may be built up in any order.
- */
+/* FixSs may be built up in any order.  */
 
 struct fix {
   /* Next fixS in linked list, or NULL.  */
@@ -6608,20 +6503,16 @@ struct fix {
 
 typedef struct fix fixS;
 
-struct reloc_list
-{
+struct reloc_list {
   struct reloc_list *next;
-  union
-  {
-    struct
-    {
+  union {
+    struct {
       symbolS *offset_sym;
       reloc_howto_type *howto;
       symbolS *sym;
       bfd_vma addend;
     } a;
-    struct
-    {
+    struct {
       asection *sec;
       asymbol *s;
       arelent r;
@@ -6800,14 +6691,11 @@ static bool input_from_string;
 
 static char lex_type[];
 static char is_end_of_line[];
-
 static int is_it_end_of_statement (void);
-
 static int target_big_endian;
 
 /* These are initialized by the CPU specific target files (tc-*.c).  */
 static const char line_separator_chars[];
-
 /* Table of -I directories.  */
 static size_t include_dir_maxlen;
 
@@ -6817,14 +6705,8 @@ static addressT abs_section_offset;
 /* True if a stabs line debug statement is currently being emitted.  */
 static int outputting_stabs_line_debug;
 
-#ifndef TC_PARSE_CONS_RETURN_TYPE
-#define TC_PARSE_CONS_RETURN_TYPE bfd_reloc_code_real_type
-#define TC_PARSE_CONS_RETURN_NONE BFD_RELOC_NONE
-#endif
-
 static void pop_insert (const pseudo_typeS *);
-static unsigned int get_stab_string_offset
-  (const char *, const char *, bool);
+static unsigned int get_stab_string_offset(const char *,const char *,bool);
 static char *demand_copy_string (int *lenP);
 static char *demand_copy_C_string (int *len_pointer);
 static char get_absolute_expression_and_terminator (long *val_pointer);
@@ -6835,14 +6717,13 @@ static void cons (int nbytes);
 static void demand_empty_rest_of_line (void);
 static void emit_expr (expressionS *exp, unsigned int nbytes);
 static void emit_expr_with_reloc (expressionS *exp, unsigned int nbytes,
-				  TC_PARSE_CONS_RETURN_TYPE);
+				  bfd_reloc_code_real_type);
 static void emit_expr_fix (expressionS *, unsigned int, fragS *, char *,
-			   TC_PARSE_CONS_RETURN_TYPE);
+			   bfd_reloc_code_real_type);
 static void emit_leb128_expr (expressionS *, int);
 static void equals (char *, int);
 static void float_cons (int);
 static void ignore_rest_of_line (void);
-#define discard_rest_of_line ignore_rest_of_line
 static unsigned output_leb128 (char *, valueT, int);
 static void pseudo_set (symbolS * symbolP);
 static void read_a_source_file (const char *name);
@@ -6974,10 +6855,8 @@ static void S_SET_VOLATILE (symbolS *);
 static void S_CLEAR_VOLATILE (symbolS *);
 static void S_SET_FORWARD_REF (symbolS *);
 
-/*
- * Current means for getting from symbols to segments and vice verse.
- * This will change for infinite-segments support (e.g. COFF).
- */
+/* Current means for getting from symbols to segments and vice verse.
+ * This will change for infinite-segments support (e.g. COFF).  */
 
 #define	SEGMENT_TO_SYMBOL_TYPE(seg)  ( seg_N_TYPE [(int) (seg)] )
 
@@ -7725,8 +7604,6 @@ typedef struct segment_info_struct {
      there are frags.  */
   unsigned int bss : 1;
 
-  int user_stuff;
-
   /* Fixups for this segment.  This is only valid after the frchains
      are run together.  */
   fixS *fix_root;
@@ -7766,10 +7643,7 @@ static symbolS *section_symbol (segT);
 static void output_file_close (void);
 static void output_file_create (const char *name);
 
-#define BFD_VERSION_DATE 20230531
-#define BFD_VERSION 240500000
-#define BFD_VERSION_STRING  "(GNU Binutils) " "2.40.50.20230531"
-#define REPORT_BUGS_TO "<https://sourceware.org/bugzilla/>"
+#define BFD_VERSION 280500000
 struct section_hash_entry {
   struct bfd_hash_entry root;
   asection section;
@@ -7793,18 +7667,6 @@ static unsigned int bfd_log2 (bfd_vma x) ;
 /* Extracted from bfd.c.  */
 bfd_error_handler_type _bfd_set_error_handler_caching (bfd *);
 const char *_bfd_get_error_program_name (void);
-/* Used in generating armaps (archive tables of contents).  */
-struct orl             /* Output ranlib.  */
-{
-  char **name;         /* Symbol name.  */
-  union
-  {
-    file_ptr pos;
-    bfd *abfd;
-  } u;                 /* bfd* or file position.  */
-  int namidx;          /* Index into string table.  */
-};
-
 /* Extracted from archures.c.  */
 static const bfd_arch_info_type bfd_default_arch_struct;
 static bool bfd_default_scan

@@ -333,10 +333,6 @@ static void	parse_args(int *pargc,char ***pargv)
 			do_not_pad_sections_to_alignment = 1;
 			break;
 
-		case OPTION_STATISTICS:
-			flag_print_statistics = 1;
-			break;
-
 		case OPTION_STRIP_LOCAL_ABSOLUTE:
 			flag_strip_local_absolute = 1;
 			break;
@@ -527,18 +523,6 @@ This program has absolutely no warranty.\n");
 			//flag_gen_sframe = 1;
 			break;
 #endif				/* OBJ_ELF */
-
-		case OPTION_ALTERNATE:
-			optarg = old_argv[optind - 1];
-			while (*optarg == '-')
-				optarg++;
-
-			if (strcmp(optarg,"alternate") == 0) {
-				flag_macro_alternate = 1;
-				break;
-			}
-			optarg++;
-			break;
 
 		case 'D':
 			/* DEBUG is implemented: it debugs different things
@@ -1416,7 +1400,6 @@ static unsigned	encoding_size(unsigned char encoding)
 static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 {
 	unsigned	size = encoding_size(encoding);
-	bfd_reloc_code_real_type code;
 
 	if (encoding == DW_EH_PE_omit)
 		return;
@@ -1424,15 +1407,6 @@ static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 	if (emit_encoding)
 		out_one(encoding);
 
-	code = tc_cfi_reloc_for_encoding(encoding);
-	if (code != BFD_RELOC_NONE) {
-		reloc_howto_type *howto = riscv_reloc_type_lookup(stdoutput,code);
-		char           *p = frag_more(size);
-		gas_assert(size == (unsigned)howto->bitsize / 8);
-		md_number_to_chars(p,0,size);
-		fix_new(frag_now,p - frag_now->fr_literal,size,exp->X_add_symbol,
-			exp->X_add_number,howto->pc_relative,code);
-	} else
 		if ((encoding & 0x70) == DW_EH_PE_pcrel) {
 			expressionS	tmp = *exp;
 			tmp.X_op = O_subtract;
@@ -2233,8 +2207,7 @@ static void	dot_cfi_personality(int ignored ATTRIBUTE_UNUSED)
 		  )
 	/* leb128 can be handled,but does something actually need it?  */
 		 || (encoding & 7) == DW_EH_PE_uleb128
-		 || (encoding & 7) > DW_EH_PE_udata8)
-		&& tc_cfi_reloc_for_encoding(encoding) == BFD_RELOC_NONE)) {
+		 || (encoding & 7) > DW_EH_PE_udata8))) {
 		as_bad(("invalid or unsupported encoding in .cfi_personality"));
 		ignore_rest_of_line();
 		return;
@@ -2288,9 +2261,8 @@ static void	dot_cfi_lsda(int ignored ATTRIBUTE_UNUSED)
 		  )
 	/* leb128 can be handled,but does something actually need it?  */
 		 || (encoding & 7) == DW_EH_PE_uleb128
-		 || (encoding & 7) > DW_EH_PE_udata8)
-		&& tc_cfi_reloc_for_encoding(encoding) == BFD_RELOC_NONE)) {
-		as_bad(("invalid or unsupported encoding in .cfi_lsda"));
+		 || (encoding & 7) > DW_EH_PE_udata8))) {
+		as_bad("invalid or unsupported encoding in .cfi_lsda");
 		ignore_rest_of_line();
 		return;
 	}
@@ -2415,29 +2387,15 @@ static void	dot_cfi_sections(int ignored ATTRIBUTE_UNUSED)
 			if (startswith(name,".eh_frame")
 			    && name[9] != '_')
 				sections |= CFI_EMIT_eh_frame;
-			else
-				if (startswith(name,".debug_frame"))
-					sections |= CFI_EMIT_debug_frame;
-#if SUPPORT_COMPACT_EH
-				else
-					if (startswith(name,".eh_frame_entry")) {
-						compact_eh = true;
-						sections |= CFI_EMIT_eh_frame_compact;
-					}
-#endif
-#ifdef tc_cfi_section_name
-					else
-						if (strcmp(name,tc_cfi_section_name) == 0)
-							sections |= CFI_EMIT_target;
-#endif
-						else
-							if (startswith(name,".sframe"))
-								sections |= CFI_EMIT_sframe;
-							else {
-								*input_line_pointer = c;
-								input_line_pointer = saved_ilp;
-								break;
-							}
+			else if (startswith(name,".debug_frame"))
+				sections |= CFI_EMIT_debug_frame;
+			else if (startswith(name,".sframe"))
+				sections |= CFI_EMIT_sframe;
+			else {
+				*input_line_pointer = c;
+				input_line_pointer = saved_ilp;
+				break;
+			}
 
 			*input_line_pointer = c;
 			SKIP_WHITESPACE_AFTER_NAME();
@@ -2739,15 +2697,8 @@ static void	output_cfi_insn(struct cfi_insn_data *insn)
 				out_one(encoding);
 
 				if ((encoding & 0x70) == DW_EH_PE_pcrel) {
-#if CFI_DIFF_EXPR_OK
 					insn->u.ea.exp.X_op = O_subtract;
 					insn->u.ea.exp.X_op_symbol = symbol_temp_new_now();
-#elif defined (tc_cfi_emit_pcrel_expr)
-					tc_cfi_emit_pcrel_expr(&insn->u.ea.exp,enc_size);
-					break;
-#else
-					abort();
-#endif
 				}
 			}
 			emit_expr(&insn->u.ea.exp,enc_size);
@@ -2912,33 +2863,15 @@ static void	output_fde(struct fde_entry *fde,struct cie_entry *cie,
 
 	exp.X_op = O_symbol;
 	if (eh_frame) {
-		bfd_reloc_code_real_type code
-		= tc_cfi_reloc_for_encoding(cie->fde_encoding);
 		addr_size = DWARF2_FDE_RELOC_SIZE;
-		if (code != BFD_RELOC_NONE) {
-			reloc_howto_type *howto = riscv_reloc_type_lookup(stdoutput,code);
-			char           *p = frag_more(addr_size);
-			gas_assert(addr_size == (unsigned)howto->bitsize / 8);
-			md_number_to_chars(p,0,addr_size);
-			fix_new(frag_now,p - frag_now->fr_literal,addr_size,
-			     fde->start_address,0,howto->pc_relative,code);
-		} else {
+			{
 			exp.X_op = O_subtract;
 			exp.X_add_number = 0;
-#if CFI_DIFF_EXPR_OK
 			exp.X_add_symbol = fde->start_address;
 			exp.X_op_symbol = symbol_temp_new_now();
 			emit_expr(&exp,addr_size);	/* Code offset.  */
-#else
-			exp.X_op = O_symbol;
-			exp.X_add_symbol = fde->start_address;
 
-#if defined(tc_cfi_emit_pcrel_expr)
-			tc_cfi_emit_pcrel_expr(&exp,addr_size);	/* Code offset.  */
-#else
 			emit_expr(&exp,addr_size);	/* Code offset.  */
-#endif
-#endif
 		}
 	} else {
 		exp.X_add_number = 0;
@@ -3028,10 +2961,6 @@ static struct cie_entry *select_cie_for_fde(struct fde_entry *fde,bool eh_frame,
 	for (cie = cie_root; cie; cie = cie->next) {
 		if (CUR_SEG(cie) != CUR_SEG(fde))
 			continue;
-#ifdef tc_cie_fde_equivalent_extra
-		if (!tc_cie_fde_equivalent_extra(cie,fde))
-			continue;
-#endif
 		if (cie->return_column != fde->return_column
 		    || cie->signal_frame != fde->signal_frame
 		    || cie->per_encoding != fde->per_encoding
@@ -3329,10 +3258,6 @@ static void	cfi_finish(void)
 
 /* The maximum address skip amount that can be encoded with a special op.  */
 #define MAX_SPECIAL_ADDR_DELTA		SPECIAL_ADDR(255)
-
-#ifndef TC_PARSE_CONS_RETURN_NONE
-#define TC_PARSE_CONS_RETURN_NONE BFD_RELOC_NONE
-#endif
 
 #define GAS_ABBREV_COMP_UNIT 1
 #define GAS_ABBREV_SUBPROG   2
@@ -4676,11 +4601,11 @@ static void	emit_fixed_inc_line_addr(int line_delta,addressT addr_delta,
 		exp.X_op = O_symbol;
 		exp.X_add_symbol = to_sym;
 		exp.X_add_number = 0;
-		emit_expr_fix(&exp,sizeof_address,frag,p,TC_PARSE_CONS_RETURN_NONE);
+		emit_expr_fix(&exp,sizeof_address,frag,p,BFD_RELOC_NONE);
 		p += sizeof_address;
 	} else {
 		*p++ = DW_LNS_fixed_advance_pc;
-		emit_expr_fix(pexp,2,frag,p,TC_PARSE_CONS_RETURN_NONE);
+		emit_expr_fix(pexp,2,frag,p,BFD_RELOC_NONE);
 		p += 2;
 	}
 
@@ -6841,20 +6766,13 @@ static void	integer_constant(int radix,expressionS * expressionP)
 					number = leader - generic_bignum + 1;
 				}
 		}
-#ifndef tc_allow_U_suffix
-#define tc_allow_U_suffix 1
-#endif
 	/* PR 19910: Look for,and ignore,a U suffix to the number.  */
-	if (tc_allow_U_suffix && (c == 'U' || c == 'u'))
+	if ((c == 'U' || c == 'u'))
 		c = *input_line_pointer++;
 
-#ifndef tc_allow_L_suffix
-#define tc_allow_L_suffix 1
-#endif
 	/* PR 20732: Look for,and ignore,a L or LL suffix to the number.  */
-	if (tc_allow_L_suffix)
-		while (c == 'L' || c == 'l')
-			c = *input_line_pointer++;
+	while (c == 'L' || c == 'l')
+		c = *input_line_pointer++;
 
 	if (small) {
 		/*
@@ -6945,14 +6863,6 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 
 		integer_constant(10, expressionP);
 		break;
-
-#ifdef LITERAL_PREFIXPERCENT_BIN
-kkk
-	case '%':
-		integer_constant(2,expressionP);
-		break;
-#endif
-
 	case '0':
 		/* Non-decimal radix.  */
 
@@ -7059,12 +6969,6 @@ kkk
 	unary:
 			operand(expressionP,mode);
 
-#ifdef md_optimize_expr
-			if (md_optimize_expr(NULL,op,expressionP)) {
-				/* Skip.  */
-				;
-			} else
-#endif
 				if (expressionP->X_op == O_constant) {
 					/*
 					 * input_line_pointer -> char after
@@ -10661,8 +10565,7 @@ static void	read_a_source_file(const char *name)
 								if (pop && !pop->poc_handler)
 									pop = NULL;
 
-								/* Print the error msg now,while we still
-								 * can.  */
+								/* Print the error msg now,while we still can.*/
 								if (pop == NULL) {
 									char           *end = input_line_pointer;
 
@@ -12225,7 +12128,7 @@ static void	pseudo_set(symbolS * symbolP)
 #ifndef TC_PARSE_CONS_EXPRESSION
 #ifdef REPEAT_CONS_EXPRESSIONS
 #define TC_PARSE_CONS_EXPRESSION(EXP,NBYTES) \
-  (parse_repeat_cons (EXP,NBYTES),TC_PARSE_CONS_RETURN_NONE)
+  (parse_repeat_cons (EXP,NBYTES),BFD_RELOC_NONE)
 static void
 		parse_repeat_cons(expressionS * exp,unsigned int nbytes);
 #endif
@@ -12233,7 +12136,7 @@ static void
 /* If we haven't gotten one yet,just call expression.  */
 #ifndef TC_PARSE_CONS_EXPRESSION
 #define TC_PARSE_CONS_EXPRESSION(EXP,NBYTES) \
-  (expression (EXP),TC_PARSE_CONS_RETURN_NONE)
+  (expression (EXP),BFD_RELOC_NONE)
 #endif
 #endif
 
@@ -12407,12 +12310,12 @@ err_out:
 /* Put the contents of expression EXP into the object file using NBYTES bytes. */
 static void	emit_expr(expressionS * exp,unsigned int nbytes)
 {
-	emit_expr_with_reloc(exp,nbytes,TC_PARSE_CONS_RETURN_NONE);
+	emit_expr_with_reloc(exp,nbytes,BFD_RELOC_NONE);
 }
 
 static void	emit_expr_with_reloc(expressionS * exp,
 				 		unsigned	int	nbytes,
-			       		TC_PARSE_CONS_RETURN_TYPE reloc)
+			       		bfd_reloc_code_real_type reloc)
 {
 	operatorT	op;
 	char           *p;
@@ -12486,7 +12389,7 @@ static void	emit_expr_with_reloc(expressionS * exp,
 
 	p = frag_more((int)nbytes);
 
-	if (reloc != TC_PARSE_CONS_RETURN_NONE) {
+	if (reloc != BFD_RELOC_NONE) {
 		emit_expr_fix(exp,nbytes,frag_now,p,reloc);
 		return;
 	}
@@ -12604,11 +12507,11 @@ static void	emit_expr_with_reloc(expressionS * exp,
 				}
 			}
 		} else
-			emit_expr_fix(exp,nbytes,frag_now,p,TC_PARSE_CONS_RETURN_NONE);
+			emit_expr_fix(exp,nbytes,frag_now,p,BFD_RELOC_NONE);
 }
 
 static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,char *p,
-		   		TC_PARSE_CONS_RETURN_TYPE r ATTRIBUTE_UNUSED)
+		   		bfd_reloc_code_real_type r ATTRIBUTE_UNUSED)
 {
 	int		offset = 0;
 	unsigned int	size = nbytes;
@@ -12617,7 +12520,7 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 
 	/* Generate a fixS to record the symbol value.  */
 
-	if (r != TC_PARSE_CONS_RETURN_NONE) {
+	if (r != BFD_RELOC_NONE) {
 		reloc_howto_type *reloc_howto;
 
 		reloc_howto = riscv_reloc_type_lookup(stdoutput,r);
@@ -14709,10 +14612,6 @@ static const char *save_symbol_name(const char *name)
 	gas_assert(name != NULL);
 	ret = notes_strdup(name);
 
-#ifdef tc_canonicalize_symbol_name
-	ret = tc_canonicalize_symbol_name(ret);
-#endif
-
 	if (!symbols_case_sensitive) {
 		char           *s;
 
@@ -14760,9 +14659,6 @@ static void	symbol_init(symbolS * symbolP,const char *name,asection * sec,
 
 	obj_symbol_new_hook(symbolP);
 
-#ifdef tc_symbol_new_hook
-	tc_symbol_new_hook(symbolP);
-#endif
 }
 
 /* Create a symbol.  NAME is copied,the caller can destroy/modify.  */
@@ -17226,12 +17122,9 @@ static void	adjust_reloc_syms(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 				if (S_FORCE_RELOC(fixp->fx_addsy,1))
 					continue;
 
-				/* Is there some other (target cpu dependent)
-				 * reason we can't adjust this one?  (E.g.
-				 * relocations involving function addresses on
-				 * the PA.  */
-				if (!tc_fix_adjustable(fixp))
-					continue;
+			/* Is there some other (target cpu dependent) reason we can't adjust 
+			 * this one?  (E.g. relocations involving function addresses on the PA.)*/
+				continue;
 
 				/* Since we're reducing to section symbols,
 				 * don't attempt to reduce anything that's
@@ -17854,7 +17747,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		unsigned int	k ,j,nsyms;
 		asymbol       **sympp;
 		sympp = bfd_get_outsymbols(stdoutput);
-		nsyms = bfd_get_symcount(stdoutput);
+		nsyms = stdoutput->symcount;
 		for (k = 0; k < n; k++)
 			if (((*relocs[k]->sym_ptr_ptr)->flags & BSF_SECTION_SYM) == 0) {
 				for (j = 0; j < nsyms; j++)
@@ -18764,10 +18657,6 @@ static void	write_object_file(void)
 				continue;
 			}
 			elf_frob_symbol(symp,&punt);
-#ifdef tc_frob_symbol
-			if (!punt || symbol_used_in_reloc_p(symp))
-				tc_frob_symbol(symp,punt);
-#endif
 
 			/* If we don't want to keep this symbol,splice it out
 			 * of the chain now.  If EMIT_SECTION_SYMBOLS is 0,we
@@ -32051,7 +31940,7 @@ static bool	sym_is_global(asymbol * sym)
  * local symbols to be at the head of the list.  */
 static bool	elf_map_symbols(bfd * abfd,unsigned int *pnum_locals)
 {
-	unsigned int	symcount = bfd_get_symcount(abfd);
+	unsigned int	symcount = abfd->symcount;
 	asymbol       **syms = bfd_get_outsymbols(abfd);
 	asymbol       **sect_syms;
 	unsigned int	num_locals = 0;
@@ -32823,7 +32712,7 @@ static bool	compute_section_file_positions(bfd * abfd,
 
 	/* The backend linker builds symbol table information itself.  */
 	need_symtab = (link_info == NULL
-		       && (bfd_get_symcount(abfd) > 0
+		       && (abfd->symcount > 0
 			   || ((abfd->flags & (EXEC_P|DYNAMIC|HAS_RELOC))
 			       == HAS_RELOC)));
 	if (need_symtab) {
@@ -33073,9 +32962,7 @@ static bool	elf_init_file_header(bfd * abfd,
 
 	/* Each bfd section is section header entry.  */
 	i_ehdrp->e_entry = 0;
-	//bfd_get_start_address(abfd);
 	i_ehdrp->e_shentsize = 64;
-	//bed->s->sizeof_shdr;
 
 	elf_tdata(abfd)->symtab_hdr.sh_name =
 		(unsigned int)strtab_add(shstrtab,".symtab",false);
@@ -33163,7 +33050,7 @@ static bool	assign_section_numbers(bfd * abfd,void *link_info)
 			d->rela.idx = 0;
 	}
 
-	need_symtab = bfd_get_symcount(abfd) > 0;
+	need_symtab = (abfd->symcount) > 0;
 	if (need_symtab) {
 		elf_onesymtab(abfd) = section_number++;
 		strtab_addref(elf_shstrtab(abfd),t->symtab_hdr.sh_name);
@@ -34169,8 +34056,13 @@ static bfd_reloc_status_type riscv_elf_ignore_reloc(bfd * abfd ATTRIBUTE_UNUSED,
 				       		bfd *		output_bfd,
 		     		char        **error_message ATTRIBUTE_UNUSED)
 {
+#if 0
+	1) output_bfd is always non-null. There is no point in the test.
+	2) input_section->output_offset is always zero within the assembler.
+       There is no point in the addition either.
 	if (output_bfd != NULL)
 		reloc_entry->address += input_section->output_offset;
+#endif
 	return bfd_reloc_ok;
 }
 /* ELF relocs are against symbols.  If we are producing relocatable output,and
@@ -35113,6 +35005,7 @@ static const struct elf_reloc_map riscv_reloc_map[] =
 	{BFD_RELOC_RISCV_SET_ULEB128,    R_RISCV_SET_ULEB128},
 	{BFD_RELOC_RISCV_SUB_ULEB128,    R_RISCV_SUB_ULEB128},
 };
+
 /* Given a BFD reloc type,return a howto structure.  */
 static reloc_howto_type *riscv_reloc_type_lookup(bfd * abfd ATTRIBUTE_UNUSED,
 				 		bfd_reloc_code_real_type code)

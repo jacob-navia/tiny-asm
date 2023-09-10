@@ -3,18 +3,18 @@
  * -------------------------------------------------------------------------
  * This is a digest of the gas assembler (a part of the binutils distribution)
  * for the riscv machine. The full copyright notice is in asm.h, the companion
- * file for this one. I have reformatted the code, and added references to where I 
- * got each function. Some names are changed.
+ * file for this one. I have reformatted the code, and added references to where
+ * I got each function. Some names are changed.
  * All the indirections existing in gas have been eliminated. When you see text
- * like this: "foo(arg);" it is highly likely that that is indeed a call to function
- * "foo" with argument "arg" and not a #defined symbol that points to a vtable that
- * renames it to some function elsewhere.
+ * like this: "foo(arg);" it is highly likely that that is indeed a call to 
+ * function "foo" with argument "arg" and not a #defined symbol that points to
+ * a vtable that renames it to some function elsewhere.
  * #ifdefs have been eliminated as far as I could do that, to simplify the code
  * and making it  easier to read.
  * All linker code that was getting pulled in by the vtables is gone. This is an 
  * assembler, not a linker.
  * The code has been reformatted to minimize the vertical length. There are already
- * around 40 000 lines, so the less, the better. Of course readability is more
+ * around 35 000 lines, so the less, the better. Of course readability is more
  * important than minimizing vertical space.
  *
  * jacob navia, Villetaneuse, France, summer 2023 
@@ -27,7 +27,7 @@ static char    *buffer_limit;	/*->1 + last char in buffer.  */
 
 /* TARGET_BYTES_BIG_ENDIAN is required to be defined to either 0 or 1 in the
  * tc-<CPU>.h file.  See the "Porting GAS" section of the internals manual. */
-static int	target_big_endian = TARGET_BYTES_BIG_ENDIAN;
+static int	target_big_endian = 0;
 
 /* Variables for handling include file directory table.  */
 /* Length of longest in table.  */
@@ -115,7 +115,7 @@ enum options {
 	OPTION_MARCH = OPTION_MD_BASE,OPTION_PIC,OPTION_NO_PIC,OPTION_MABI,
 	OPTION_RELAX,OPTION_NO_RELAX,OPTION_ARCH_ATTR,OPTION_NO_ARCH_ATTR,
 	OPTION_CSR_CHECK,OPTION_NO_CSR_CHECK,OPTION_MISA_SPEC,OPTION_MPRIV_SPEC,
-	OPTION_BIG_ENDIAN,OPTION_LITTLE_ENDIAN,OPTION_END_OF_ENUM
+	OPTION_END_OF_ENUM
 };
 /* Since it is easy to do here we interpret the special arg "-" to mean "use
  * stdin" and we set that argv[] pointing to "". After we have munged argv[],
@@ -139,8 +139,6 @@ static struct option md_longopts[] =
 	{"mno-csr-check",no_argument,NULL,OPTION_NO_CSR_CHECK},
 	{"misa-spec",required_argument,NULL,OPTION_MISA_SPEC},
 	{"mpriv-spec",required_argument,NULL,OPTION_MPRIV_SPEC},
-	{"mbig-endian",no_argument,NULL,OPTION_BIG_ENDIAN},
-	{"mlittle-endian",no_argument,NULL,OPTION_LITTLE_ENDIAN},
 
 	{NULL,no_argument,NULL,0}
 };
@@ -817,437 +815,6 @@ int	main(int argc,char **argv)
 	/* Only generate dependency file if assembler was successful.  */
 	xexit(EXIT_SUCCESS);
 }
-/* ==================================================**** atof-generic.c */
-/* atof_generic.c - turn a string of digits into a Flonum */
-#ifdef TRACE
-static void	flonum_print(const FLONUM_TYPE *);
-#endif
-
-#define ASSUME_DECIMAL_MARK_IS_DOT
-static int	atof_generic(	/* return pointer to just AFTER number we read.  */
-		      		char        **address_of_string_pointer,
-/* At most one per number.  */
-	       		const		char  *string_of_decimal_marks,
-      		const		char  *string_of_decimal_exponent_marks,
-     		FLONUM_TYPE *	address_of_generic_floating_point_number)
-{
-	int		return_value = 0;	/* 0 means OK.  */
-	char           *first_digit;
-	unsigned	number_of_digits_before_decimal;
-	unsigned	number_of_digits_after_decimal;
-	unsigned long	decimal_exponent;
-	unsigned	number_of_digits_available;
-	char		digits_sign_char;
-
-	/*
-	 * Scan the input string,abstracting (1)digits (2)decimal mark (3)
-	 * exponent. It would be simpler to modify the string,but we don't;
-	 * just to be nice to caller. We need to know how many digits we have,
-	 * so we can allocate space for the digits' value.
-	 */
-
-	char           *p;
-	char		c;
-	int		seen_significant_digit;
-
-#ifdef ASSUME_DECIMAL_MARK_IS_DOT
-	gas_assert(string_of_decimal_marks[0] == '.'
-		   && string_of_decimal_marks[1] == 0);
-#define IS_DECIMAL_MARK(c)	((c) == '.')
-#else
-#define IS_DECIMAL_MARK(c)	(0 != strchr (string_of_decimal_marks,(c)))
-#endif
-
-	first_digit = *address_of_string_pointer;
-	c = *first_digit;
-
-	if (c == '-' || c == '+') {
-		digits_sign_char = c;
-		first_digit++;
-	} else
-		digits_sign_char = '+';
-
-	switch (first_digit[0]) {
-	case 's': case 'S': case 'q': case 'Q':
-		if (!strncasecmp("nan",first_digit + 1,3)) {
-			address_of_generic_floating_point_number->sign =
-				digits_sign_char == '+' ? TOUPPER(first_digit[0])
-				: TOLOWER(first_digit[0]);
-			address_of_generic_floating_point_number->exponent = 0;
-			address_of_generic_floating_point_number->leader =
-				address_of_generic_floating_point_number->low;
-			*address_of_string_pointer = first_digit + 4;
-			return 0;
-		}
-		break;
-
-	case 'n': case 'N':
-		if (!strncasecmp("nan",first_digit,3)) {
-			address_of_generic_floating_point_number->sign =
-				digits_sign_char == '+' ? 0 : 'q';
-			address_of_generic_floating_point_number->exponent = 0;
-			address_of_generic_floating_point_number->leader =
-				address_of_generic_floating_point_number->low;
-			*address_of_string_pointer = first_digit + 3;
-			return 0;
-		}
-		break;
-
-	case 'i': case 'I':
-		if (!strncasecmp("inf",first_digit,3)) {
-			address_of_generic_floating_point_number->sign =
-				digits_sign_char == '+' ? 'P' : 'N';
-			address_of_generic_floating_point_number->exponent = 0;
-			address_of_generic_floating_point_number->leader =
-				address_of_generic_floating_point_number->low;
-
-			first_digit += 3;
-			if (!strncasecmp("inity",first_digit,5))
-				first_digit += 5;
-
-			*address_of_string_pointer = first_digit;
-
-			return 0;
-		}
-		break;
-	}
-
-	number_of_digits_before_decimal = 0;
-	number_of_digits_after_decimal = 0;
-	decimal_exponent = 0;
-	seen_significant_digit = 0;
-	for (p = first_digit;
-	     (((c = *p) != '\0')
-	      && (!c || !IS_DECIMAL_MARK(c))
-	      && (!c || !strchr(string_of_decimal_exponent_marks,c)));
-	     p++) {
-		if (ISDIGIT(c)) {
-			if (seen_significant_digit || c > '0') {
-				++number_of_digits_before_decimal;
-				seen_significant_digit = 1;
-			} else {
-				first_digit++;
-			}
-		} else {
-			break;	/* p -> char after pre-decimal digits.  */
-		}
-	}			/* For each digit before decimal mark.  */
-
-	/* Ignore trailing 0's after the decimal point.  The original code here
-	 * (ifdef'd out) does not do this,and numbers like
-	 * 4.29496729600000000000e+09	(2**31) come out inexact for some
-	 * reason related to length of the digit string.  */
-
-	/* The case number_of_digits_before_decimal = 0 is handled for deleting
-	 * zeros after decimal.  In this case the decimal mark and the first
-	 * zero digits after decimal mark are skipped. */
-	seen_significant_digit = 0;
-	unsigned long	subtract_decimal_exponent = 0;
-
-	if (c && IS_DECIMAL_MARK(c)) {
-		unsigned	zeros = 0;	/* Length of current string of zeros.  */
-
-		if (number_of_digits_before_decimal == 0)
-			/* Skip decimal mark.  */
-			first_digit++;
-
-		for (p++; (c = *p) && ISDIGIT(c); p++) {
-			if (c == '0') {
-				if (number_of_digits_before_decimal == 0
-				    && !seen_significant_digit) {
-					/* Skip '0' and the decimal mark.  */
-					first_digit++;
-					subtract_decimal_exponent--;
-				} else
-					zeros++;
-			} else {
-				seen_significant_digit = 1;
-				number_of_digits_after_decimal += 1 + zeros;
-				zeros = 0;
-			}
-		}
-	}
-	if (c && strchr(string_of_decimal_exponent_marks,c)) {
-		char		digits_exponent_sign_char;
-
-		c = *++p;
-		if (c && strchr("+-",c)) {
-			digits_exponent_sign_char = c;
-			c = *++p;
-		} else {
-			digits_exponent_sign_char = '+';
-		}
-
-		for (; (c); c = *++p) {
-			if (ISDIGIT(c)) {
-				if (decimal_exponent > LONG_MAX / 10
-				    || (decimal_exponent == LONG_MAX / 10
-					&& c > '0' + (char)(LONG_MAX - LONG_MAX / 10 * 10)))
-					return_value = ERROR_EXPONENT_OVERFLOW;
-				decimal_exponent = decimal_exponent * 10 + c - '0';
-			} else {
-				break;
-			}
-		}
-
-		if (digits_exponent_sign_char == '-') {
-			decimal_exponent = -decimal_exponent;
-		}
-	}
-	/* Subtract_decimal_exponent != 0 when number_of_digits_before_decimal
-	 * = 0 and first digit after decimal is '0'.  */
-	decimal_exponent += subtract_decimal_exponent;
-
-	*address_of_string_pointer = p;
-
-	number_of_digits_available =
-		number_of_digits_before_decimal + number_of_digits_after_decimal;
-	if (number_of_digits_available == 0) {
-		address_of_generic_floating_point_number->exponent = 0;	/* Not strictly necessary */
-		address_of_generic_floating_point_number->leader
-			= -1 + address_of_generic_floating_point_number->low;
-		address_of_generic_floating_point_number->sign = digits_sign_char;
-		/* We have just concocted (+/-)0.0E0 */
-
-	} else {
-		int		count;	/* Number of useful digits left to scan.  */
-
-		LITTLENUM_TYPE *temporary_binary_low = NULL;
-		LITTLENUM_TYPE *power_binary_low = NULL;
-		LITTLENUM_TYPE *digits_binary_low;
-		unsigned	precision;
-		unsigned	maximum_useful_digits;
-		unsigned	number_of_digits_to_use;
-		unsigned	more_than_enough_bits_for_digits;
-		unsigned	more_than_enough_littlenums_for_digits;
-		unsigned	size_of_digits_in_littlenums;
-		unsigned	size_of_digits_in_chars;
-		FLONUM_TYPE	power_of_10_flonum;
-		FLONUM_TYPE	digits_flonum;
-
-		precision = (address_of_generic_floating_point_number->high
-			     - address_of_generic_floating_point_number->low
-			     + 1);	/* Number of destination littlenums.  */
-
-		/*
-		 * precision includes two littlenums worth of guard bits,so
-		 * this gives us 10 decimal guard digits here.
-		 */
-		maximum_useful_digits = (precision
-					 * LITTLENUM_NUMBER_OF_BITS
-					 * 1000000 / 3321928
-					 + 1);	/* round up.  */
-
-		if (number_of_digits_available > maximum_useful_digits) {
-			number_of_digits_to_use = maximum_useful_digits;
-		} else {
-			number_of_digits_to_use = number_of_digits_available;
-		}
-
-		/*
-		 * Cast these to SIGNED LONG first,otherwise,on systems with
-		 * LONG wider than INT (such as Alpha OSF/1),unsignedness may
-		 * cause unexpected results.
-		 */
-		decimal_exponent += ((long)number_of_digits_before_decimal
-				     - (long)number_of_digits_to_use);
-
-		more_than_enough_bits_for_digits
-			= (number_of_digits_to_use * 3321928 / 1000000 + 1);
-
-		more_than_enough_littlenums_for_digits
-			= (more_than_enough_bits_for_digits
-			   / LITTLENUM_NUMBER_OF_BITS)
-			+ 2;
-
-		/* Compute (digits) part. In "12.34E56" this is the "1234"
-		 * part. Arithmetic is exact here. If no digits are supplied
-		 * then this part is a 0 valued binary integer.  Allocate room
-		 * to build up the binary number as littlenums.  We want this
-		 * memory to disappear when we leave this function.  Assume no
-		 * alignment problems => (room for n objects) == n * (room for
-		 * 1 object). */
-
-		size_of_digits_in_littlenums = more_than_enough_littlenums_for_digits;
-		size_of_digits_in_chars = size_of_digits_in_littlenums
-			* sizeof(LITTLENUM_TYPE);
-
-		digits_binary_low = (LITTLENUM_TYPE *)
-			xmalloc(size_of_digits_in_chars);
-
-		memset((char *)digits_binary_low,'\0',size_of_digits_in_chars);
-
-		/* Digits_binary_low[] is allocated and zeroed.  */
-
-		/* Parse the decimal digits as if * digits_low was in the units
-		 * position. Emit a binary number into digits_binary_low[].
-		 * 
-		 * Use a large-precision version of: (((1st-digit) * 10 +
-		 * 2nd-digit) * 10 + 3rd-digit ...) * 10 + last-digit */
-		for (p = first_digit,count = number_of_digits_to_use; count; p++,--count) {
-			c = *p;
-			if (ISDIGIT(c)) {
-				/* Multiply by 10. Assume can never overflow.
-				 * Add this digit to digits_binary_low[].  */
-
-				long		carry;
-				LITTLENUM_TYPE *littlenum_pointer;
-				LITTLENUM_TYPE *littlenum_limit;
-
-				littlenum_limit = digits_binary_low
-					+ more_than_enough_littlenums_for_digits
-					- 1;
-
-				carry = c - '0';	/* char -> binary */
-
-				for (littlenum_pointer = digits_binary_low;
-				     littlenum_pointer <= littlenum_limit;
-				     littlenum_pointer++) {
-					long		work;
-
-					work = carry + 10 * (long)(*littlenum_pointer);
-					*littlenum_pointer = work & LITTLENUM_MASK;
-					carry = work >> LITTLENUM_NUMBER_OF_BITS;
-				}
-
-				if (carry != 0) {
-					/*
-					 * We have a GROSS internal error. This
-					 * should never happen.
-					 */
-					as_fatal(("failed sanity check"));
-				}
-			} else {
-				++count;	/* '.' doesn't alter digits
-						 * used count.  */
-			}
-		}
-
-		/* Digits_binary_low[] properly encodes the value of the
-		 * digits. Forget about any high-order littlenums that are 0.  */
-		while (digits_binary_low[size_of_digits_in_littlenums - 1] == 0
-		       && size_of_digits_in_littlenums >= 2)
-			size_of_digits_in_littlenums--;
-
-		digits_flonum.low = digits_binary_low;
-		digits_flonum.high = digits_binary_low + size_of_digits_in_littlenums - 1;
-		digits_flonum.leader = digits_flonum.high;
-		digits_flonum.exponent = 0;
-		/* The value of digits_flonum . sign should not be important.
-		 * We have already decided the output's sign. We trust that the
-		 * sign won't influence the other parts of the number! So we
-		 * give it a value for these reasons: (1) courtesy to humans
-		 * reading/debugging these numbers so they don't get excited
-		 * about strange values (2) in future there may be more meaning
-		 * attached to sign,and what was harmless noise may become
-		 * disruptive,ill-conditioned (or worse) input.  */
-		digits_flonum.sign = '+';
-
-		{
-			/* Compute the mantissa (& exponent) of the power of
-			 * 10. If successful,then multiply the power of 10 by
-			 * the digits giving return_binary_mantissa and
-			 * return_binary_exponent.  */
-
-			int		decimal_exponent_is_negative;
-			/* This refers to the "-56" in "12.34E-56".  */
-			/* FALSE: decimal_exponent is positive (or 0) */
-			/* TRUE:  decimal_exponent is negative */
-			FLONUM_TYPE	temporary_flonum;
-			unsigned	size_of_power_in_littlenums;
-			unsigned	size_of_power_in_chars;
-
-			size_of_power_in_littlenums = precision;
-			/* Precision has a built-in fudge factor so we get a
-			 * few guard bits.  */
-
-			decimal_exponent_is_negative = (long)decimal_exponent < 0;
-			if (decimal_exponent_is_negative) {
-				decimal_exponent = -decimal_exponent;
-			}
-			/* From now on: the decimal exponent is > 0. Its sign
-			 * is separate.  */
-
-			size_of_power_in_chars = size_of_power_in_littlenums
-				* sizeof(LITTLENUM_TYPE) + 2;
-
-			power_binary_low = (LITTLENUM_TYPE *) xmalloc(size_of_power_in_chars);
-			temporary_binary_low = (LITTLENUM_TYPE *) xmalloc(size_of_power_in_chars);
-
-			memset((char *)power_binary_low,'\0',size_of_power_in_chars);
-			*power_binary_low = 1;
-			power_of_10_flonum.exponent = 0;
-			power_of_10_flonum.low = power_binary_low;
-			power_of_10_flonum.leader = power_binary_low;
-			power_of_10_flonum.high = power_binary_low + size_of_power_in_littlenums - 1;
-			power_of_10_flonum.sign = '+';
-			temporary_flonum.low = temporary_binary_low;
-			temporary_flonum.high = temporary_binary_low + size_of_power_in_littlenums - 1;
-			/* (power) == 1. Space for temporary_flonum allocated.  */
-
-			/* ... 
-			 * WHILE	more bits DO	find next bit (with place
-			 * value) multiply into power mantissa OD */
-			{
-				int		place_number_limit;
-				/* Any 10^(2^n) whose "n" exceeds this */
-				/* value will fall off the end of */
-				/* flonum_XXXX_powers_of_ten[].  */
-				int		place_number;
-				const FLONUM_TYPE *multiplicand;	/* -> 10^(2^n) */
-
-				place_number_limit = table_size_of_flonum_powers_of_ten;
-
-				multiplicand = (decimal_exponent_is_negative
-						? flonum_negative_powers_of_ten
-					     : flonum_positive_powers_of_ten);
-
-				for (place_number = 1;	/* Place value of this
-							 * bit of exponent.  */
-				     decimal_exponent;	/* Quit when no more 1
-							 * bits in exponent.  */
-				     decimal_exponent >>= 1,place_number++) {
-					if (decimal_exponent & 1) {
-						if (place_number > place_number_limit) {
-						/* The decimal exponent has a magnitude so
-						 * great that our tables can't help us fragment it.
-						 * Although this routine is in error because it can't
-						 * imagine a number* that big,signal an* error as if it is
-						 * the user's fault for presenting such a big number.  */
-							return_value = ERROR_EXPONENT_OVERFLOW;
-							/* quit out of loop gracefully */
-							decimal_exponent = 0;
-						} else {
-							flonum_multip(multiplicand + place_number,
-								      &power_of_10_flonum,&temporary_flonum);
-							flonum_copy(&temporary_flonum,&power_of_10_flonum);
-						}	/* If this bit of
-							 * decimal_exponent was
-							 * computable. */
-					}	/* If this bit of
-						 * decimal_exponent was set.  */
-				}	/* For each bit of binary
-					 * representation of exponent */
-			}
-		}
-
-		/* power_of_10_flonum is power of ten in binary (mantissa) ,
-		 * (exponent). It may be the number 1,in which case we don't
-		 * NEED to multiply.
-		 * 
-		 * Multiply (decimal digits) by power_of_10_flonum.  */
-
-		flonum_multip(&power_of_10_flonum,&digits_flonum,address_of_generic_floating_point_number);
-		/* Assert sign of the number we made is '+'.  */
-		address_of_generic_floating_point_number->sign = digits_sign_char;
-
-		free(temporary_binary_low);
-		free(power_binary_low);
-		free(digits_binary_low);
-	}
-	return return_value;
-}
-/* end of atof_generic.c */
 /* ==================================================** compress-debug.c */
 /* compress-debug.c - compress debug sections */
 struct z_stream_s;
@@ -1407,13 +974,13 @@ static void	emit_expr_encoded(expressionS * exp,int encoding,bool emit_encoding)
 	if (emit_encoding)
 		out_one(encoding);
 
-		if ((encoding & 0x70) == DW_EH_PE_pcrel) {
-			expressionS	tmp = *exp;
-			tmp.X_op = O_subtract;
-			tmp.X_op_symbol = symbol_temp_new_now();
-			emit_expr(&tmp,size);
-		} else
-			emit_expr(exp,size);
+	if ((encoding & 0x70) == DW_EH_PE_pcrel) {
+		expressionS	tmp = *exp;
+		tmp.X_op = O_subtract;
+		tmp.X_op_symbol = symbol_temp_new_now();
+		emit_expr(&tmp,size);
+	} else
+		emit_expr(exp,size);
 }
 
 /* Build based on segment the derived .debug_... segment name containing origin
@@ -6505,10 +6072,6 @@ static symbolS *symbol_lookup_or_make(const char *name,bool start)
  */
 
 /*
- * Build any floating-point literal here. Also build any bignum literal here.
- */
-
-/*
  * Seems atof_machine can backscan through generic_bignum and hit whatever
  * happens to be loaded before it in memory.  And its way too complicated for
  * me to fix right.  Thus a hack.  JF:  Just make generic_bignum bigger,and
@@ -6524,30 +6087,6 @@ static FLONUM_TYPE generic_floating_point_number = {
 	0			/* sign.  */
 };
 
-
-static void	floating_constant(expressionS * expressionP)
-{
-	/* input_line_pointer -> floating-point constant.  */
-	int		error_code;
-
-	error_code = atof_generic(&input_line_pointer,".",EXP_CHARS,
-				  &generic_floating_point_number);
-
-	if (error_code) {
-		if (error_code == ERROR_EXPONENT_OVERFLOW) {
-			as_bad(("bad floating-point constant: exponent overflow"));
-		} else {
-			as_bad(("bad floating-point constant: unknown error code=%d"),
-			       error_code);
-		}
-	}
-	expressionP->X_op = O_big;
-	/*
-	 * input_line_pointer -> just after constant,which may point to
-	 * whitespace.
-	 */
-	expressionP->X_add_number = -1;
-}
 
 static uint32_t	generic_bignum_to_int32(void)
 {
@@ -6874,7 +6413,7 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 	default_case:
 			if (c && strchr(FLT_CHARS,c)) {
 				input_line_pointer++;
-				floating_constant(expressionP);
+				as_bad("No floating point expressions allowed\n");
 				expressionP->X_add_number = -TOLOWER(c);
 			} else {
 				/* The string was only zero.  */
@@ -6906,7 +6445,7 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 		case 'f': case 'd': case 'D': case 'F': case 'r': case 'e':
 		case 'E': case 'g': case 'G':
 			input_line_pointer++;
-			floating_constant(expressionP);
+			as_bad("No floating point expressions allowed\n");
 			expressionP->X_add_number = -TOLOWER(c);
 			break;
 
@@ -8205,411 +7744,6 @@ static unsigned int get_single_number(void)
 }
 /* ======================================================= flonum-copy.c */
 /* flonum_copy.c - copy a flonum  */
-static void	flonum_copy(FLONUM_TYPE * in,FLONUM_TYPE * out)
-{
-	unsigned int	in_length;	/* 0 origin */
-	unsigned int	out_length;	/* 0 origin */
-
-	out->sign = in->sign;
-	in_length = in->leader - in->low;
-
-	if (in->leader < in->low) {
-		out->leader = out->low - 1;	/* 0.0 case */
-	} else {
-		out_length = out->high - out->low;
-		/* Assume no GAPS in packing of littlenums. I.e. sizeof(array)
-		 * == sizeof(element) * number_of_elements.  */
-		if (in_length <= out_length) {
-			/* For defensive programming,zero any
-			 * high-order littlenums we don't need.  This
-			 * is destroying evidence and wasting time,so
-			 * why bother???  */
-			if (in_length < out_length) {
-				memset((char *)(out->low + in_length + 1),'\0',
-				       out_length - in_length);
-			}
-			memcpy((void *)(out->low),(void *)(in->low),
-			       ((in_length + 1) * sizeof(LITTLENUM_TYPE)));
-			out->exponent = in->exponent;
-			out->leader = in->leader - in->low + out->low;
-		} else {
-			int		shorten;	/* 1-origin. Number of
-							 * littlenums we drop.  */
-
-			shorten = in_length - out_length;
-			/* Assume out_length >= 0 ! */
-			memcpy((void *)(out->low),(void *)(in->low + shorten),
-			       ((out_length + 1) * sizeof(LITTLENUM_TYPE)));
-			out->leader = out->high;
-			out->exponent = in->exponent + shorten;
-		}
-	}			/* if any significant bits */
-}
-/* ==================================================**** flonum-konst.c */
-/*
- * flonum_const.c - Useful Flonum constants JF:  I added the last entry to this
- * table,and I'm not sure if its right or not.  Could go either way.  I wish I
- * really understood this stuff.
- */
-static const int table_size_of_flonum_powers_of_ten = 13;
-static const LITTLENUM_TYPE zero[] = {1};
-/* ====================================================================== 
- * 
- * Warning: the low order bits may be WRONG here.			* I took this
- * from a suspect bc(1) script.			* "minus("[] is supposed to be
- * 10^(2^-X) expressed in base 2^16.	* The radix point is just AFTER the
- * highest element of the []	* *
- * 
- * Because bc rounds DOWN for printing (I think),the lowest	* significance
- * littlenums should probably have 1 added to them.	* *
- * 
- * \======================================================================
- */
-
-/* JF:  If this equals 6553/(2^16)+39321/(2^32)+...  it approaches .1 */
-static const LITTLENUM_TYPE minus_1[] = {
-	39322,39321,39321,39321,39321,39321,39321,39321,39321,39321,
-	39321,39321,39321,39321,39321,39321,39321,39321,39321,6553
-};
-
-static const LITTLENUM_TYPE plus_1[] = {10};
-
-/* JF:  If this equals 655/(2^16) + 23592/(2^32) + ... it approaches .01 */
-static const LITTLENUM_TYPE minus_2[] = {
-	10486,36700,62914,23592,49807,10485,36700,62914,23592,49807,
-	10485,36700,62914,23592,49807,10485,36700,62914,23592,655
-};
-
-static const LITTLENUM_TYPE plus_2[] = {100};
-
-/* This approaches .0001 */
-static const LITTLENUM_TYPE minus_3[] = {
-	52534,20027,37329,65116,64067,60397,14784,18979,33659,19503,
-	2726,9542,629,2202,40475,10590,4299,47815,36280,6
-};
-
-static const LITTLENUM_TYPE plus_3[] = {10000};
-
-/* JF: this approaches 1e-8 */
-static const LITTLENUM_TYPE minus_4[] = {
-	22517,49501,54293,19424,60699,6716,24348,22618,23904,21327,
-	3919,44703,19149,28803,48959,6259,50273,62237,42
-};
-
-/* This equals 1525 * 2^16 + 57600 */
-static const LITTLENUM_TYPE plus_4[] = {57600,1525};
-
-/* This approaches 1e-16 */
-static const LITTLENUM_TYPE minus_5[] = {
-	22199,45957,17005,26266,10526,16260,55017,35680,40443,19789,
-	17356,30195,55905,28426,63010,44197,1844
-};
-
-static const LITTLENUM_TYPE plus_5[] = {
-	28609,34546,35
-};
-
-static const LITTLENUM_TYPE minus_6[] = {
-	30926,26518,13110,43018,54982,48258,24658,15209,63366,11929,
-	20069,43857,60487,51
-};
-
-static const LITTLENUM_TYPE plus_6[] = {
-	61313,34220,16731,11629,1262
-};
-
-static const LITTLENUM_TYPE minus_7[] = {
-	29819,14733,21490,40602,31315,65186,2695
-};
-
-static const LITTLENUM_TYPE plus_7[] = {
-	7937,49002,60772,28216,38893,55975,63988,59711,20227,24
-};
-
-static const LITTLENUM_TYPE minus_8[] = {
-	27579,64807,12543,794,13907,61297,12013,64360,15961,20566,
-	24178,15922,59427,110
-};
-
-static const LITTLENUM_TYPE plus_8[] = {
-	15873,11925,39177,991,14589,3861,58415,9076,62956,54223,
-	56328,50180,45274,48333,32537,42547,9731,59679,590
-};
-
-static const LITTLENUM_TYPE minus_9[] = {
-	11042,8464,58971,63429,6022,63485,5500,53464,47545,50068,
-	56988,22819,49708,54493,9920,47667,40409,35764,10383,54466,
-	32702,17493,32420,34382,22750,20681,12300
-};
-
-static const LITTLENUM_TYPE plus_9[] = {
-	20678,27614,28272,53066,55311,54677,29038,9906,26288,44486,
-	13860,7445,54106,15426,21518,25599,29632,52309,61207,26105,
-	10482,21948,51191,32988,60892,62574,61390,24540,21495,5
-};
-
-static const LITTLENUM_TYPE minus_10[] = {
-	6214,48771,23471,30163,31763,38013,57001,11770,18263,36366,
-	20742,45086,56969,53231,37856,55814,38057,15692,46761,8713,
-	6102,20083,8269,11839,11571,50963,15649,11698,40675,2308
-};
-
-static const LITTLENUM_TYPE plus_10[] = {
-	63839,36576,45712,44516,37803,29482,4966,30556,37961,23310,
-	27070,44972,29507,48257,45209,7494,17831,38728,41577,29443,
-	36016,7955,35339,35479,36011,14553,49618,5588,25396,28
-};
-
-static const LITTLENUM_TYPE minus_11[] = {
-	16663,56882,61983,7804,36555,32060,34502,1000,14356,21681,
-	6605,34767,51411,59048,53614,39850,30079,6496,6846,26841,
-	40778,19578,59899,44085,54016,24259,11232,21229,21313,81
-};
-
-static const LITTLENUM_TYPE plus_11[] = {
-	92,9054,62707,17993,7821,56838,13992,21321,29637,48426,
-	42982,38668,49574,28820,18200,18927,53979,16219,37484,2516,
-	44642,14665,11587,41926,13556,23956,54320,6661,55766,805
-};
-
-static const LITTLENUM_TYPE minus_12[] = {
-	33202,45969,58804,56734,16482,26007,44984,49334,31007,32944,
-	44517,63329,47131,15291,59465,2264,23218,11829,59771,38798,
-	31051,28748,23129,40541,41562,35108,50620,59014,51817,6613
-};
-
-static const LITTLENUM_TYPE plus_12[] = {
-	10098,37922,58070,7432,10470,63465,23718,62190,47420,7009,
-	38443,4587,45596,38472,52129,52779,29012,13559,48688,31678,
-	41753,58662,10668,36067,29906,56906,21461,46556,59571,9
-};
-
-static const LITTLENUM_TYPE minus_13[] = {
-	45309,27592,37144,34637,34328,41671,34620,24135,53401,22112,
-	21576,45147,39310,44051,48572,3676,46544,59768,33350,2323,
-	49524,61568,3903,36487,36356,30903,14975,9035,29715,667
-};
-
-static const LITTLENUM_TYPE plus_13[] = {
-	18788,16960,6318,45685,55400,46230,35794,25588,7253,55541,
-	49716,59760,63592,8191,63765,58530,44667,13294,10001,55586,
-	47887,18738,9509,40896,42506,52580,4171,325,12329,98
-};
-
-/*
- * Shut up complaints about differing pointer types.  They only differ in the
- * const attribute,but there isn't any easy way to do this
- */
-#define X (LITTLENUM_TYPE *)
-
-static const FLONUM_TYPE flonum_negative_powers_of_ten[] = {
-	{X zero,X zero,X zero,0,'+'},
-	{X minus_1,X minus_1 + 19,X minus_1 + 19,-20,'+'},
-	{X minus_2,X minus_2 + 19,X minus_2 + 19,-20,'+'},
-	{X minus_3,X minus_3 + 19,X minus_3 + 19,-20,'+'},
-	{X minus_4,X minus_4 + 18,X minus_4 + 18,-20,'+'},
-	{X minus_5,X minus_5 + 16,X minus_5 + 16,-20,'+'},
-	{X minus_6,X minus_6 + 13,X minus_6 + 13,-20,'+'},
-	{X minus_7,X minus_7 + 6,X minus_7 + 6,-20,'+'},
-	{X minus_8,X minus_8 + 13,X minus_8 + 13,-40,'+'},
-	{X minus_9,X minus_9 + 26,X minus_9 + 26,-80,'+'},
-	{X minus_10,X minus_10 + 29,X minus_10 + 29,-136,'+'},
-	{X minus_11,X minus_11 + 29,X minus_11 + 29,-242,'+'},
-	{X minus_12,X minus_12 + 29,X minus_12 + 29,-455,'+'},
-	{X minus_13,X minus_13 + 29,X minus_13 + 29,-880,'+'},
-};
-
-static const FLONUM_TYPE flonum_positive_powers_of_ten[] = {
-	{X zero,X zero,X zero,0,'+'},
-	{X plus_1,X plus_1 + 0,X plus_1 + 0,0,'+'},
-	{X plus_2,X plus_2 + 0,X plus_2 + 0,0,'+'},
-	{X plus_3,X plus_3 + 0,X plus_3 + 0,0,'+'},
-	{X plus_4,X plus_4 + 1,X plus_4 + 1,0,'+'},
-	{X plus_5,X plus_5 + 2,X plus_5 + 2,1,'+'},
-	{X plus_6,X plus_6 + 4,X plus_6 + 4,2,'+'},
-	{X plus_7,X plus_7 + 9,X plus_7 + 9,4,'+'},
-	{X plus_8,X plus_8 + 18,X plus_8 + 18,8,'+'},
-	{X plus_9,X plus_9 + 29,X plus_9 + 29,24,'+'},
-	{X plus_10,X plus_10 + 29,X plus_10 + 29,77,'+'},
-	{X plus_11,X plus_11 + 29,X plus_11 + 29,183,'+'},
-	{X plus_12,X plus_12 + 29,X plus_12 + 29,396,'+'},
-	{X plus_13,X plus_13 + 29,X plus_13 + 29,821,'+'},
-};
-
-/* ======================================================= flonum-mult.c */
-/*
- * flonum_mult.c - multiply two flonums Copyright (C) 1987-2023 Free Software
- * Foundation,Inc.
- * 
- * This file is part of GAS,the GNU Assembler.
- * 
- * GAS is free software; you can redistribute it and/or modify it under the terms
- * of the GNU General Public License as published by the Free Software
- * Foundation; either version 3,or (at your option) any later version.
- * 
- * GAS is distributed in the hope that it will be useful,but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
- * details.
- * 
- * You should have received a copy of the GNU General Public License along with
- * GAS; see the file COPYING.  If not,write to the Free Software Foundation,
- * 51 Franklin Street - Fifth Floor,Boston,MA 02110-1301,USA.
- */
-
-
-/*
- * plan for a . b => p(roduct)
- * 
- *  +-------+-------+-/   /-+-------+-------+
- *  | a | a |  ...  | a | a |
- *  |  A    |  A-1  |   |  1    |  0    |
- *  +-------+-------+-/   /-+-------+-------+
-
- *  +-------+-------+-/   /-+-------+-------+
- *  | b | b |  ...  | b | b |
- *  |  B    |  B-1  |   |  1    |  0    |
- *  +-------+-------+-/   /-+-------+-------+
-
- *  +-------+-------+-/   /-+-------+-/   /-+-------+-------+
- *  | p | p |  ...  | p |  ...  | p | p |
- *  |  A+B+1|  A+B  |   |  N    |   |  1    |  0    |
- *  +-------+-------+-/   /-+-------+-/   /-+-------+-------+
-
- *  /^\
- *  (carry) a .b       ...      |      ...   a .b    a .b
- *  A  B            |         0  1    0  0
- *  |
- *  ...     |      ...   a .b
- *  |         1  0
- *  |
- *  |      ...
- *  |
- *  |
- *  |
- *  |         ___
- *  |         \
- *  +-----  P  =   >  a .b
- *  N     /__  i  j
- *
- *  N = 0 ... A+B
- * 
- * for all i,j where i+j=N [i,j integers > 0]
- * 
- * a[],b[],p[] may not intersect. Zero length factors signify 0 significant
- * bits: treat as 0.0. 0.0 factors do the right thing. Zero length product OK.
- * 
- * I chose the ForTran accent "foo[bar]" instead of the C accent "*garply" because
- * I felt the ForTran way was more intuitive. The C way would probably yield
- * better code on most C compilers. Dean Elsner. (C style also gives deeper
- * insight [to me] ... oh well ...) */
-static void	flonum_multip(const FLONUM_TYPE * a,const FLONUM_TYPE * b,
-			  		FLONUM_TYPE *	product)
-{
-	int		size_of_a;	/* 0 origin  */
-	int		size_of_b;	/* 0 origin  */
-	int		size_of_product;	/* 0 origin  */
-	int		size_of_sum;	/* 0 origin  */
-	int		extra_product_positions;	/* 1 origin  */
-	unsigned long	work;
-	unsigned long	carry;
-	long		exponent;
-	LITTLENUM_TYPE *q;
-	long		significant;	/* TRUE when we emit a non-0 littlenum  */
-	/* ForTran accent follows.  */
-	int		P;	/* Scan product low-order -> high.  */
-	int		N;	/* As in sum above.  */
-	int		A;	/* Which [] of a?  */
-	int		B;	/* Which [] of b?  */
-
-	if ((a->sign != '-' && a->sign != '+')
-	    || (b->sign != '-' && b->sign != '+')) {
-		/* Got to fail somehow.  Any suggestions?  */
-		product->sign = 0;
-		return;
-	}
-	product->sign = (a->sign == b->sign) ? '+' : '-';
-	size_of_a = a->leader - a->low;
-	size_of_b = b->leader - b->low;
-	exponent = a->exponent + b->exponent;
-	size_of_product = product->high - product->low;
-	size_of_sum = size_of_a + size_of_b;
-	extra_product_positions = size_of_product - size_of_sum;
-	if (extra_product_positions < 0) {
-		P = extra_product_positions;	/* P < 0  */
-		exponent -= extra_product_positions;	/* Increases exponent.  */
-	} else {
-		P = 0;
-	}
-	carry = 0;
-	significant = 0;
-	for (N = 0; N <= size_of_sum; N++) {
-		work = carry;
-		carry = 0;
-		for (A = 0; A <= N; A++) {
-			B = N - A;
-			if (A <= size_of_a && B <= size_of_b && B >= 0) {
-#ifdef TRACE
-				printf("a:low[%d.]=%04x b:low[%d.]=%04x work_before=%08x\n",
-				       A,a->low[A],B,b->low[B],work);
-#endif
-				/*
-				 * Watch out for sign extension!  Without the
-				 * casts,on the DEC Alpha,the multiplication
-				 * result is *signed* int,which gets
-				 * sign-extended to convert to the unsigned
-				 * long!
-				 */
-				work += (unsigned long)a->low[A] * (unsigned long)b->low[B];
-				carry += work >> LITTLENUM_NUMBER_OF_BITS;
-				work &= LITTLENUM_MASK;
-#ifdef TRACE
-				printf("work=%08x carry=%04x\n",work,carry);
-#endif
-			}
-		}
-		significant |= work;
-		if (significant || P < 0) {
-			if (P >= 0) {
-				product->low[P] = work;
-#ifdef TRACE
-				printf("P=%d. work[p]:=%04x\n",P,work);
-#endif
-			}
-			P++;
-		} else {
-			extra_product_positions++;
-			exponent++;
-		}
-	}
-	/*
-	 * [P]-> position # size_of_sum + 1. This is where 'carry' should go.
-	 */
-#ifdef TRACE
-	printf("final carry =%04x\n",carry);
-#endif
-	if (carry) {
-		if (extra_product_positions > 0)
-			product->low[P] = carry;
-		else {
-			/* No room at high order for carry littlenum.  */
-			/*
-			 * Shift right 1 to make room for most significant
-			 * littlenum.
-			 */
-			exponent++;
-			P--;
-			for (q = product->low + P; q >= product->low; q--) {
-				work = *q;
-				*q = carry;
-				carry = work;
-			}
-		}
-	} else
-		P--;
-	product->leader = product->low + P;
-	product->exponent = exponent;
-}
 /* ============================================================* frags.c */
 /* frags.c - manage frags - */
 static fragS	zero_address_frag;
@@ -11762,11 +10896,6 @@ static int	float_length(int float_type,int *pad_p)
 		break;
 
 	case 'p': case 'P':
-#ifdef P_PRECISION
-		length = P_PRECISION * sizeof(LITTLENUM_TYPE);
-		pad = P_PRECISION_PAD * sizeof(LITTLENUM_TYPE);
-		if (!length)
-#endif
 			length = 12;
 		break;
 
@@ -11785,14 +10914,6 @@ static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_
 	int		length;
 
 	SKIP_WHITESPACE();
-
-	/* Skip any 0{letter} that may be present.  Don't even check if the
-	 * letter is legal.  Someone may invent a "z" format and this routine
-	 * has no use for such information. Lusers beware: you get diagnostics
-	 * if your input is ill-conditioned.  */
-	if (input_line_pointer[0] == '0' && ISALPHA(input_line_pointer[1]))
-		input_line_pointer += 2;
-
 	/* Accept :xxxx,where the x's are hex digits,for a floating point
 	 * with the exact digits specified.  */
 	if (input_line_pointer[0] == ':') {
@@ -11803,27 +10924,45 @@ static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_
 			return length;
 		}
 	} else {
-		const char     *err;
-
-		err = ieee_md_atof(float_type,temp,&length,TARGET_BYTES_BIG_ENDIAN);
-		know(length <= MAXIMUM_NUMBER_OF_CHARS_FOR_FLOAT);
-		know(err != NULL || length > 0);
-		if (err) {
-			as_bad(("bad floating literal: %s"),err);
-			ignore_rest_of_line();
-			return -1;
+		long double ld;
+		double d; float f; _Float16 f16;
+	
+		errno=0;
+		ld = strtold(input_line_pointer,&input_line_pointer);
+		if (errno) goto err;
+		switch (float_type) {
+			case 'H': case 'h':
+				f16 = ld;
+				length = 2;
+				memcpy(temp,&f16,2);
+				break;
+			case 'f': case 'F': case 's': case 'S':
+				f = ld;
+				length = 4;
+				memcpy(temp,&f,4);
+				break;
+			case 'd': case 'D': case 'r': case 'R':
+				d = ld;
+				length = 8;
+				memcpy(temp,&d,8);
+				break;
+	
+			default:
+err:
+				as_bad("bad floating literal");
+				ignore_rest_of_line();
+				return (-1);
 		}
 	}
+	SKIP_WHITESPACE();
 	return length;
 }
 static void	s_struct(int ignore ATTRIBUTE_UNUSED)
 {
 	abs_section_offset = get_absolute_expression();
 #if defined (OBJ_ELF) || defined (OBJ_MAYBE_ELF)
-	/*
-	 * The ELF backend needs to know that we are changing sections,so that
-	 * .previous works correctly.
-	 */
+	/* The ELF backend needs to know that we are changing sections,so that
+	 * .previous works correctly.  */
 	if (IS_ELF)
 		obj_elf_section_change_hook();
 #endif
@@ -11857,10 +10996,8 @@ static void	s_weakref(int ignore ATTRIBUTE_UNUSED)
 	symbolP = symbol_find_or_make(name);
 
 	if (S_IS_DEFINED(symbolP) || symbol_equated_p(symbolP)) {
-		//if (!S_IS_VOLATILE(symbolP)) {
-			as_bad(("symbol `%s' is already defined"),name);
-			goto err_out;
-		//}
+		as_bad(("symbol `%s' is already defined"),name);
+		goto err_out;
 	}
 	SKIP_WHITESPACE();
 
@@ -11914,11 +11051,9 @@ static void	s_weakref(int ignore ATTRIBUTE_UNUSED)
 			ignore_rest_of_line();
 			return;
 		}
-		/*
-		 * Short-circuiting instead of just checking here might speed
+		/* Short-circuiting instead of just checking here might speed
 		 * things up a tiny little bit,but loop error messages would
-		 * miss intermediate links.
-		 */
+		 * miss intermediate links.  */
 		/* symbolP2 = symp; */
 	}
 
@@ -12125,21 +11260,8 @@ static void	pseudo_set(symbolS * symbolP)
  * case,then only simple expressions are permitted.
  */
 
-#ifndef TC_PARSE_CONS_EXPRESSION
-#ifdef REPEAT_CONS_EXPRESSIONS
-#define TC_PARSE_CONS_EXPRESSION(EXP,NBYTES) \
-  (parse_repeat_cons (EXP,NBYTES),BFD_RELOC_NONE)
-static void
-		parse_repeat_cons(expressionS * exp,unsigned int nbytes);
-#endif
-
 /* If we haven't gotten one yet,just call expression.  */
-#ifndef TC_PARSE_CONS_EXPRESSION
-#define TC_PARSE_CONS_EXPRESSION(EXP,NBYTES) \
-  (expression (EXP),BFD_RELOC_NONE)
-#endif
-#endif
-
+#define TC_PARSE_CONS_EXPRESSION(EXP,NBYTES) (expression (EXP),BFD_RELOC_NONE)
 static void	do_parse_cons_expression(expressionS * exp,
 			    		int		nbytes	ATTRIBUTE_UNUSED)
 {
@@ -12178,11 +11300,8 @@ static void	cons_worker(int nbytes,	/* 1=.byte,2=.word,4=.long.  */
 		++c;
 	}
 	while (*input_line_pointer++ == ',');
-
 	input_line_pointer--;	/* Put terminator back into stream.  */
-
 	demand_empty_rest_of_line();
-
 }
 
 static void	cons(int size)
@@ -17856,7 +16975,7 @@ static void	compress_debug(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 	if ((stdoutput->flags & BFD_COMPRESS_GABI) == 0)
 		header_size = 12;
 	else
-		header_size = bfd_get_compression_header_size(stdoutput,NULL);
+		header_size = 0;
 
 	/* Create a new frag to contain the compression header.  */
 	struct obstack *ob = &seginfo->frchainP->frch_obstack;
@@ -20626,10 +19745,7 @@ static htab_t	insn_type_hash = NULL;
 /* This array holds machine specific line separator characters.  */
 static const char line_separator_chars[] = ";";
 
-/* Chars that can be used to separate mant from exp in floating point nums.  */
-static const char EXP_CHARS[] = "eE";
-
-/* * Chars that mean this number is a floating point constant. As in 0f12.456 or
+/* Chars that mean this number is a floating point constant. As in 0f12.456 or
  * 0d1.2345e12.  */
 static const char FLT_CHARS[] = "rRsSfFdDxXpPhH";
 
@@ -24214,13 +23330,6 @@ static int	md_parse_option(int c,const char *arg)
 	case OPTION_MPRIV_SPEC:
 		return riscv_set_default_priv_spec(arg);
 
-	case OPTION_BIG_ENDIAN:
-		target_big_endian = 1;
-		break;
-
-	case OPTION_LITTLE_ENDIAN:
-		target_big_endian = 0;
-		break;
 
 	default:
 		return 0;
@@ -25545,10 +24654,8 @@ static int	match_c_slli64(const struct riscv_opcode *op,insn_t insn)
 	return match_opcode(op,insn) && EXTRACT_CITYPE_IMM(insn) == 0;
 }
 
-/*
- * This is used for both srli and srai.  This requires a non-zero shift. A zero
- * rd is not possible.
- */
+/* This is used for both srli and srai.  This requires a non-zero shift. A zero
+ * rd is not possible.  */
 static int	match_srxi_as_c_srxi(const struct riscv_opcode *op,insn_t insn)
 {
 	return match_opcode(op,insn) && EXTRACT_CITYPE_IMM(insn) != 0;
@@ -25576,10 +24683,8 @@ static int	match_vd_eq_vs1_eq_vs2(const struct riscv_opcode *op,
 static int	match_th_load_inc(const struct riscv_opcode *op,
 			     		insn_t	insn)
 {
-	/*
-	 * Load-increment has the following restriction: The values of rd and
-	 * rs1 must not be the same.
-	 */
+	/* Load-increment has the following restriction: The values of rd and
+	 * rs1 must not be the same.  */
 	int		rd = (insn & MASK_RD) >> OP_SH_RD;
 	int		rs1 = (insn & MASK_RS1) >> OP_SH_RS1;
 
@@ -25589,12 +24694,10 @@ static int	match_th_load_inc(const struct riscv_opcode *op,
 static int	match_th_load_pair(const struct riscv_opcode *op,
 			      		insn_t	insn)
 {
-	/*
-	 * Load pair instructions use the following encoding: - rd1 = RD
+	/* Load pair instructions use the following encoding: - rd1 = RD
 	 * (insn[11:7]) - rd2 = RS2 (insn[24:20]) - rs = RS1 ([19:15]) This
 	 * function matches if the following restriction is met: The values of
-	 * rd1,rd2,and rs1 must not be the same.
-	 */
+	 * rd1,rd2,and rs1 must not be the same.  */
 	int		rd1 = (insn & MASK_RD) >> OP_SH_RD;
 	int		rd2 = (insn & MASK_RS2) >> OP_SH_RS2;
 	int		rs = (insn & MASK_RS1) >> OP_SH_RS1;
@@ -27740,11 +26843,9 @@ static void	obj_elf_change_section(const char *name,
 
 		if (type == SHT_NULL)
 			type = ssect->type;
-		else
-			if (type != ssect->type) {
+		else if (type != ssect->type) {
 				if (old_sec == NULL
-				/*
-				 * Some older versions of gcc will emit
+				/* Some older versions of gcc will emit
 				 * 
 				 * .section .init_array,"aw",@progbits
 				 * 
@@ -27755,24 +26856,15 @@ static void	obj_elf_change_section(const char *name,
 				 * 
 				 * .section .lbss,"aw",@progbits
 				 * 
-				 * "@progbits" is incorrect.
-				 */
-#ifdef TC_I386
-				    && (bed->s->arch_size != 64
-					|| !(ssect->attr & SHF_X86_64_LARGE))
-#endif
+				 * "@progbits" is incorrect.  */
 				    && ssect->type != SHT_INIT_ARRAY
 				    && ssect->type != SHT_FINI_ARRAY
 				    && ssect->type != SHT_PREINIT_ARRAY) {
-					/*
-					 * We allow to specify any type for a
-					 * .note section.
-					 */
+					/* We allow to specify any type for a
+					 * .note section.  */
 					if (ssect->type != SHT_NOTE
-					/*
-					 * Processor and application defined
-					 * types are allowed too.
-					 */
+					/* Processor and application defined
+					 * types are allowed too.  */
 					    && type < SHT_LOPROC)
 						as_warn(("setting incorrect section type for %s"),
 							name);
@@ -27782,8 +26874,7 @@ static void	obj_elf_change_section(const char *name,
 					type = ssect->type;
 				}
 			}
-		if (old_sec == NULL && ((attr & ~(SHF_LINK_ORDER
-						 |SHF_MASKOS
+		if (old_sec == NULL && ((attr & ~(SHF_LINK_ORDER |SHF_MASKOS
 						 |SHF_MASKPROC))
 					& ~ssect->attr) != 0) {
 			/* Strip SHF_GNU_RETAIN.  */
@@ -27791,20 +26882,16 @@ static void	obj_elf_change_section(const char *name,
 			if (elf_tdata(stdoutput)->has_gnu_osabi)
 				generic_attr &= ~SHF_GNU_RETAIN;
 
-			/*
-			 * As a GNU extension,we permit a .note section to be
+			/* As a GNU extension,we permit a .note section to be
 			 * allocatable.  If the linker sees an allocatable
 			 * .note section,it will create a PT_NOTE segment in
 			 * the output file.  We also allow "x" for
-			 * .note.GNU-stack.
-			 */
+			 * .note.GNU-stack.  */
 			if (ssect->type == SHT_NOTE
 			    && (generic_attr == SHF_ALLOC
 				|| generic_attr == SHF_EXECINSTR));
-			/*
-			 * Allow different SHF_MERGE and SHF_STRINGS if we have
-			 * something like .rodata.str.
-			 */
+			/* Allow different SHF_MERGE and SHF_STRINGS if we have
+			 * something like .rodata.str.  */
 			else if (ssect->suffix_length == -2
 				    && name[ssect->prefix_length] == '.'
 				    && (generic_attr
@@ -27887,12 +26974,10 @@ static void	obj_elf_change_section(const char *name,
 		/* Add a symbol for this section to the symbol table.  */
 		secsym = symbol_find(name);
 		if (secsym != NULL) {
-			/*
-			 * We could be repurposing an undefined symbol here:
+			/* We could be repurposing an undefined symbol here:
 			 * make sure we reset sy_value to look like other
 			 * section symbols in order to avoid trying to
-			 * incorrectly resolve this section symbol later on.
-			 */
+			 * incorrectly resolve this section symbol later on.  */
 			static const expressionS exp = {.X_op = O_constant};
 			symbol_set_value_expression(secsym,&exp);
 			symbol_set_bfdsym(secsym,sec->symbol);
@@ -27901,27 +26986,20 @@ static void	obj_elf_change_section(const char *name,
 	} else {
 		if (type != SHT_NULL && (unsigned)type != elf_section_type(old_sec)) {
 			if (ssect != NULL)
-				/*
-				 * This is a special section with known type.
+				/* This is a special section with known type.
 				 * User assembly might get the section type
 				 * wrong; Even high profile projects like glibc
 				 * have done so in the past. So don't error in
-				 * this case.
-				 */
+				 * this case.  */
 				as_warn(("ignoring changed section type for %s"),name);
 			else
-				/*
-				 * Do error when assembly isn't
-				 * self-consistent.
-				 */
+				/* Do error when assembly isn't self-consistent.  */
 				as_bad(("changed section type for %s"),name);
 		}
 		if (attr != 0) {
-			/*
-			 * If section attributes are specified the second time
+			/* If section attributes are specified the second time
 			 * we see a particular section,then check that they
-			 * are the same as we saw the first time.
-			 */
+			 * are the same as we saw the first time.  */
 			if (((old_sec->flags ^ flags)
 			     & (SEC_ALLOC|SEC_LOAD|SEC_READONLY|SEC_CODE
 				| SEC_EXCLUDE|SEC_SORT_ENTRIES|SEC_MERGE|SEC_STRINGS
@@ -27932,11 +27010,9 @@ static void	obj_elf_change_section(const char *name,
 				else
 					as_bad(("changed section attributes for %s"),name);
 			} else
-				/*
-				 * FIXME: Maybe we should consider removing a
+				/* FIXME: Maybe we should consider removing a
 				 * previously set processor or application
-				 * specific attribute as suspicious?
-				 */
+				 * specific attribute as suspicious?  */
 				elf_section_flags(sec) = attr;
 
 			if ((flags & SEC_MERGE) && old_sec->entsize != (unsigned)entsize)
@@ -28096,6 +27172,7 @@ static const char *obj_elf_section_name(void)
 	return name;
 }
 
+/* gas/config/obj-elf.c:81 */
 static void	obj_elf_attach_to_group(int dummy ATTRIBUTE_UNUSED)
 {
 	const char     *gname = obj_elf_section_name();
@@ -28569,16 +27646,13 @@ static void	obj_elf_symver(int ignore ATTRIBUTE_UNUSED)
 		if (startswith(input_line_pointer,"local")) {
 			input_line_pointer += 5;
 			sy_obj->visibility = visibility_local;
-		} else
-			if (startswith(input_line_pointer,"hidden")) {
-				input_line_pointer += 6;
-				sy_obj->visibility = visibility_hidden;
-			} else
-				if (startswith(input_line_pointer,"remove")) {
-					input_line_pointer += 6;
-					sy_obj->visibility = visibility_remove;
-				} else
-					input_line_pointer = save;
+		} else if (startswith(input_line_pointer,"hidden")) {
+			input_line_pointer += 6;
+			sy_obj->visibility = visibility_hidden;
+		} else if (startswith(input_line_pointer,"remove")) {
+			input_line_pointer += 6;
+			sy_obj->visibility = visibility_remove;
+		} else input_line_pointer = save;
 	}
 	demand_empty_rest_of_line();
 }
@@ -28662,7 +27736,7 @@ static struct fix *obj_elf_get_vtable_entry(void)
 
 	sym = get_sym_from_input_line_and_check();
 	if (*input_line_pointer != ',') {
-		as_bad(("expected comma after name in .vtable_entry"));
+		as_bad("expected comma after name in .vtable_entry");
 		ignore_rest_of_line();
 		return NULL;
 	}
@@ -28674,8 +27748,7 @@ static struct fix *obj_elf_get_vtable_entry(void)
 
 	demand_empty_rest_of_line();
 
-	return fix_new(frag_now,frag_now_fix(),0,sym,offset,0,
-		       BFD_RELOC_VTABLE_ENTRY);
+	return fix_new(frag_now,frag_now_fix(),0,sym,offset,0, BFD_RELOC_VTABLE_ENTRY);
 }
 
 /* This is a version of obj_elf_get_vtable_entry() that is suitable for use in
@@ -29112,57 +28185,51 @@ static void	obj_elf_type(int ignore ATTRIBUTE_UNUSED)
 	    || strcmp(type_name,"2") == 0
 	    || strcmp(type_name,"STT_FUNC") == 0)
 		type = BSF_FUNCTION;
-	else
-		if (strcmp(type_name,"object") == 0
-		    || strcmp(type_name,"1") == 0
-		    || strcmp(type_name,"STT_OBJECT") == 0)
-			type = BSF_OBJECT;
-		else
-			if (strcmp(type_name,"tls_object") == 0
-			    || strcmp(type_name,"6") == 0
-			    || strcmp(type_name,"STT_TLS") == 0)
-				type = BSF_OBJECT|BSF_THREAD_LOCAL;
-			else
-				if (strcmp(type_name,"notype") == 0
-				    || strcmp(type_name,"0") == 0
-				    || strcmp(type_name,"STT_NOTYPE") == 0);
-				else
-					if (strcmp(type_name,"common") == 0
-					    || strcmp(type_name,"5") == 0
-					    || strcmp(type_name,"STT_COMMON") == 0) {
-						type = BSF_OBJECT;
+	else if (strcmp(type_name,"object") == 0
+	    || strcmp(type_name,"1") == 0
+	    || strcmp(type_name,"STT_OBJECT") == 0)
+		type = BSF_OBJECT;
+	else if (strcmp(type_name,"tls_object") == 0
+	    || strcmp(type_name,"6") == 0
+	    || strcmp(type_name,"STT_TLS") == 0)
+		type = BSF_OBJECT|BSF_THREAD_LOCAL;
+	else if (strcmp(type_name,"notype") == 0
+	   || strcmp(type_name,"0") == 0
+	    || strcmp(type_name,"STT_NOTYPE") == 0)
+		;
+	else if (strcmp(type_name,"common") == 0
+	    || strcmp(type_name,"5") == 0
+	    || strcmp(type_name,"STT_COMMON") == 0) {
+		type = BSF_OBJECT;
 
-						if (!S_IS_COMMON(sym)) {
-							if (S_IS_VOLATILE(sym)) {
-								sym = symbol_clone(sym,1);
-								S_SET_SEGMENT(sym,bfd_com_section_ptr);
-								S_SET_VALUE(sym,0);
-								S_SET_EXTERNAL(sym);
-								symbol_set_frag(sym,&zero_address_frag);
-								S_CLEAR_VOLATILE(sym);
-							}
-							else
-								if (S_IS_DEFINED(sym) || symbol_equated_p(sym))
-									as_bad(("symbol '%s' is already defined"),S_GET_NAME(sym));
-								else {
-									/* FIXME:Is it safe to just change the section ? */
-									S_SET_SEGMENT(sym,bfd_com_section_ptr);
-									S_SET_VALUE(sym,0);
-									S_SET_EXTERNAL(sym);
-								}
-						}
-					} else
-						if (strcmp(type_name,"gnu_indirect_function") == 0
-						|| strcmp(type_name,"10") == 0
-						    || strcmp(type_name,"STT_GNU_IFUNC") == 0) {
-							elf_tdata(stdoutput)->has_gnu_osabi |= elf_gnu_osabi_ifunc;
-							type = BSF_FUNCTION|BSF_GNU_INDIRECT_FUNCTION;
-						} else
-							if (strcmp(type_name,"gnu_unique_object") == 0) {
-								elf_tdata(stdoutput)->has_gnu_osabi |= elf_gnu_osabi_unique;
-								type = BSF_OBJECT|BSF_GNU_UNIQUE;
-							}
-							else as_bad(("unrecognized symbol type \"%s\""),type_name);
+		if (!S_IS_COMMON(sym)) {
+			if (S_IS_VOLATILE(sym)) {
+				sym = symbol_clone(sym,1);
+				S_SET_SEGMENT(sym,bfd_com_section_ptr);
+				S_SET_VALUE(sym,0);
+				S_SET_EXTERNAL(sym);
+				symbol_set_frag(sym,&zero_address_frag);
+				S_CLEAR_VOLATILE(sym);
+			}
+			else if (S_IS_DEFINED(sym) || symbol_equated_p(sym))
+				as_bad("symbol '%s' is already defined",S_GET_NAME(sym));
+			else {
+				/* FIXME:Is it safe to just change the section ? */
+				S_SET_SEGMENT(sym,bfd_com_section_ptr);
+				S_SET_VALUE(sym,0);
+				S_SET_EXTERNAL(sym);
+			}
+		}
+	} else if (strcmp(type_name,"gnu_indirect_function") == 0
+			|| strcmp(type_name,"10") == 0
+		    || strcmp(type_name,"STT_GNU_IFUNC") == 0) {
+			elf_tdata(stdoutput)->has_gnu_osabi |= elf_gnu_osabi_ifunc;
+			type = BSF_FUNCTION|BSF_GNU_INDIRECT_FUNCTION;
+	} else if (strcmp(type_name,"gnu_unique_object") == 0) {
+		elf_tdata(stdoutput)->has_gnu_osabi |= elf_gnu_osabi_unique;
+		type = BSF_OBJECT|BSF_GNU_UNIQUE;
+	}
+	else as_bad(("unrecognized symbol type \"%s\""),type_name);
 
 	*input_line_pointer = c;
 
@@ -29394,8 +28461,7 @@ static void	elf_frob_symbol(symbolS * symp,int *puntp)
 	/* Double check weak symbols.  */
 	if (S_IS_WEAK(symp)) {
 		if (S_IS_COMMON(symp))
-			as_bad(("symbol `%s' can not be both weak and common"),
-			       S_GET_NAME(symp));
+			as_bad("symbol '%s' can't be weak AND common", S_GET_NAME(symp));
 	}
 }
 
@@ -29433,7 +28499,7 @@ static void	build_additional_section_info(asection * sec,void *inf)
 		symbolS        *linked_to_sym;
 		linked_to_sym = symbol_find(sec->map_head.linked_to_symbol_name);
 		if (!linked_to_sym || !S_IS_DEFINED(linked_to_sym))
-			as_bad(("undefined linked-to symbol `%s' on section `%s'"),
+			as_bad("undefined linked-to symbol `%s' on section `%s'",
 			       sec->map_head.linked_to_symbol_name,
 			       bfd_section_name(sec));
 		else
@@ -29660,600 +28726,6 @@ static void	elf_end(void)
 		htab_delete(groups.indexes);
 		free(groups.head);
 	}
-}
-/* ============================================================**** atof-ieee.c */
-/* atof_ieee.c - turn a Flonum into an IEEE floating point number */
-
-/* Flonums returned here.  */
-extern FLONUM_TYPE generic_floating_point_number;
-/* Precision in LittleNums.  */
-/* Don't count the gap in the m68k extended precision format.  */
-#define MAX_PRECISION  5
-#define H_PRECISION    1
-#define B_PRECISION    1	/* Not strictly IEEE,but handled here anyway.  */
-#define F_PRECISION    2
-#define D_PRECISION    4
-#define X_PRECISION    5
-#ifndef X_PRECISION_PAD
-#define X_PRECISION_PAD 0
-#endif
-#define P_PRECISION    5
-#ifndef P_PRECISION_PAD
-#define P_PRECISION_PAD X_PRECISION_PAD
-#endif
-
-/* Length in LittleNums of guard bits.  */
-#define GUARD          2
-
-#ifndef TC_LARGEST_EXPONENT_IS_NORMAL
-#define TC_LARGEST_EXPONENT_IS_NORMAL(PRECISION) 0
-#endif
-
-static const unsigned long mask[] =
-{
-	0x00000000,0x00000001,0x00000003,0x00000007,0x0000000f,0x0000001f,
-	0x0000003f,0x0000007f,0x000000ff,0x000001ff,0x000003ff,0x000007ff,
-	0x00000fff,0x00001fff,0x00003fff,0x00007fff,0x0000ffff,0x0001ffff,
-	0x0003ffff,0x0007ffff,0x000fffff,0x001fffff,0x003fffff,0x007fffff,
-	0x00ffffff,0x01ffffff,0x03ffffff,0x07ffffff,0x0fffffff,0x1fffffff,
-0x3fffffff,0x7fffffff,0xffffffff,};
-static int	bits_left_in_littlenum;
-static int	littlenums_left;
-static LITTLENUM_TYPE *littlenum_pointer;
-
-static int	next_bits(int number_of_bits)
-{
-	int		return_value;
-
-	if (!littlenums_left)
-		return 0;
-
-	if (number_of_bits >= bits_left_in_littlenum) {
-		return_value = mask[bits_left_in_littlenum] & *littlenum_pointer;
-		number_of_bits -= bits_left_in_littlenum;
-		return_value <<= number_of_bits;
-
-		if (--littlenums_left) {
-			bits_left_in_littlenum = LITTLENUM_NUMBER_OF_BITS - number_of_bits;
-			--littlenum_pointer;
-			return_value |=
-				(*littlenum_pointer >> bits_left_in_littlenum)
-				& mask[number_of_bits];
-		}
-	} else {
-		bits_left_in_littlenum -= number_of_bits;
-		return_value =
-			mask[number_of_bits] & (*littlenum_pointer >> bits_left_in_littlenum);
-	}
-	return return_value;
-}
-
-/* Num had better be less than LITTLENUM_NUMBER_OF_BITS.  */
-
-static void	unget_bits(int num)
-{
-	if (!littlenums_left) {
-		++littlenum_pointer;
-		++littlenums_left;
-		bits_left_in_littlenum = num;
-	} else
-		if (bits_left_in_littlenum + num > LITTLENUM_NUMBER_OF_BITS) {
-			bits_left_in_littlenum =
-				num - (LITTLENUM_NUMBER_OF_BITS - bits_left_in_littlenum);
-			++littlenum_pointer;
-			++littlenums_left;
-		} else
-			bits_left_in_littlenum += num;
-}
-
-static void	make_invalid_floating_point_number(LITTLENUM_TYPE * words)
-{
-	as_bad("cannot create floating-point number");
-	/* Zero the leftmost bit.  */
-	words[0] = (LITTLENUM_TYPE) ((unsigned)-1) >> 1;
-	words[1] = (LITTLENUM_TYPE) - 1;
-	words[2] = (LITTLENUM_TYPE) - 1;
-	words[3] = (LITTLENUM_TYPE) - 1;
-	words[4] = (LITTLENUM_TYPE) - 1;
-	words[5] = (LITTLENUM_TYPE) - 1;
-}
-
-/* Build a floating point constant at str into a IEEE floating point number.
- * This function does the same thing as atof_ieee however it allows more
- * control over the exact format,i.e. explicitly specifying the precision and
- * number of exponent bits instead of relying on this infomation being deduced
- * from a given type.
- * 
- * If generic_float_info is not NULL then it will be set to contain generic
- * infomation about the parsed floating point number.
- * 
- * Returns pointer past text consumed.  */
-static char    *atof_ieee_detail(char *str,
-				 		int		precision,
-				 		int		exponent_bits,
-				 		LITTLENUM_TYPE * words,
-			    		FLONUM_TYPE *	generic_float_info)
-{
-	/* Extra bits for zeroed low-order bits. The 1st MAX_PRECISION are
-	 * zeroed,the last contain flonum bits.  */
-	static LITTLENUM_TYPE bits[MAX_PRECISION + MAX_PRECISION + GUARD];
-	char           *return_value;
-
-	/* Number of 16-bit words in the format.  */
-	FLONUM_TYPE	save_gen_flonum;
-
-	/* We have to save the generic_floating_point_number because it
-	 * contains storage allocation about the array of LITTLENUMs where the
-	 * value is actually stored.  We will allocate our own array of
-	 * littlenums below,but have to restore the global one on exit.  */
-	save_gen_flonum = generic_floating_point_number;
-
-	return_value = str;
-	generic_floating_point_number.low = bits + MAX_PRECISION;
-	generic_floating_point_number.high = NULL;
-	generic_floating_point_number.leader = NULL;
-	generic_floating_point_number.exponent = 0;
-	generic_floating_point_number.sign = '\0';
-
-	/* Use more LittleNums than seems necessary: the highest flonum may
-	 * have 15 leading 0 bits,so could be useless.  */
-
-	memset(bits,'\0',sizeof(LITTLENUM_TYPE) * MAX_PRECISION);
-
-	generic_floating_point_number.high
-		= generic_floating_point_number.low + precision - 1 + GUARD;
-
-	if (atof_generic(&return_value,".",EXP_CHARS,
-			 &generic_floating_point_number)) {
-		make_invalid_floating_point_number(words);
-		return NULL;
-	}
-	if (generic_float_info)
-		*generic_float_info = generic_floating_point_number;
-
-	gen_to_words(words,precision,exponent_bits);
-
-	/* Restore the generic_floating_point_number's storage alloc (and
-	 * everything else).  */
-	generic_floating_point_number = save_gen_flonum;
-
-	return return_value;
-}
-
-/* Warning: This returns 16-bit LITTLENUMs.  It is up to the caller to figure
- * out any alignment problems and to conspire for the bytes/word to be emitted
- * in the right order.  Bigendians beware!  */
-
-/* Note that atof-ieee always has X and P precisions enabled.  it is up to
- * md_atof to filter them out if the target machine does not support them.  */
-
-/* Returns pointer past text consumed.  */
-static char    *atof_ieee(char *str,	/* Text to convert to binary.  */
-			  		int		what_kind,	/* 'd','f','x','p'.  */
-			  		LITTLENUM_TYPE * words)
-{				/* Build the binary here.  */
-	int		precision;
-	long		exponent_bits;
-
-	switch (what_kind) {
-	case 'h': case 'H':
-		precision = H_PRECISION;
-		exponent_bits = 5;
-		break;
-
-	case 'b': case 'B':
-		precision = B_PRECISION;
-		exponent_bits = 8;
-		break;
-
-	case 'f': case 'F': case 's': case 'S':
-		precision = F_PRECISION;
-		exponent_bits = 8;
-		break;
-
-	case 'd': case 'D': case 'r': case 'R':
-		precision = D_PRECISION;
-		exponent_bits = 11;
-		break;
-
-	case 'x': case 'X': case 'e': case 'E':
-		precision = X_PRECISION;
-		exponent_bits = 15;
-		break;
-
-	case 'p': case 'P':
-		precision = P_PRECISION;
-		exponent_bits = -1;
-		break;
-
-	default:
-		make_invalid_floating_point_number(words);
-		return (NULL);
-	}
-
-	return atof_ieee_detail(str,precision,exponent_bits,words,NULL);
-}
-
-/* Turn generic_floating_point_number into a real float/double/extended.  */
-/* gas/config/atof-ieee.c:308 */
-static int	gen_to_words(LITTLENUM_TYPE * words,int precision,long exponent_bits)
-{
-	int		return_value = 0;
-
-	long		exponent_1;
-	long		exponent_2;
-	long		exponent_3;
-	long		exponent_4;
-	int		exponent_skippage;
-	LITTLENUM_TYPE	word1;
-	LITTLENUM_TYPE *lp;
-	LITTLENUM_TYPE *words_end;
-
-	words_end = words + precision;
-
-	if (generic_floating_point_number.low > generic_floating_point_number.leader) {
-		/* 0.0e0 seen.  */
-		if (generic_floating_point_number.sign == '+')
-			words[0] = 0x0000;
-		else
-			words[0] = 0x8000;
-		memset(&words[1],'\0',
-		       (words_end - words - 1) * sizeof(LITTLENUM_TYPE));
-		return return_value;
-	}
-	switch (generic_floating_point_number.sign) {
-		/* NaN:  Do the right thing.  */
-	case 0: case 'Q': case 'q': case 'S': case 's':
-		if (TC_LARGEST_EXPONENT_IS_NORMAL(precision))
-			as_warn(("NaNs are not supported by this target"));
-
-		if (precision == H_PRECISION) {
-			if (TOUPPER(generic_floating_point_number.sign) != 'S')
-				words[0] = 0x7fff;
-			else
-				words[0] = exponent_bits == 5 ? 0x7dff : 0x7fbf;
-		} else
-			if (precision == F_PRECISION) {
-				words[0] = TOUPPER(generic_floating_point_number.sign) == 'S'
-					? 0x7fbf : 0x7fff;
-				words[1] = 0xffff;
-			} else
-				if (precision == X_PRECISION) {
-					abort();
-				} else {
-					words[0] = TOUPPER(generic_floating_point_number.sign) == 'S'
-						? 0x7ff7 : 0x7fff;
-					words[1] = 0xffff;
-					words[2] = 0xffff;
-					words[3] = 0xffff;
-				}
-
-		if (ISLOWER(generic_floating_point_number.sign))
-			words[0] |= 0x8000;
-
-		return return_value;
-
-	case 'P': case 'N':
-		if (TC_LARGEST_EXPONENT_IS_NORMAL(precision))
-			as_warn(("Infinities are not supported by this target"));
-
-		/* +INF:  Do the right thing.  */
-		if (precision == H_PRECISION /* also B_PRECISION */ ) {
-			words[0] = exponent_bits == 5 ? 0x7c00 : 0x7f80;
-		} else
-			if (precision == F_PRECISION) {
-				words[0] = 0x7f80;
-				words[1] = 0;
-			} else
-				if (precision == X_PRECISION) {
-					abort();
-				} else {
-					words[0] = 0x7ff0;
-					words[1] = 0;
-					words[2] = 0;
-					words[3] = 0;
-				}
-
-		if (generic_floating_point_number.sign == 'N')
-			words[0] |= 0x8000;
-
-		return return_value;
-	}
-
-	/* The floating point formats we support have: Bit 15 is sign bit. Bits
-	 * 14:n are excess-whatever exponent. Bits n-1:0 (if any) are most
-	 * significant bits of fraction. Bits 15:0 of the next word(s) are the
-	 * next most significant bits.
-	 * 
-	 * So we need: number of bits of exponent,number of bits of mantissa.  */
-	bits_left_in_littlenum = LITTLENUM_NUMBER_OF_BITS;
-	littlenum_pointer = generic_floating_point_number.leader;
-	littlenums_left = (1
-			   + generic_floating_point_number.leader
-			   - generic_floating_point_number.low);
-
-	/* Seek (and forget) 1st significant bit.  */
-	for (exponent_skippage = 0; !next_bits(1); ++exponent_skippage);
-	exponent_1 = (generic_floating_point_number.exponent
-		      + generic_floating_point_number.leader
-		      + 1
-		      - generic_floating_point_number.low);
-
-	/* Radix LITTLENUM_RADIX,point just higher than
-	 * generic_floating_point_number.leader.  */
-	exponent_2 = exponent_1 * LITTLENUM_NUMBER_OF_BITS;
-
-	/* Radix 2.  */
-	exponent_3 = exponent_2 - exponent_skippage;
-
-	/* Forget leading zeros,forget 1st bit.  */
-	exponent_4 = exponent_3 + ((1 << (exponent_bits - 1)) - 2);
-
-	/* Offset exponent.  */
-	lp = words;
-
-	/* Word 1.  Sign,exponent and perhaps high bits.  */
-	word1 = ((generic_floating_point_number.sign == '+')
-		 ? 0
-		 : (1 << (LITTLENUM_NUMBER_OF_BITS - 1)));
-
-	/* Assume 2's complement integers.  */
-	if (exponent_4 <= 0) {
-		int		prec_bits;
-		int		num_bits;
-
-		unget_bits(1);
-		num_bits = -exponent_4;
-		prec_bits =
-			LITTLENUM_NUMBER_OF_BITS * precision - (exponent_bits + 1 + num_bits);
-
-		if (num_bits >= LITTLENUM_NUMBER_OF_BITS - exponent_bits) {
-			/* Bigger than one littlenum.  */
-			num_bits -= (LITTLENUM_NUMBER_OF_BITS - 1) - exponent_bits;
-			*lp++ = word1;
-			if (num_bits + exponent_bits + 1
-			    > precision * LITTLENUM_NUMBER_OF_BITS) {
-				/* Exponent overflow.  */
-				make_invalid_floating_point_number(words);
-				return return_value;
-			}
-			while (num_bits >= LITTLENUM_NUMBER_OF_BITS) {
-				num_bits -= LITTLENUM_NUMBER_OF_BITS;
-				*lp++ = 0;
-			}
-			if (num_bits)
-				*lp++ = next_bits(LITTLENUM_NUMBER_OF_BITS - (num_bits));
-		} else {
-			if (precision == X_PRECISION && exponent_bits == 15) {
-				*lp++ = word1;
-				*lp++ = next_bits(LITTLENUM_NUMBER_OF_BITS - num_bits);
-			} else {
-				word1 |= next_bits((LITTLENUM_NUMBER_OF_BITS - 1)
-						- (exponent_bits + num_bits));
-				*lp++ = word1;
-			}
-		}
-		while (lp < words_end)
-			*lp++ = next_bits(LITTLENUM_NUMBER_OF_BITS);
-
-		/* Round the mantissa up,but don't change the number.  */
-		if (next_bits(1)) {
-			--lp;
-			if (prec_bits >= LITTLENUM_NUMBER_OF_BITS) {
-				int		n = 0;
-				int		tmp_bits;
-
-				n = 0;
-				tmp_bits = prec_bits;
-				while (tmp_bits > LITTLENUM_NUMBER_OF_BITS) {
-					if (lp[n] != (LITTLENUM_TYPE) - 1)
-						break;
-					--n;
-					tmp_bits -= LITTLENUM_NUMBER_OF_BITS;
-				}
-				if (tmp_bits > LITTLENUM_NUMBER_OF_BITS
-				 || (lp[n] & mask[tmp_bits]) != mask[tmp_bits]
-				    || (prec_bits != (precision * LITTLENUM_NUMBER_OF_BITS
-						      - exponent_bits - 1))) {
-					unsigned long	carry;
-
-					for (carry = 1; carry && (lp >= words); lp--) {
-						carry = *lp + carry;
-						*lp = carry;
-						carry >>= LITTLENUM_NUMBER_OF_BITS;
-					}
-				} else {
-					/*
-					 * This is an overflow of the denormal
-					 * numbers.  We need to forget what we
-					 * have produced,and instead generate
-					 * the smallest normalized number.
-					 */
-					lp = words;
-					word1 = ((generic_floating_point_number.sign == '+')
-						 ? 0
-						 : (1 << (LITTLENUM_NUMBER_OF_BITS - 1)));
-					word1 |= (1
-					    << ((LITTLENUM_NUMBER_OF_BITS - 1)
-						- exponent_bits));
-					*lp++ = word1;
-					while (lp < words_end)
-						*lp++ = 0;
-				}
-			} else
-				*lp += 1;
-		}
-		return return_value;
-	} else
-		if ((unsigned long)exponent_4 > mask[exponent_bits]
-		    || (!TC_LARGEST_EXPONENT_IS_NORMAL(precision)
-			&& (unsigned long)exponent_4 == mask[exponent_bits])) {
-			/* Exponent overflow.  Lose immediately.  */
-
-			/*
-			 * We leave return_value alone: admit we read the
-			 * number,but return a floating exception because we
-			 * can't encode the number.
-			 */
-			make_invalid_floating_point_number(words);
-			return return_value;
-		} else {
-			word1 |= (exponent_4 << ((LITTLENUM_NUMBER_OF_BITS - 1) - exponent_bits))
-				| next_bits((LITTLENUM_NUMBER_OF_BITS - 1) - exponent_bits);
-		}
-
-	*lp++ = word1;
-
-	/*
-	 * X_PRECISION is special: on the 68k,it has 16 bits of zero in the
-	 * middle.  Either way,it is then followed by a 1 bit.
-	 */
-	if (exponent_bits == 15 && precision == X_PRECISION) {
-		*lp++ = (1 << (LITTLENUM_NUMBER_OF_BITS - 1)
-			|next_bits(LITTLENUM_NUMBER_OF_BITS - 1));
-	}
-	/* The rest of the words are just mantissa bits.  */
-	while (lp < words_end)
-		*lp++ = next_bits(LITTLENUM_NUMBER_OF_BITS);
-
-	if (next_bits(1)) {
-		unsigned long	carry;
-		/* Since the NEXT bit is a 1,round UP the mantissa. The
-		 * cunning design of these hidden-1 floats permits us to let
-		 * the mantissa overflow into the exponent,and it 'does the
-		 * right thing'. However,we lose if the highest-order bit of
-		 * the lowest-order word flips. Is that clear?  */
-
-		/* #if (sizeof(carry)) < ((sizeof(bits[0]) * BITS_PER_CHAR) +
-		 * 2) Please allow at least 1 more bit in carry than is in a
-		 * LITTLENUM. We need that extra bit to hold a carry during a
-		 * LITTLENUM carry propagation. Another extra bit (kept 0) will
-		 * assure us that we don't get a sticky sign bit after shifting
-		 * right,and that permits us to propagate the carry without
-		 * any masking of bits. #endif */
-		for (carry = 1,lp--; carry; lp--) {
-			carry = *lp + carry;
-			*lp = carry;
-			carry >>= LITTLENUM_NUMBER_OF_BITS;
-			if (lp == words)
-				break;
-		}
-		if (precision == X_PRECISION && exponent_bits == 15) {
-			/* Extended precision numbers have an explicit integer
-			 * bit that we may have to restore.  */
-			if (lp == words) {
-				/* Put back the integer bit.  */
-				lp[1] |= 1 << (LITTLENUM_NUMBER_OF_BITS - 1);
-			}
-		}
-		if ((word1 ^ *words) & (1 << (LITTLENUM_NUMBER_OF_BITS - 1))) {
-			/* We leave return_value alone: admit we read the
-			 * number,but return a floating exception because we
-			 * can't encode the number.  */
-			*words &= ~(1 << (LITTLENUM_NUMBER_OF_BITS - 1));
-		}
-	}
-	return return_value;
-}
-
-/* This is a utility function called from various tc-*.c files.  It is here in
- * order to reduce code duplication.
- * 
- * Turn a string at input_line_pointer into a floating point constant of type TYPE
- * (a character found in the FLT_CHARS macro),and store it as LITTLENUMS in
- * the bytes buffer LITP.  The number of chars emitted is stored in *SIZEP.
- * BIG_WORDIAN is TRUE if the littlenums should be emitted most significant
- * littlenum first.
- * 
- * An error message is returned,or a NULL pointer if everything went OK.  */
-static const char *ieee_md_atof(int type,
-						char         *litP,
-						int          *sizeP,
-						bool		big_wordian)
-{
-	LITTLENUM_TYPE	words[MAX_LITTLENUMS];
-	LITTLENUM_TYPE *wordP;
-	char           *t;
-	int		prec = 0,	pad = 0;
-
-	if (strchr(FLT_CHARS,type) != NULL) {
-		switch (type) {
-		case 'H': case 'h':
-			prec = H_PRECISION;
-			break;
-
-		case 'B': case 'b':
-			prec = B_PRECISION;
-			break;
-
-		case 'f': case 'F': case 's': case 'S':
-			prec = F_PRECISION;
-			break;
-
-		case 'd': case 'D': case 'r': case 'R':
-			prec = D_PRECISION;
-			break;
-
-		case 't': case 'T':
-			prec = X_PRECISION;
-			pad = X_PRECISION_PAD;
-			type = 'x';	/* This is what atof_ieee()
-					 * understands.  */
-			break;
-
-		case 'x': case 'X': case 'p': case 'P':
-			prec = P_PRECISION;
-			pad = P_PRECISION_PAD;
-			break;
-
-		default:
-			break;
-		}
-	}
-	/* The 'f' and 'd' types are always recognised,even if the target has
-	 * not put them into the FLT_CHARS macro.  This is because the 'f' type
-	 * can come from the .dc.s,.dcb.s,.float or .single pseudo-ops and
-	 * the 'd' type from the .dc.d,.dbc.d or .double pseudo-ops.
-	 * 
-	 * The 'x' type is not implicitly recognised however,even though it can
-	 * be generated by the .dc.x and .dbc.x pseudo-ops because not all
-	 * targets can support floating point values that big.  ie the target
-	 * has to explicitly allow them by putting them into FLT_CHARS.  */
-	else
-		if (type == 'f')
-			prec = F_PRECISION;
-		else
-			if (type == 'd')
-				prec = D_PRECISION;
-
-	if (prec == 0) {
-		*sizeP = 0;
-		return ("Unrecognized or unsupported floating point constant");
-	}
-	gas_assert(prec <= MAX_LITTLENUMS);
-
-	t = atof_ieee(input_line_pointer,type,words);
-	if (t)
-		input_line_pointer = t;
-
-	*sizeP = (prec + pad) * sizeof(LITTLENUM_TYPE);
-
-	if (big_wordian) {
-		for (wordP = words; prec--;) {
-			md_number_to_chars(litP,(valueT) (*wordP++),sizeof(LITTLENUM_TYPE));
-			litP += sizeof(LITTLENUM_TYPE);
-		}
-	} else {
-		for (wordP = words + prec; prec--;) {
-			md_number_to_chars(litP,(valueT) (*--wordP),sizeof(LITTLENUM_TYPE));
-			litP += sizeof(LITTLENUM_TYPE);
-		}
-	}
-
-	memset(litP,0,pad * sizeof(LITTLENUM_TYPE));
-	litP += pad * sizeof(LITTLENUM_TYPE);
-
-	return NULL;
 }
 /* ============================================================**** hashtab.c */
 /* An expandable hash tables datatype.  This package implements basic hash
@@ -31673,8 +30145,7 @@ static bool	_bfd_elf_init_reloc_shdr(bfd * abfd ATTRIBUTE_UNUSED,
 	rel_hdr->sh_name = (unsigned int)strtab_add(elf_shstrtab(stdoutput),name,1);
 	if (rel_hdr->sh_name == (unsigned int)-1)
 		return false;
-	//if (!_bfd_elf_set_reloc_sh_name(abfd,rel_hdr,sec_name,use_rela_p))
-		rel_hdr->sh_type = use_rela_p ? SHT_RELA : SHT_REL;
+	rel_hdr->sh_type = use_rela_p ? SHT_RELA : SHT_REL;
 	rel_hdr->sh_entsize = sizeof(Elf64_External_Rela);
 	rel_hdr->sh_addralign = 8;
 	rel_hdr->sh_flags = 0;
@@ -31689,7 +30160,6 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 {
 	bfd            *abfd = stdoutput;
 	struct fake_section_arg *arg = (struct fake_section_arg *)fsarg;
-	//const struct elf_backend_data *bed = get_elf_backend_data(abfd);
 	struct bfd_elf_section_data *esd = elf_section_data(asect);
 	Elf_Internal_Shdr *this_hdr;
 	unsigned int	sh_type;
@@ -31698,10 +30168,7 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 	bfd_vma		Mask;
 
 	if (arg->failed) {
-		/*
-		 * We already failed; just get out of the map_over_sections
-		 * loop.
-		 */
+		/* We already failed; just get out of the map_over_sections loop. */
 		return;
 	}
 	this_hdr = &esd->this_hdr;
@@ -31731,7 +30198,6 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 	}
 
 	/* Don't clear sh_flags. Assembler may set additional bits.  */
-
 	if ((asect->flags & SEC_ALLOC) != 0 || asect->user_set_vma)
 		this_hdr->sh_addr = asect->vma;
 	else
@@ -31747,16 +30213,12 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 		arg->failed = true;
 		return;
 	}
-	/*
-	 * Set sh_addralign to the highest power of two given by alignment
-	 * consistent with the section VMA.  Linker scripts can force VMA.
-	 */
+	/* Set sh_addralign to the highest power of two given by alignment
+	 * consistent with the section VMA.  Linker scripts can force VMA.  */
 	Mask = ((bfd_vma) 1 << asect->alignment_power)|this_hdr->sh_addr;
 	this_hdr->sh_addralign = Mask & -Mask;
-	/*
-	 * The sh_entsize and sh_info fields may have been set already by
-	 * copy_private_section_data.
-	 */
+	/* The sh_entsize and sh_info fields may have been set already by
+	 * copy_private_section_data.  */
 	this_hdr->bfd_section = asect;
 	this_hdr->contents = NULL;
 
@@ -31774,14 +30236,11 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 	else
 		if (this_hdr->sh_type == SHT_NOBITS && sh_type == SHT_PROGBITS
 		    && (asect->flags & SEC_ALLOC) != 0) {
-			/*
-			 * Warn if we are changing a NOBITS section to
-			 * PROGBITS,but allow the link to proceed.  This can
-			 * happen when users link non-bss input sections to bss
-			 * output sections,or emit data to a bss output
-			 * section via a linker script.
-			 */
-			error_handler(("warning: section `%pA' type changed to PROGBITS"),asect);
+			/* Warn if we are changing a NOBITS section to PROGBITS,but allow the link 
+			 * to proceed.  This can happen when users link non-bss input sections to 
+			 * bss output sections,or emit data to a bss output
+			 * section via a linker script.  */
+			error_handler("warning: section `%pA' type changed to PROGBITS",asect);
 			this_hdr->sh_type = sh_type;
 		}
 	switch (this_hdr->sh_type) {
@@ -31828,11 +30287,9 @@ static void	elf_fake_sections(asection * asect,void *fsarg)
 
 	case SHT_GNU_verdef:
 		this_hdr->sh_entsize = 0;
-		/*
-		 * objcopy or strip will copy over sh_info,but may not set
+		/* objcopy or strip will copy over sh_info,but may not set
 		 * cverdefs.  The linker will set cverdefs,but sh_info will be
-		 * zero.
-		 */
+		 * zero.  */
 		if (this_hdr->sh_info == 0)
 			this_hdr->sh_info = elf_tdata(abfd)->cverdefs;
 		else
@@ -33498,25 +31955,6 @@ static bool	is_local_label_name(const char *Name)
 {
 	return Name[0] == '.' && Name[1] == 'L';
 }
-static bool	_bfd_elf_set_reloc_sh_name(bfd * abfd,
-				       		Elf_Internal_Shdr * rel_hdr,
-				     		const		char  *sec_name,
-				       		bool		use_rela_p)
-{
-	char           *Name = (char *)bfd_alloc(abfd,
-					   sizeof ".rela" + strlen(sec_name));
-	if (Name == NULL)
-		return false;
-
-	sprintf(Name,"%s%s",use_rela_p ? ".rela" : ".rel",sec_name);
-	rel_hdr->sh_name =
-		(unsigned int)strtab_add(elf_shstrtab(abfd),Name,
-					 false);
-	if (rel_hdr->sh_name == (unsigned int)-1)
-		return false;
-
-	return true;
-}
 /*
  * Align to the maximum file alignment that could be required for any ELF data
  * structure.
@@ -33558,61 +31996,8 @@ static bool	assign_file_positions_for_non_load(bfd * abfd)
 					shdrp->contents = sec->contents;
 				} else
 					if (shdrp->sh_name == -1u) {
-						const char     *Name = sec->name;
-						struct bfd_elf_section_data *d;
-
-						/*
-						 * Compress DWARF debug
-						 * sections.
-						 */
-						if (!bfd_compress_section(abfd,sec,shdrp->contents))
-							return false;
-
-						if (sec->compress_status == COMPRESS_SECTION_DONE
-						    && (abfd->flags & BFD_COMPRESS_GABI) == 0
-						    && Name[1] == 'd') {
-							/*
-							 * If section is
-							 * compressed with
-							 * zlib-gnu,convert
-							 * section name from
-							 * .debug_* to
-							 * .zdebug_*.
-							 */
-							char           *new_name = bfd_debug_name_to_zdebug(abfd,Name);
-							if (new_name == NULL)
-								return false;
-							Name = new_name;
-						}
-						/*
-						 * Add section name to section
-						 * name section.
-						 */
-						shdrp->sh_name
-							= (unsigned int)strtab_add(elf_shstrtab(abfd),
-								 Name,false);
-						d = elf_section_data(sec);
-
-						/*
-						 * Add reloc section name to
-						 * section name section.
-						 */
-						if (d->rel.hdr
-						    && !_bfd_elf_set_reloc_sh_name(abfd,d->rel.hdr,
-								 Name,false))
-							return false;
-						if (d->rela.hdr
-						    && !_bfd_elf_set_reloc_sh_name(abfd,d->rela.hdr,
-								  Name,true))
-							return false;
-
-						/*
-						 * Update section size and
-						 * contents.
-						 */
-						shdrp->sh_size = sec->size;
-						shdrp->contents = sec->contents;
-						sec->contents = NULL;
+						/* Compress DWARF debug sections.  */
+						return false;
 					}
 			off = assign_file_position_for_section(shdrp,off,true);
 		}
@@ -34049,11 +32434,11 @@ static bfd_reloc_status_type riscv_elf_add_sub_reloc(bfd * abfd,
 /* Special handler for relocations which don't have to be relocated. This
  * function just simply return bfd_reloc_ok.  */
 static bfd_reloc_status_type riscv_elf_ignore_reloc(bfd * abfd ATTRIBUTE_UNUSED,
-				      		arelent *	reloc_entry,
+				      		arelent *	reloc_entry ATTRIBUTE_UNUSED,
 			  		asymbol *	symbol ATTRIBUTE_UNUSED,
 			      		void         *data ATTRIBUTE_UNUSED,
-				    		asection *	input_section,
-				       		bfd *		output_bfd,
+				    		asection *	input_section ATTRIBUTE_UNUSED,
+				       		bfd *		output_bfd ATTRIBUTE_UNUSED,
 		     		char        **error_message ATTRIBUTE_UNUSED)
 {
 #if 0
@@ -35390,18 +33775,6 @@ static void	bfd_update_compression_header(bfd * abfd,bfd_byte * contents,
 	}
 }
 
-static int	bfd_get_compression_header_size(bfd * abfd ATTRIBUTE_UNUSED,
-			    		asection *	sec ATTRIBUTE_UNUSED)
-{
-	return 0;
-}
-
-static bool	bfd_compress_section(bfd * abfd ATTRIBUTE_UNUSED,
-			      		sec_ptr	sec	ATTRIBUTE_UNUSED,
-	 		bfd_byte *	uncompressed_bufferi ATTRIBUTE_UNUSED)
-{
-	return false;
-}
 static unsigned int bfd_log2(bfd_vma x)
 {
 	unsigned int	result = 0;

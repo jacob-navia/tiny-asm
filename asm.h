@@ -1746,10 +1746,7 @@ static inline char * bfd_zdebug_name_to_debug (bfd *abfd, const char *name)
 static void bfd_update_compression_header (bfd *abfd, 
 						bfd_byte *contents, asection *sec);
 
-static int bfd_get_compression_header_size (bfd *abfd, asection *sec);
 static bool elf_write_object_contents (bfd *abfd);
-static bool bfd_compress_section
-   (bfd *abfd, asection *section, bfd_byte *uncompressed_buffer);
 
 /* Extracted from format.c.  */
 static bool bfd_set_format (bfd *abfd, bfd_format format);
@@ -2227,46 +2224,6 @@ struct FLONUM_STRUCT {
 
 typedef struct FLONUM_STRUCT FLONUM_TYPE;
 
-/***********************************************************************\
- *									*
- *	Since we can (& do) meet with exponents like 10^5000, it	*
- *	is silly to make a table of ~ 10,000 entries, one for each	*
- *	power of 10. We keep a table where item [n] is a struct		*
- *	FLONUM_FLOATING_POINT representing 10^(2^n). We then		*
- *	multiply appropriate entries from this table to get any		*
- *	particular power of 10. For the example of 10^5000, a table	*
- *	of just 25 entries suffices: 10^(2^-12)...10^(2^+12).		*
- *									*
- \***********************************************************************/
-
-static const FLONUM_TYPE flonum_positive_powers_of_ten[];
-static const FLONUM_TYPE flonum_negative_powers_of_ten[];
-static const int table_size_of_flonum_powers_of_ten;
-/* Flonum_XXX_powers_of_ten[] table has legal indices from 0 to
-   + this number inclusive.  */
-
-/***********************************************************************\
- *									*
- *	Declare worker functions.					*
- *									*
- \***********************************************************************/
-
-static int atof_generic (char **address_of_string_pointer,
-		  const char *string_of_decimal_marks,
-		  const char *string_of_decimal_exponent_marks,
-		  FLONUM_TYPE * address_of_generic_floating_point_number);
-
-static void flonum_copy (FLONUM_TYPE * in, FLONUM_TYPE * out);
-static void flonum_multip (const FLONUM_TYPE * a, const FLONUM_TYPE * b,
-		    FLONUM_TYPE * product);
-
-/***********************************************************************\
- *									*
- *	Declare error codes.						*
- *									*
- \***********************************************************************/
-#define ERROR_EXPONENT_OVERFLOW (2)
-
 /* These are assembler-wide concepts */
 static bfd GlobalData;
 static bfd *stdoutput = &GlobalData;
@@ -2510,13 +2467,9 @@ static void   print_version_id (void);
 #define MAX_LITTLENUMS 6
 
 static bool assign_section_numbers (bfd *abfd, void *link_info);
-static char * atof_ieee (char *, int, LITTLENUM_TYPE *);
-static char * atof_ieee_detail (char *, int, int, LITTLENUM_TYPE *, FLONUM_TYPE *);
-static const char * ieee_md_atof (int, char *, int *, bool);
 static char * input_scrub_new_file (const char *);
 static char * input_scrub_next_buffer (char **bufp);
 static bool   scan_for_multibyte_characters (const unsigned char *, const unsigned char *, bool);
-static int    gen_to_words (LITTLENUM_TYPE *, int, long);
 static const char * as_where (unsigned int *);
 static const char * as_where_physical (unsigned int *);
 static void   bump_line_counters (void);
@@ -7145,7 +7098,6 @@ static arelent **tc_gen_reloc (asection *, fixS *);
 #endif
 
 static const char FLT_CHARS[];
-static const char EXP_CHARS[];
 
 #if defined OBJ_ELF || defined OBJ_MAYBE_ELF
 /* If .size directive failure should be error or warning.  */

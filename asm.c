@@ -27,7 +27,8 @@ static char    *buffer_limit;	/*->1 + last char in buffer.  */
 
 /* TARGET_BYTES_BIG_ENDIAN is required to be defined to either 0 or 1 in the
  * tc-<CPU>.h file.  See the "Porting GAS" section of the internals manual. */
-static int	target_big_endian = 0;
+// No longer used. Jacob
+//static int	target_big_endian = 0;
 
 /* Variables for handling include file directory table.  */
 /* Length of longest in table.  */
@@ -299,6 +300,7 @@ static void	parse_args(int *pargc,char ***pargv)
 		default:
 			/* md_parse_option should return 1 if it recognizes
 			 * optc,0 if not.  */
+			gas_assert(optarg); // Added NULL check. jacob
 			if (md_parse_option(optc,optarg) != 0)
 				break;
 			/* `-v' isn't included in the general short_opts list,
@@ -317,6 +319,7 @@ static void	parse_args(int *pargc,char ***pargv)
 			exit(EXIT_FAILURE);
 
 		case 1:	/* File name.  */
+			gas_assert(optarg); // Added NULL check. jacob
 			if (!strcmp(optarg,"-"))
 				optarg = (char *)"";
 			new_argv[new_argc++] = optarg;
@@ -340,6 +343,7 @@ static void	parse_args(int *pargc,char ***pargv)
 			break;
 
 		case OPTION_MULTIBYTE_HANDLING:
+			gas_assert(optarg);
 			if (strcmp(optarg,"allow") == 0)
 				multibyte_handling = multibyte_allow;
 			else if (strcmp(optarg,"warn") == 0)
@@ -355,8 +359,7 @@ static void	parse_args(int *pargc,char ***pargv)
 			/* This output is intended to follow the GNU standards document.  */
 			printf("tiny GNU assembler without BFD\nCopyright (C) 2023 Free Software Foundation,Inc.\n");
 			printf("Hacked by jacob in the summer of 2023\n");
-			printf("\
-This program is free software; you may redistribute it under the terms of\n\
+			printf("This program is free software; you may redistribute it under the terms of\n\
 the GNU General Public License version 3 or later.\n\
 This program has absolutely no warranty.\n");
 			printf(("This assembler was configured for a target of `%s' "
@@ -378,6 +381,7 @@ This program has absolutely no warranty.\n");
 			break;
 
 		case OPTION_DEBUG_PREFIX_MAP:
+			gas_assert(optarg); // Added NULL check. jacob
 			add_debug_prefix_map(optarg);
 			break;
 		case OPTION_DEFSYM:
@@ -445,11 +449,10 @@ This program has absolutely no warranty.\n");
 			break;
 
 		case OPTION_GDWARF_CIE_VERSION:
+			gas_assert(optarg);
 			flag_dwarf_cie_version = atoi(optarg);
-			/*
-			 * The available CIE versions are 1 (DWARF 2),3 (DWARF
-			 * 3),and 4 (DWARF 4 and 5).
-			 */
+			/* The available CIE versions are 1 (DWARF 2),3 (DWARF
+			 * 3),and 4 (DWARF 4 and 5).  */
 			if (flag_dwarf_cie_version < 1
 			    || flag_dwarf_cie_version == 2
 			    || flag_dwarf_cie_version > 4)
@@ -487,6 +490,7 @@ This program has absolutely no warranty.\n");
 			flag_execstack = 0;
 			break;
 		case OPTION_SIZE_CHECK:
+			gas_assert(optarg);
 			if (strcasecmp(optarg,"error") == 0)
 				flag_allow_nonconst_size = false;
 			else
@@ -496,6 +500,7 @@ This program has absolutely no warranty.\n");
 					as_fatal(("Invalid --size-check= option: `%s'"),optarg);
 			break;
 		case OPTION_ELF_STT_COMMON:
+			gas_assert(optarg);
 			if (strcasecmp(optarg,"no") == 0)
 				flag_use_elf_stt_common = 0;
 			else
@@ -507,6 +512,7 @@ This program has absolutely no warranty.\n");
 			break;
 		case OPTION_SECTNAME_SUBST: flag_sectname_subst = 1; break;
 		case OPTION_ELF_BUILD_NOTES:
+			gas_assert(optarg);
 			if (strcasecmp(optarg,"no") == 0)
 				flag_generate_build_notes = false;
 			else
@@ -529,7 +535,7 @@ This program has absolutely no warranty.\n");
 			break;
 
 		case 'f': flag_no_comments = 1; break;
-		case 'o': out_file_name = notes_strdup(optarg); break;
+		case 'o': gas_assert(optarg); out_file_name = notes_strdup(optarg); break;
 		case 'w': break;
 		case 'X': /* -X means treat warnings as errors.  */ break;
 			break;
@@ -641,7 +647,6 @@ static void	gas_early_init(int *argcp ATTRIBUTE_UNUSED,char ***argvp)
 	out_file_name = "a.out";
 
 	obstack_begin(&notes,CHUNKSIZE);
-	xatexit(free_notes);
 
 	myname = **argvp;
 	xmalloc_set_program_name(myname);
@@ -664,24 +669,18 @@ static void	gas_init(void)
 	logical_input_file = NULL;
 
 	buffer_length = BUFFER_SIZE * 2;
-	buffer_start = XNEWVEC(char,BEFORE_SIZE + AFTER_SIZE + 1 + buffer_length);
+	buffer_start = XCNEWVEC(char,BEFORE_SIZE + AFTER_SIZE + 1 + buffer_length);
 	memcpy(buffer_start,BEFORE_STRING,(int)BEFORE_SIZE);
 
 	expr_begin();
 	eh_begin();
 
-	//macro_init();
-
 	dwarf2_init();
-
-	local_symbol_make(".gasversion.",absolute_section,
-			  &predefined_address_frag,BFD_VERSION / 10000UL);
 
 	/* Note: Put new initialisation calls that don't depend on stdoutput
 	 * being open above this point.  stdoutput must be open for anything
 	 * that might use stdoutput objalloc memory,eg. calling bfd_alloc or
 	 * creating global symbols (via bfd_make_empty_symbo).  */
-	xatexit(output_file_close);
 	output_file_create(out_file_name);
 	gas_assert(stdoutput != 0);
 
@@ -806,14 +805,9 @@ int	main(int argc,char **argv)
 	free(buffer_start);
 	buffer_start = 0;
 
-	/* Use xexit instead of return,because under VMS environments they may
-	 * not place the same interpretation on the value given.
-	 */
-	if (had_errors() != 0)
-		xexit(EXIT_FAILURE);
-
-	/* Only generate dependency file if assembler was successful.  */
-	xexit(EXIT_SUCCESS);
+	output_file_close();
+	free_notes();
+	exit(EXIT_SUCCESS);
 }
 /* ==================================================** compress-debug.c */
 /* compress-debug.c - compress debug sections */
@@ -827,10 +821,8 @@ static void    *compress_init(bool use_zstd ATTRIBUTE_UNUSED)
 	return &strm;
 }
 
-/*
- * Stream the contents of a frag to the compression engine.  Output from the
- * engine goes into the current frag on the obstack.
- */
+/* Stream the contents of a frag to the compression engine.  Output from the
+ * engine goes into the current frag on the obstack.  */
 static int	compress_data(bool use_zstd ATTRIBUTE_UNUSED,
                     void *ctx,const char **next_in,int *avail_in,
 			 		char        **next_out,int *avail_out)
@@ -900,9 +892,6 @@ static void	cfi_add_CFA_undefined(unsigned);
 static void	cfi_add_CFA_same_value(unsigned);
 static void	cfi_add_CFA_remember_state(void);
 static void	cfi_add_CFA_restore_state(void);
-struct symbol;
-
-
 static htab_t	dwcfi_hash;
 static htab_t	sy_hash;
 
@@ -1172,7 +1161,6 @@ static inline unsigned long bfd_hash_hash(const char *string,unsigned int *lenp)
 
 	gas_assert(string != NULL);
 	hash = 0;
-	len = 0;
 	s = (const unsigned char *)string;
 	while ((c = *s++) != '\0') {
 		hash += c + (c << 17);
@@ -1472,7 +1460,7 @@ static void	cfi_add_CFA_remember_state(void)
 
 	cfi_add_CFA_insn(DW_CFA_remember_state);
 
-	p = XNEW(struct cfa_save_data);
+	p = XCNEW(struct cfa_save_data);
 	p->cfa_offset = frchain_now->frch_cfi_data->cur_cfa_offset;
 	p->next = frchain_now->frch_cfi_data->cfa_save_stack;
 	frchain_now->frch_cfi_data->cfa_save_stack = p;
@@ -1737,7 +1725,7 @@ static void	dot_cfi_escape(int ignored ATTRIBUTE_UNUSED)
 
 	tail = &head;
 	do {
-		e = XNEW(struct cfi_escape_data);
+		e = XCNEW(struct cfi_escape_data);
 		do_parse_cons_expression(&e->exp,1);
 		*tail = e;
 		tail = &e->next;
@@ -2425,7 +2413,7 @@ static void	output_fde(struct fde_entry *fde,struct cie_entry *cie,
 		exp.X_add_number = 0;
 		emit_expr(&exp,offset_size);	/* CIE offset.  */
 	} else {
-		TC_DWARF2_EMIT_OFFSET(cie->start_address,offset_size);
+		generic_dwarf2_emit_offset(cie->start_address,offset_size);
 	}
 
 	exp.X_op = O_symbol;
@@ -2565,7 +2553,7 @@ static struct cie_entry *select_cie_for_fde(struct fde_entry *fde,bool eh_frame,
 		}
 	}
 
-	cie = XNEW(struct cie_entry);
+	cie = XCNEW(struct cie_entry);
 	cie->next = cie_root;
 	cie_root = cie;
 	SET_CUR_SEG(cie,CUR_SEG(fde));
@@ -2694,8 +2682,6 @@ static void	cfi_finish(void)
 			    alignment);
 
 		ccseg = NULL;
-		seek_next_seg = 0;
-
 		for (cie = cie_root; cie; cie = cie_next) {
 			cie_next = cie->next;
 			free((void *)cie);
@@ -2915,10 +2901,8 @@ static struct line_subseg *get_line_subseg(segT seg,subsegT subseg,bool create_p
 		if (!create_p)
 			return NULL;
 
-		s = XNEW(struct line_seg);
-		s->next = NULL;
+		s = XCNEW(struct line_seg);
 		s->seg = seg;
-		s->head = NULL;
 		*last_seg_ptr = s;
 		last_seg_ptr = &s->next;
 		seg_info(seg)->dwarf2_line_seg = s;
@@ -2932,10 +2916,9 @@ static struct line_subseg *get_line_subseg(segT seg,subsegT subseg,bool create_p
 			break;
 	}
 
-	lss = XNEW(struct line_subseg);
+	lss = XCNEW(struct line_subseg);
 	lss->next = *pss;
 	lss->subseg = subseg;
-	lss->head = NULL;
 	lss->ptail = &lss->head;
 	lss->pmove_tail = &lss->head;
 	*pss = lss;
@@ -3131,8 +3114,7 @@ static void	dwarf2_gen_line_info_1(symbolS * label,struct dwarf2_line_info *loc)
 				segment_name(now_seg));
 		return;
 	}
-	e = XNEW(struct line_entry);
-	e->next = NULL;
+	e = XCNEW(struct line_entry);
 	e->label = label;
 	e->loc = *loc;
 
@@ -3492,25 +3474,7 @@ fail:
 		return false;
 
 	if (with_md5) {
-		if (target_big_endian) {
-			/* md5's are stored in litte endian format.  */
-			unsigned int	bits_remaining = NUM_MD5_BYTES * BITS_PER_CHAR;
-			unsigned int	byte = NUM_MD5_BYTES;
-			unsigned int	bignum_index = 0;
-
-			while (bits_remaining) {
-				unsigned int	bignum_bits_remaining = LITTLENUM_NUMBER_OF_BITS;
-				valueT		bignum_value = generic_bignum[bignum_index];
-				bignum_index++;
-
-				while (bignum_bits_remaining) {
-					files[i].md5[--byte] = bignum_value & 0xff;
-					bignum_value >>= 8;
-					bignum_bits_remaining -= 8;
-					bits_remaining -= 8;
-				}
-			}
-		} else {
+		{
 			unsigned int	bits_remaining = NUM_MD5_BYTES * BITS_PER_CHAR;
 			unsigned int	byte = 0;
 			unsigned int	bignum_index = 0;
@@ -3983,7 +3947,6 @@ static int	size_inc_line_addr(int line_delta,addressT addr_delta)
 	 * encode it with DW_LNS_advance_line.  */
 	if (tmp >= DWARF2_LINE_RANGE) {
 		len = 1 + sizeof_leb128(line_delta,1);
-		line_delta = 0;
 		tmp = 0 - DWARF2_LINE_BASE;
 	}
 	/* Bias the opcode by the special opcode base.  */
@@ -4450,7 +4413,7 @@ static void	out_dir_and_file_list(segT line_seg,int sizeof_offset)
 		line_strp = add_line_strp(line_str_seg,dir);
 		free(dir);
 		subseg_set(line_seg,0);
-		TC_DWARF2_EMIT_OFFSET(line_strp,sizeof_offset);
+		generic_dwarf2_emit_offset(line_strp,sizeof_offset);
 	}
 	for (i = 1; i < dirs_in_use; ++i) {
 		dir = remap_debug_filename(dirs[i]);
@@ -4461,7 +4424,7 @@ static void	out_dir_and_file_list(segT line_seg,int sizeof_offset)
 		} else {
 			line_strp = add_line_strp(line_str_seg,dir);
 			subseg_set(line_seg,0);
-			TC_DWARF2_EMIT_OFFSET(line_strp,sizeof_offset);
+			generic_dwarf2_emit_offset(line_strp,sizeof_offset);
 		}
 		free(dir);
 	}
@@ -4552,7 +4515,7 @@ static void	out_dir_and_file_list(segT line_seg,int sizeof_offset)
 			else
 				line_strp = file0_strp;
 			subseg_set(line_seg,0);
-			TC_DWARF2_EMIT_OFFSET(line_strp,sizeof_offset);
+			generic_dwarf2_emit_offset(line_strp,sizeof_offset);
 			if (i == 0 && files_in_use > 1
 			    && files[0].filename == files[1].filename)
 				file0_strp = line_strp;
@@ -4853,7 +4816,7 @@ static void	out_debug_aranges(segT aranges_seg,segT info_seg)
 	size += 2;
 
 	/* Offset to .debug_info.  */
-	TC_DWARF2_EMIT_OFFSET(section_symbol(info_seg),sizeof_offset);
+	generic_dwarf2_emit_offset(section_symbol(info_seg),sizeof_offset);
 	size += sizeof_offset;
 
 	/* Size of an address (offset portion).  */
@@ -5023,7 +4986,7 @@ static void	out_debug_info(segT info_seg,segT abbrev_seg,segT line_seg,segT str_
 
 	if (DWARF2_VERSION < 5) {
 		/* .debug_abbrev offset */
-		TC_DWARF2_EMIT_OFFSET(section_symbol(abbrev_seg),sizeof_offset);
+		generic_dwarf2_emit_offset(section_symbol(abbrev_seg),sizeof_offset);
 	} else {
 		/* unit (header) type */
 		out_byte(DW_UT_compile);
@@ -5034,13 +4997,13 @@ static void	out_debug_info(segT info_seg,segT abbrev_seg,segT line_seg,segT str_
 
 	if (DWARF2_VERSION >= 5) {
 		/* .debug_abbrev offset */
-		TC_DWARF2_EMIT_OFFSET(section_symbol(abbrev_seg),sizeof_offset);
+		generic_dwarf2_emit_offset(section_symbol(abbrev_seg),sizeof_offset);
 	}
 	/* DW_TAG_compile_unit DIE abbrev */
 	out_uleb128(GAS_ABBREV_COMP_UNIT);
 
 	/* DW_AT_stmt_list */
-	TC_DWARF2_EMIT_OFFSET(section_symbol(line_seg),
+	generic_dwarf2_emit_offset(section_symbol(line_seg),
 			      (DWARF2_FORMAT(line_seg) == dwarf2_format_32bit
 			       ? 4 : 8));
 
@@ -5068,14 +5031,14 @@ static void	out_debug_info(segT info_seg,segT abbrev_seg,segT line_seg,segT str_
 	} else {
 		/* This attribute is emitted if the code is disjoint.  */
 		/* DW_AT_ranges.  */
-		TC_DWARF2_EMIT_OFFSET(ranges_sym,sizeof_offset);
+		generic_dwarf2_emit_offset(ranges_sym,sizeof_offset);
 	}
 
 	/* DW_AT_name,DW_AT_comp_dir and DW_AT_producer.  Symbols in
 	 * .debug_str setup in out_debug_str below.  */
-	TC_DWARF2_EMIT_OFFSET(name_sym,sizeof_offset);
-	TC_DWARF2_EMIT_OFFSET(comp_dir_sym,sizeof_offset);
-	TC_DWARF2_EMIT_OFFSET(producer_sym,sizeof_offset);
+	generic_dwarf2_emit_offset(name_sym,sizeof_offset);
+	generic_dwarf2_emit_offset(comp_dir_sym,sizeof_offset);
+	generic_dwarf2_emit_offset(producer_sym,sizeof_offset);
 
 	/* DW_AT_language.  Yes,this is probably not really MIPS,but the
 	 * dwarf2 draft has no standard code for assembler.  */
@@ -5128,7 +5091,7 @@ static void	out_debug_info(segT info_seg,segT abbrev_seg,segT line_seg,segT str_
 			out_uleb128(GAS_ABBREV_SUBPROG);
 
 			/* DW_AT_name */
-			TC_DWARF2_EMIT_OFFSET(name_sym,sizeof_offset);
+			generic_dwarf2_emit_offset(name_sym,sizeof_offset);
 
 			/* DW_AT_external.  */
 			if (func_form == DW_FORM_flag)
@@ -5325,6 +5288,7 @@ static void	dwarf2_finish(void)
 
 	/* For each subsection,chain the debug entries together.  */
 	for (s = all_segs; s; s = s->next) {
+		gas_assert(s->head);
 		struct line_subseg *lss = s->head;
 		struct line_entry **ptail = lss->ptail;
 
@@ -8740,7 +8704,7 @@ static void	as_bad_where(const char *file,unsigned int line,const char *format,.
 
 /* Send to stderr a string as a fatal message,and print location of error in
  * input file(s). Please only use this for when we DON'T have some recovery
- * action. It xexit()s with a warning status. */
+ * action. It exit()s with a warning status. */
 static void	as_fatal(const char *format,...)
 {
 	va_list		args;
@@ -8755,7 +8719,7 @@ static void	as_fatal(const char *format,...)
 	 * thinking that a file was created and hence does not need rebuilding.  */
 	if (out_file_name != NULL)
 		unlink(out_file_name);
-	xexit(EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /* Indicate internal constency error. Arguments: Filename,line number,
@@ -8773,7 +8737,7 @@ static void	as_abort(const char *file,int line,const char *fn)
 		else
 			fprintf(stderr,"Internal error at %s:%d.\n",file,line);
 	fprintf(stderr,"Please report this bug.\n");
-	xexit(EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /* Handler for fatal signals,such as SIGSEGV. */
@@ -9059,12 +9023,6 @@ static void	output_file_close(void)
 
 	if (obfd == NULL)
 		return;
-
-	/*
-	 * Prevent an infinite loop - if the close failed we will call as_fatal
-	 * which will call xexit() which may call this function again...
-	 */
-	//stdoutput = NULL;
 
 	/*
 	 * We can't free obstacks attached to the output bfd sections before
@@ -9651,7 +9609,7 @@ static void	read_a_source_file(const char *name)
 			 * test is independent of all other tests at the (top)
 			 * level.  */
 			do
-				nul_char = next_char = *input_line_pointer++;
+				next_char = *input_line_pointer++;
 			while (next_char == '\t' || next_char == ' ' || next_char == '\f');
 
 			/* C is the 1st significant character.
@@ -9705,7 +9663,7 @@ static void	read_a_source_file(const char *name)
 
 									(void)restore_line_pointer(nul_char);
 									s_ignore(0);
-									nul_char = next_char = *--input_line_pointer;
+									nul_char = *--input_line_pointer;
 									*input_line_pointer = '\0';
 									*end = '\0';
 									as_bad("unknown pseudo-op: `%s'",s);
@@ -9726,11 +9684,10 @@ static void	read_a_source_file(const char *name)
 
 							} else {
 								/* WARNING: next_char may be end-of-line. */
-								/* Also: input_line_pointer->`\0` where
-								 * nul_char was.  */
+								/* Also: input_line_pointer->`\0` where nul_char was.  */
 								(void)restore_line_pointer(nul_char);
 								input_line_pointer = _find_end_of_line(input_line_pointer);
-								next_char = nul_char = *input_line_pointer;
+								nul_char = *input_line_pointer;
 								*input_line_pointer = '\0';
 
 								generate_lineno_debug();
@@ -10908,6 +10865,38 @@ static int	float_length(int float_type,int *pad_p)
 	if (pad_p) *pad_p = pad;
 	return length;
 }
+typedef struct {
+	unsigned mantissa:23;
+	unsigned exponent:8;
+	unsigned sign:1;
+} _Float;
+
+#define PACK(sign, exp, frac) (((sign) << 15) | ((exp) << 10) | (frac))
+
+static uint16_t float2half(float x) {
+  _Float *pf = (_Float *)&x;
+  uint16_t retval;
+
+  if (x == 0) return 0;
+  uint8_t   sign  = pf->sign;
+  int16_t   exp = pf->exponent;
+  uint32_t  frac  = pf->mantissa;
+
+//  printf("%d %d %lx\n", sign, exp, frac);
+
+  if (exp == 0x7f80) // + infinity
+	return (sign)? 0xfc00 : 0x7c00 ;
+  exp = exp-127;
+  if (exp < -14) { // Minimum exponent
+    return 0x7c00; // positive infinity
+  } else if (exp > 15) { // Maximum exponent
+    return 0xfc00; // negative infinity
+  } else if (frac > 0x3fff) {
+	frac=(frac>> 13)&2047;
+   }
+    retval = PACK(sign, exp+15, frac);
+  return retval;
+}
 
 static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_FLOAT])
 {
@@ -10925,14 +10914,14 @@ static int	parse_one_float(int float_type,char temp[MAXIMUM_NUMBER_OF_CHARS_FOR_
 		}
 	} else {
 		long double ld;
-		double d; float f; _Float16 f16;
+		double d; float f; uint16_t f16;
 	
 		errno=0;
 		ld = strtold(input_line_pointer,&input_line_pointer);
 		if (errno) goto err;
 		switch (float_type) {
 			case 'H': case 'h':
-				f16 = ld;
+				f16 = float2half((float)ld);
 				length = 2;
 				memcpy(temp,&f16,2);
 				break;
@@ -11334,7 +11323,7 @@ static void	s_reloc(int ignore ATTRIBUTE_UNUSED)
 		{"64",BFD_RELOC_64}
 	};
 
-	reloc = XNEW(struct reloc_list);
+	reloc = XCNEW(struct reloc_list);
 
 	expression(&exp);
 	switch (exp.X_op) {
@@ -11595,21 +11584,7 @@ static void	emit_expr_with_reloc(expressionS * exp,
 			}
 			know(nbytes % CHARS_PER_LITTLENUM == 0);
 
-			if (target_big_endian) {
-				while (nbytes > size) {
-					md_number_to_chars(p,extra_digit,CHARS_PER_LITTLENUM);
-					nbytes -= CHARS_PER_LITTLENUM;
-					p += CHARS_PER_LITTLENUM;
-				}
-
-				nums = generic_bignum + size / CHARS_PER_LITTLENUM;
-				while (size >= CHARS_PER_LITTLENUM) {
-					--nums;
-					md_number_to_chars(p,(valueT) * nums,CHARS_PER_LITTLENUM);
-					size -= CHARS_PER_LITTLENUM;
-					p += CHARS_PER_LITTLENUM;
-				}
-			} else {
+			{
 				nums = generic_bignum;
 				while (size >= CHARS_PER_LITTLENUM) {
 					md_number_to_chars(p,(valueT) * nums,CHARS_PER_LITTLENUM);
@@ -11648,9 +11623,7 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 		if (size > nbytes) {
 			as_bad("%s relocations do not fit in %u byte(s)",reloc_howto->name,nbytes);
 			return;
-		} else
-			if (target_big_endian)
-				offset = nbytes - size;
+		}
 	} else
 		switch (size) {
 		case 1:
@@ -11711,18 +11684,12 @@ static int	hex_float(int float_type,char *bytes)
 			d += hex_value(*input_line_pointer);
 			++input_line_pointer;
 		}
-		if (target_big_endian)
-			bytes[i] = d;
-		else
-			bytes[length - i - 1] = d;
+		bytes[length - i - 1] = d;
 		++i;
 	}
 
 	if (i < length) {
-		if (target_big_endian)
-			memset(bytes + i,0,length - i);
-		else
-			memset(bytes,0,length - i);
+		memset(bytes,0,length - i);
 	}
 	memset(bytes + length,0,pad);
 
@@ -12109,9 +12076,6 @@ static void	stringer_append_char(int c,int bitsize)
 		as_bad(("attempt to store non-empty string in section `%s'"),
 		       segment_name(now_seg));
 
-	if (!target_big_endian)
-		FRAG_APPEND_1_CHAR(c);
-
 	switch (bitsize) {
 	case 64:
 		FRAG_APPEND_1_CHAR(0);
@@ -12133,8 +12097,6 @@ static void	stringer_append_char(int c,int bitsize)
 		abort();
 		break;
 	}
-	if (target_big_endian)
-		FRAG_APPEND_1_CHAR(c);
 }
 
 /* Worker to do .ascii etc statements. Reads 0 or more ',' separated,
@@ -12478,7 +12440,7 @@ static void	s_incbin(int x ATTRIBUTE_UNUSED)
 	}
 	demand_empty_rest_of_line();
 
-	path = XNEWVEC(char,len + include_dir_maxlen + 2);
+	path = XCNEWVEC(char,len + include_dir_maxlen + 2);
 	binfile = search_and_open(filename,path);
 
 	if (binfile == NULL)
@@ -12739,7 +12701,7 @@ static void	add_debug_prefix_map(const char *arg)
 		as_fatal(("invalid argument '%s' to -fdebug-prefix-map"),arg);
 		return;
 	}
-	map = XNEW(debug_prefix_map);
+	map = XCNEW(debug_prefix_map);
 	o = strdup(arg);
 	map->old_prefix = o;
 	map->old_len = p - arg;
@@ -13130,10 +13092,8 @@ static void	stabs_generate_asm_file(void)
 	generate_asm_file(N_SO,file);
 }
 
-/*
- * Generate stabs debugging information to denote the source file. TYPE is one
- * of N_SO,N_SOL.
- */
+/* Generate stabs debugging information to denote the source file. TYPE is one
+ * of N_SO,N_SOL.  */
 static void	generate_asm_file(int type,const char *file)
 {
 	char		sym       [30];
@@ -13160,7 +13120,7 @@ static void	generate_asm_file(int type,const char *file)
 	 * doubled up backslashes),the symbol name,and the other characters
 	 * that make up a stabs file directive.
 	 */
-	bufp = buf = XNEWVEC(char,2 * strlen(file) + strlen(sym) + 12);
+	bufp = buf = XCNEWVEC(char,2 * strlen(file) + strlen(sym) + 12);
 
 	*bufp++ = '"';
 
@@ -13243,11 +13203,11 @@ static void	stabs_generate_asm_lineno(void)
 	++line_label_count;
 
 	if (current_function_label) {
-		buf = XNEWVEC(char,100 + strlen(current_function_label));
+		buf = XCNEWVEC(char,100 + strlen(current_function_label));
 		sprintf(buf,"%d,0,%d,%s-%s\n",N_SLINE,lineno,
 			sym,current_function_label);
 	} else {
-		buf = XNEWVEC(char,100);
+		buf = XCNEWVEC(char,100);
 		sprintf(buf,"%d,0,%d,%s\n",N_SLINE,lineno,sym);
 	}
 
@@ -13367,15 +13327,13 @@ static void	alloc_seginfo(segT seg)
 	seginfo->bfd_section = seg;
 	seg->userdata = seginfo;
 }
-/*
- * subseg_change()
+/* subseg_change()
  * 
  * Change the subsegment we are in,BUT DO NOT MAKE A NEW FRAG for the subsegment.
  * If we are already in the correct subsegment,change nothing. This is used eg
  * as a worker for subseg_set [which does make a new frag_now] and for changing
  * segments after we have read the source. We construct eg fixSs even after the
- * source file is read,so we do have to keep the segment context correct.
- */
+ * source file is read,so we do have to keep the segment context correct.  */
 static void	subseg_change(segT seg,int subseg)
 {
 	now_seg = seg;
@@ -13444,8 +13402,7 @@ static void	subseg_set_rest(segT seg,subsegT subseg)
 	gas_assert(frchain_now->frch_last == frag_now);
 }
 
-/*
- * subseg_set(segT,subsegT)
+/* subseg_set(segT,subsegT)
  * 
  * If you attempt to change to the current subsegment,nothing happens.
  * 
@@ -13454,8 +13411,7 @@ static void	subseg_set_rest(segT seg,subsegT subseg)
  * frag,so the old frag is not closed off.
  * 
  * Out:	now_subseg,now_seg updated. Frchain_now points to the (possibly new)
- * struct frchain for this sub-segment.
- */
+ * struct frchain for this sub-segment.  */
 
 static segT	subseg_get(const char *segname,int force_new)
 {
@@ -13489,10 +13445,8 @@ static segT	subseg_new(const char *segname,subsegT subseg)
 	return secptr;
 }
 
-/*
- * Like subseg_new,except a new section is always created,even if a section
- * with that name already exists.
- */
+/* Like subseg_new,except a new section is always created,even if a section
+ * with that name already exists. */
 static segT	subseg_force_new(const char *segname,subsegT subseg)
 {
 	segT		secptr;
@@ -13508,9 +13462,6 @@ static void	subseg_set(segT secptr,subsegT subseg)
 		subseg_set_rest(secptr,subseg);
 }
 
-#ifndef obj_sec_sym_ok_for_reloc
-#define obj_sec_sym_ok_for_reloc(SEC)	0
-#endif
 static symbolS *section_symbol(segT sec)
 {
 	segment_info_type *seginfo = seg_info(sec);
@@ -13531,10 +13482,8 @@ static symbolS *section_symbol(segT sec)
 	} else {
 		segT		seg;
 		s = symbol_find(sec->symbol->name);
-		/*
-		 * We have to make sure it is the right symbol when we have
-		 * multiple sections with the same section name.
-		 */
+		/* We have to make sure it is the right symbol when we have
+		 * multiple sections with the same section name.  */
 		if (s == NULL
 		    || ((seg = S_GET_SEGMENT(s)) != sec
 			&& seg != undefined_section))
@@ -13564,12 +13513,10 @@ static int	subseg_text_p(segT sec)
 	return (sec->flags & SEC_CODE) != 0;
 }
 
-/*
- * Return non zero if SEC has at least one byte of data.  It is possible that
+/* Return non zero if SEC has at least one byte of data.  It is possible that
  * we'll return zero even on a non-empty section because we don't know all the
  * fragment types,and it is possible that an fr_fix == 0 one still contributes
- * data.  Think of this as seg_definitely_not_empty_p.
- */
+ * data.  Think of this as seg_definitely_not_empty_p.  */
 static int	seg_not_empty_p(segT sec ATTRIBUTE_UNUSED)
 {
 	segment_info_type *seginfo = seg_info(sec);
@@ -13589,11 +13536,8 @@ static int	seg_not_empty_p(segT sec ATTRIBUTE_UNUSED)
 	}
 	return 0;
 }
-
 /* end of subsegs.c */
 /* =======================================================**** symbols.c */
-typedef struct symbol symbolS;
-
 /* Hash function for a symbol_entry.  */
 
 static hashval_t hash_symbol_entry(const void *e)
@@ -13770,6 +13714,7 @@ static void	symbol_init(symbolS * symbolP,const char *name,asection * sec,
 		as_warn(("symbol '%s' contains multibyte characters"),name);
 		symbolP->flags.multibyte_warned = 1;
 	}
+	gas_assert(symbolP->x);
 	S_SET_VALUE(symbolP,valu);
 	if (sec == reg_section)
 		symbolP->x->value.X_op = O_register;
@@ -14043,8 +13988,6 @@ static symbolS *symbol_clone(symbolS * orgsymP,int replace)
 	bsymnew->name = bsymorg->name;
 	bsymnew->flags = bsymorg->flags & ~BSF_SECTION_SYM;
 	bsymnew->section = bsymorg->section;
-	//bfd_copy_private_symbol_data(bfd_asymbol_bfd(bsymorg),bsymorg,
-				       //bfd_asymbol_bfd(bsymnew),bsymnew);
 
 	elf_obj_symbol_clone_hook(newsymP,orgsymP);
 
@@ -14193,7 +14136,7 @@ static symbolS *symbol_find_noref(const char *name,int noref)
 		orig = name;
 		if (copy != NULL)
 			copy2 = copy;
-		name = copy = XNEWVEC(char,strlen(name) + 1);
+		name = copy = XCNEWVEC(char,strlen(name) + 1);
 
 		while ((c = *orig++) != '\0')
 			*copy++ = TOUPPER(c);
@@ -15116,10 +15059,8 @@ static int	S_IS_LOCAL(symbolS * s)
 		return 1;
 
 	if (flag_strip_local_absolute
-	/*
-	 * Keep BSF_FILE symbols in order to allow debuggers to identify the
-	 * source file even when the object file is stripped.
-	 */
+	/* Keep BSF_FILE symbols in order to allow debuggers to identify the
+	 * source file even when the object file is stripped.  */
 	    && (flags & (BSF_GLOBAL|BSF_FILE)) == 0
 	    && bfd_asymbol_section(s->bsym) == absolute_section)
 		return 1;
@@ -15536,6 +15477,7 @@ static symbolS *symbol_symbolS(symbolS * s)
 /* Return the BFD symbol for a symbol.  */
 static asymbol *symbol_get_bfdsym(symbolS * s)
 {
+	gas_assert(s);
 	if (s->flags.local_symbol)
 		s = local_symbol_convert(s);
 	return s->bsym;
@@ -16006,6 +15948,7 @@ static void	size_seg(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 
 	seginfo = seg_info(sec);
 	if (seginfo && seginfo->frchainP) {
+		gas_assert(seginfo->frchainP->frch_root); // Added NULL check jacob
 		for (fragp = seginfo->frchainP->frch_root; fragp; fragp = fragp->fr_next)
 			cvt_frag_to_fill(sec,fragp);
 		for (fragp = seginfo->frchainP->frch_root;
@@ -16136,39 +16079,34 @@ static void	resolve_reloc_expr_symbols(void)
 			symval = symbol_get_value_expression(r->u.a.sym);
 			if (symval->X_op == O_constant)
 				sym = r->u.a.sym;
-			else
-				if (symval->X_op == O_symbol) {
-					sym = symval->X_add_symbol;
-					addend += symval->X_add_number;
-					symval = symbol_get_value_expression(symval->X_add_symbol);
-				}
+			else if (symval->X_op == O_symbol) {
+				sym = symval->X_add_symbol;
+				addend += symval->X_add_number;
+				symval = symbol_get_value_expression(symval->X_add_symbol);
+			}
 			if (symval->X_op != O_constant) {
 				as_bad_where(r->file,r->line,("invalid reloc expression"));
 				sec = NULL;
-			} else
-				if (sym != NULL && sec != NULL) {
-				/* Convert relocs against local symbols to refer to the corresponding
-				 * section symbol plus offset instead. Keep PC-relative relocs of the REL
-				 * variety intact though to prevent the offset from overflowing the
-				 * relocated field,unless it has enough bits to cover the whole
-				 * address space.  */
-					if (S_IS_LOCAL(sym)
-					    && S_IS_DEFINED(sym)
-					    && !symbol_section_p(sym)
-					    && (sec->use_rela_p
-						|| (howto->partial_inplace
-						    && (!howto->pc_relative
+			} else if (sym != NULL && sec != NULL) {
+			/* Convert relocs against local symbols to refer to the corresponding
+			 * section symbol plus offset instead. Keep PC-relative relocs of the REL
+			 * variety intact though to prevent the offset from overflowing the
+			 * relocated field,unless it has enough bits to cover the whole
+			 * address space.  */
+				if (S_IS_LOCAL(sym) && S_IS_DEFINED(sym) && !symbol_section_p(sym)
+				 	&& (sec->use_rela_p || (howto->partial_inplace
+				    && (!howto->pc_relative
 					 || howto->src_mask == addr_mask)))) {
-						asection       *symsec = S_GET_SEGMENT(sym);
-						if (!(((symsec->flags & SEC_MERGE) != 0
-						       && addend != 0)
-						      || (symsec->flags & SEC_THREAD_LOCAL) != 0)) {
-							addend += S_GET_VALUE(sym);
-							sym = section_symbol(symsec);
-						}
+					asection       *symsec = S_GET_SEGMENT(sym);
+					if (!(((symsec->flags & SEC_MERGE) != 0
+					       && addend != 0)
+					      || (symsec->flags & SEC_THREAD_LOCAL) != 0)) {
+						addend += S_GET_VALUE(sym);
+						sym = section_symbol(symsec);
 					}
-					symbol_mark_used_in_reloc(sym);
 				}
+				symbol_mark_used_in_reloc(sym);
+			}
 		}
 		if (sym == NULL) {
 			if (abs_section_sym == NULL)
@@ -16591,12 +16529,15 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 	asymbol        *symbol;
 	bfd_byte       *data;
 
+	gas_assert(reloc_entry->sym_ptr_ptr); // Added NULL check. jacob
 	symbol = *(reloc_entry->sym_ptr_ptr);
+	gas_assert(symbol);
+	gas_assert(howto); // Added NULL check
 
 	/* If there is a function supplied to handle this relocation type,call
 	 * it.  It'll return `bfd_reloc_continue' if further processing can be
 	 * done.  */
-	if (howto && howto->special_function) {
+	if (howto->special_function) {
 		bfd_reloc_status_type cont;
 
 		/* Note - we do not call bfd_reloc_offset_in_range here as the
@@ -16611,7 +16552,7 @@ bfd_reloc_status_type bfd_install_relocation(bfd * abfd,
 		if (cont != bfd_reloc_continue)
 			return cont;
 	}
-	if (howto->install_addend)
+	if (howto && howto->install_addend) // Added NULL check. jacob
 		relocation = reloc_entry->addend;
 	else {
 		if (bfd_is_abs_section(symbol->section))
@@ -16884,7 +16825,7 @@ static void	write_relocs(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 		sec->orelocation = relocs;
 		sec->reloc_count = n;
 	}
-	else sec->flags &= ~SEC_RELOC;
+	else { sec->flags &= ~SEC_RELOC; free(relocs);}
 
 #ifdef DEBUG3
 	{
@@ -17520,7 +17461,7 @@ static void	create_note_reloc(segT sec,
 {
 	struct reloc_list *reloc;
 
-	reloc = XNEW(struct reloc_list);
+	reloc = XCNEW(struct reloc_list);
 
 	/* We create a .b type reloc as resolve_reloc_expr_symbols() has
 	 * already been called.  */
@@ -17592,18 +17533,10 @@ static void	maybe_generate_build_notes(void)
 			frag_now_fix();
 			note = frag_more(note_size);
 			memset(note,0,note_size);
-
-			if (target_big_endian) {
-				note[3] = 8;	/* strlen (name) + 1.  */
-				note[7] = desc_size;	/* Two N-byte offsets.  */
-				note[10] = NT_GNU_BUILD_ATTRIBUTE_OPEN >> 8;
-				note[11] = NT_GNU_BUILD_ATTRIBUTE_OPEN & 0xff;
-			} else {
-				note[0] = 8;	/* strlen (name) + 1.  */
-				note[4] = desc_size;	/* Two N-byte offsets.  */
-				note[8] = NT_GNU_BUILD_ATTRIBUTE_OPEN & 0xff;
-				note[9] = NT_GNU_BUILD_ATTRIBUTE_OPEN >> 8;
-			}
+			note[0] = 8;	/* strlen (name) + 1.  */
+			note[4] = desc_size;	/* Two N-byte offsets.  */
+			note[8] = NT_GNU_BUILD_ATTRIBUTE_OPEN & 0xff;
+			note[9] = NT_GNU_BUILD_ATTRIBUTE_OPEN >> 8;
 
 			/* The a1 version number indicates that this note was
 			 * generated by the assembler and not the gcc annobin
@@ -18128,7 +18061,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 							know(S_GET_SEGMENT(symbolP)->vma == 0);
 							target += S_GET_VALUE(symbolP) * OCTETS_PER_BYTE;
 						}
-						know(fragP->fr_next);
+						gas_assert(fragP->fr_next);
 						after = fragP->fr_next->fr_address + stretch;
 						growth = target - after;
 
@@ -18137,8 +18070,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						if ((offsetT) (address + fragP->fr_fix) > target) {
 							growth = 0;
 
-							/*
-							 * Don't error on first few frag relax passes. The symbol might be an
+							/* Don't error on first few frag relax passes. The symbol might be an
 							 * expression involving symbol values from other sections.  If those 
 							 * sections have not yet been processed their frags will all have
 							 * zero addresses,so we will calculate incorrect values for them.  
@@ -18147,11 +18079,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 							 * increasingly contrived dependencies between frags to trigger a
 							 * false error.  */
 							if (pass < 2) {
-								/*
-								 * Force
-								 * another
-								 * pass.
-								 */
+								/* Force another pass.  */
 								ret = 1;
 								break;
 							}
@@ -18178,7 +18106,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						    || S_IS_COMMON(symbolP)
 						  || !S_IS_DEFINED(symbolP)) {
 							as_bad_where(fragP->fr_file,fragP->fr_line,
-								     (".space,.nops or .fill specifies non-absolute value"));
+								     ".space,.nops or .fill specifies non-absolute value");
 							/* Prevent repeat of this error message. */
 							fragP->fr_symbol = 0;
 						} else
@@ -18190,11 +18118,13 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 									break;
 								}
 								as_warn_where(fragP->fr_file,fragP->fr_line,
-									      (".space,.nops or .fill with negative value,ignored"));
+									      ".space,.nops or .fill with negative value,ignored");
 								fragP->fr_symbol = 0;
-							} else
+							} else {
+								gas_assert(fragP->fr_next); // NULL check. jacob
 								growth = (was_address + fragP->fr_fix + amount
 									  - fragP->fr_next->fr_address);
+							}
 					}
 					break;
 
@@ -18922,10 +18852,8 @@ static bool	riscv_update_subset(riscv_parse_subset_t * rps,const char *str)
 		if (len > 0)
 			q++;
 
-		/*
-		 * Check if the end of extension is 'p' or not.  If yes,then
-		 * the second letter from the end cannot be number.
-		 */
+		/* Check if the end of extension is 'p' or not.  If yes,then
+		 * the second letter from the end cannot be number.  */
 		if (len > 1 && *(q - 1) == 'p' && ISDIGIT(*(q - 2))) {
 			*q = '\0';
 			rps->error_handler
@@ -19657,7 +19585,7 @@ static void	riscv_set_arch(const char *s)
 		return;
 	}
 	if (riscv_rps_as.subset_list == NULL) {
-		riscv_rps_as.subset_list = XNEW(riscv_subset_list_t);
+		riscv_rps_as.subset_list = XCNEW(riscv_subset_list_t);
 		riscv_rps_as.subset_list->head = NULL;
 		riscv_rps_as.subset_list->tail = NULL;
 		riscv_rps_as.subset_list->arch_str = NULL;
@@ -22888,8 +22816,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				if (riscv_handle_implicit_zero_offset(imm_expr,asarg))
 					continue;
 		alu_op:
-				/* If this value won't fit into a 16 bit
-				 * offset,then go find a macro that will
+				/* If this value won't fit into a 16 bit offset,then go find a macro that will
 				 * generate the 32 bit offset code pattern. */
 				if (!my_getSmallExpression(imm_expr,imm_reloc,asarg,p)) {
 					normalize_constant_expr(imm_expr);
@@ -23197,7 +23124,7 @@ static const char *riscv_ip_hardcode(char *str,struct riscv_cl_insn *ip,
 	if (*input_line_pointer != '\0')
 		return ("unrecognized values");
 
-	insn = XNEW(struct riscv_opcode);
+	insn = XCNEW(struct riscv_opcode);
 	insn->match = values[num - 1];
 	create_insn(ip,insn);
 	unsigned int	bytes = riscv_insn_length(insn->match);
@@ -23567,8 +23494,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_JMP:
 		if (fixP->fx_addsy) {
-			/* Fill in a tentative value to improve objdump
-			 * readability.  */
+			/* Fill in a tentative value to improve objdump readability. */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl32(bfd_getl32(buf)|ENCODE_JTYPE_IMM(delta),buf);
@@ -23577,8 +23503,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_12_PCREL:
 		if (fixP->fx_addsy) {
-			/* Fill in a tentative value to improve objdump
-			 * readability.  */
+			/* Fill in a tentative value to improve objdump readability. */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl32(bfd_getl32(buf)|ENCODE_BTYPE_IMM(delta),buf);
@@ -23587,8 +23512,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_RVC_BRANCH:
 		if (fixP->fx_addsy) {
-			/* Fill in a tentative value to improve objdump
-			 * readability.  */
+			/* Fill in a tentative value to improve objdump readability. */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl16(bfd_getl16(buf)|ENCODE_CBTYPE_IMM(delta),buf);
@@ -23597,8 +23521,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 	case BFD_RELOC_RISCV_RVC_JUMP:
 		if (fixP->fx_addsy) {
-			/* Fill in a tentative value to improve objdump
-			 * readability.  */
+			/* Fill in a tentative value to improve objdump readability.  */
 			bfd_vma		target = S_GET_VALUE(fixP->fx_addsy) + *valP;
 			bfd_vma		delta = target - md_pcrel_from(fixP);
 			bfd_putl16(bfd_getl16(buf)|ENCODE_CJTYPE_IMM(delta),buf);
@@ -23626,7 +23549,7 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 	if (fixP->fx_subsy != NULL)
 		as_bad_subtract(fixP);
 
-	/* Add an R_RISCV_RELAX reloc if the reloc is relaxable.  */
+	/* Add an R_RISCV_RELAX reloc if the reloc is relaxable. */
 	if (relaxable && fixP->fx_tcbit && fixP->fx_addsy != NULL) {
 		fixP->fx_next = xmemdup(fixP,sizeof(*fixP),sizeof(*fixP));
 		fixP->fx_next->fx_addsy = fixP->fx_next->fx_subsy = NULL;
@@ -23661,15 +23584,11 @@ static void	riscv_pre_output_hook(void)
 					exp.X_add_number = 0;
 					exp.X_op_symbol = symval->X_op_symbol;
 
-					/*
-					 * We must set the segment before
-					 * creating a frag after all frag
-					 * chains have been chained together.
-					 */
+					/* We must set the segment before creating a frag after all frag
+					 * chains have been chained together.  */
 					subseg_set(s,frch->frch_subseg);
 
-					fix_new_exp(frag,(int)frag->fr_offset,1,&exp,0,
-						    BFD_RELOC_RISCV_CFA);
+					fix_new_exp(frag,(int)frag->fr_offset,1,&exp,0,BFD_RELOC_RISCV_CFA);
 				}
 			}
 		}
@@ -23752,7 +23671,7 @@ static void	s_riscv_option(int x ATTRIBUTE_UNUSED)
 	} else if (strcmp(name,"push") == 0) {
 		struct riscv_option_stack *s;
 
-		s = XNEW(struct riscv_option_stack);
+		s = XCNEW(struct riscv_option_stack);
 		s->next = riscv_opts_stack;
 		s->options = riscv_opts;
 		s->subset_list = riscv_rps_as.subset_list;
@@ -23966,9 +23885,7 @@ static int	md_estimate_size_before_relax(fragS * fragp,asection * segtype)
 	return (fragp->fr_var = relaxed_branch_length(fragp,segtype,false));
 }
 
-/*
- * Translate internal representation of relocation info to BFD target format.
- */
+/* Translate internal representation of relocation info to BFD target format. */
 static arelent *tc_gen_reloc(asection * section ATTRIBUTE_UNUSED,fixS * fixp)
 {
 	arelent        *reloc = (arelent *) xmalloc(sizeof(arelent));
@@ -23982,15 +23899,13 @@ static arelent *tc_gen_reloc(asection * section ATTRIBUTE_UNUSED,fixS * fixp)
 	if (reloc->howto == NULL) {
 		if ((fixp->fx_r_type == BFD_RELOC_16 || fixp->fx_r_type == BFD_RELOC_8)
 		    && fixp->fx_addsy != NULL && fixp->fx_subsy != NULL) {
-			/*
-			 * We don't have R_RISCV_8/16,but for this special
-			 * case,we can use R_RISCV_ADD8/16 with
-			 * R_RISCV_SUB8/16.
-			 */
+			/* We don't have R_RISCV_8/16,but for this special
+			 * case,we can use R_RISCV_ADD8/16 with R_RISCV_SUB8/16.  */
 			return reloc;
 		}
 		as_bad_where(fixp->fx_file,fixp->fx_line,
 			     "cannot represent relocation type %d in object file",fixp->fx_r_type);
+		free(reloc);
 		return NULL;
 	}
 	return reloc;
@@ -24281,19 +24196,15 @@ static void	riscv_write_out_attrs(void)
 }
 
 /* Add the default contents for the .riscv.attributes section.  */
-
 static void	riscv_set_public_attributes(void)
 {
 	if (riscv_opts.arch_attr || explicit_attr)
 		riscv_write_out_attrs();
 }
 
-/*
- * Scan uleb128 subtraction expressions and insert fixups for them. e.g.,
+/* Scan uleb128 subtraction expressions and insert fixups for them. e.g.,
  * .uleb128 .L1 - .L0 Because relaxation may change the value of the
- * subtraction,we must resolve them at link-time.
- */
-
+ * subtraction,we must resolve them at link-time. */
 static void	riscv_insert_uleb128_fixes(asection * sec,void *xxx ATTRIBUTE_UNUSED)
 {
 	segment_info_type *seginfo = seg_info(sec);
@@ -24319,16 +24230,15 @@ static void	riscv_insert_uleb128_fixes(asection * sec,void *xxx ATTRIBUTE_UNUSED
 		exp_dup->X_op = O_symbol;
 		exp_dup->X_op_symbol = NULL;
 
-		/*
-		 * Insert relocations to resolve the subtraction at link-time.
-		 * Emit the SET relocation first in riscv.
-		 */
+		/* Insert relocations to resolve the subtraction at link-time.
+		 * Emit the SET relocation first in riscv.  */
 		exp_dup->X_add_symbol = exp->X_add_symbol;
 		fix_new_exp(fragP,fragP->fr_fix,0,
 			    exp_dup,0,BFD_RELOC_RISCV_SET_ULEB128);
 		exp_dup->X_add_symbol = exp->X_op_symbol;
 		fix_new_exp(fragP,fragP->fr_fix,0,
 			    exp_dup,0,BFD_RELOC_RISCV_SUB_ULEB128);
+		free(exp_dup);
 	}
 }
 
@@ -24435,7 +24345,7 @@ void		riscv_elf_copy_symbol_attributes(symbolS * dest,symbolS * src)
 	 */
 	if (!destelf->size && S_GET_SIZE(dest) == 0) {
 		if (srcelf->size) {
-			destelf->size = XNEW(expressionS);
+			destelf->size = XCNEW(expressionS);
 			*destelf->size = *srcelf->size;
 		}
 		S_SET_SIZE(dest,S_GET_SIZE(src));
@@ -26818,7 +26728,7 @@ static void	obj_elf_change_section(const char *name,
 	/* Switch to the section,creating it if necessary.  */
 	if (push) {
 		struct section_stack *elt;
-		elt = XNEW(struct section_stack);
+		elt = XCNEW(struct section_stack);
 		elt->next = section_stack;
 		elt->seg = now_seg;
 		elt->prev_seg = previous_section;
@@ -27068,7 +26978,6 @@ static bfd_vma	obj_elf_parse_section_letters(char *str,size_t len,
 
 						attr |= numeric_flags;
 
-						{
 						/* Add flags in the SHF_MASKOS range to gnu_attr for OSABIs
 						 * that support those flags. Also adding the flags for
 						 * ELFOSABI_{NONE,STANDALONE} allows them to be validated later
@@ -27078,8 +26987,7 @@ static bfd_vma	obj_elf_parse_section_letters(char *str,size_t len,
 						 * It's therefore possible that numeric flags are being used to set
 						 * bits in the SHF_MASKOS range for those targets,and
 						 * we don't want assembly to fail in those situations.  */
-							*gnu_attr |= (numeric_flags & SHF_MASKOS);
-						}
+						*gnu_attr |= (numeric_flags & SHF_MASKOS);
 
 						/* Update str and len,allowing for the fact that we will
 						 * execute str++ and len-- below.  */
@@ -27795,7 +27703,7 @@ static void	record_attribute(int vendor,unsigned int tag)
 			rai->mask |= mask;
 			return;
 		}
-	rai = XNEW(struct recorded_attribute_info);
+	rai = XCNEW(struct recorded_attribute_info);
 	rai->next = recorded_attributes;
 	rai->vendor = vendor;
 	rai->base = base;
@@ -27819,6 +27727,7 @@ static obj_attribute *elf_new_obj_attr(bfd * abfd,int vendor,unsigned tag)
 		/* Create a new tag.  */
 		list = (obj_attribute_list *)
 			bfd_alloc(abfd,sizeof(obj_attribute_list));
+		if (list == NULL) return NULL;
 		memset(list,0,sizeof(obj_attribute_list));
 		list->tag = tag;
 		/* Keep the tag list in order.  */
@@ -28027,7 +27936,7 @@ static void	elf_obj_symbol_clone_hook(symbolS * newsym,symbolS * orgsym ATTRIBUT
 {
 	struct elf_obj_sy *newelf = symbol_get_obj(newsym);
 	if (newelf->size) {
-		expressionS    *exp = XNEW(expressionS);
+		expressionS    *exp = XCNEW(expressionS);
 		*exp = *newelf->size;
 		newelf->size = exp;
 	}
@@ -28123,7 +28032,7 @@ static void	obj_elf_size(int ignore ATTRIBUTE_UNUSED)
 		xfree(symbol_get_obj(sym)->size);
 		symbol_get_obj(sym)->size = NULL;
 	} else {
-		symbol_get_obj(sym)->size = XNEW(expressionS);
+		symbol_get_obj(sym)->size = XCNEW(expressionS);
 		*symbol_get_obj(sym)->size = exp;
 	}
 	demand_empty_rest_of_line();
@@ -28525,7 +28434,7 @@ static void	build_additional_section_info(asection * sec,void *inf)
 	list->num_group += 1;
 
 	/* Add index to hash.  */
-	idx_ptr = XNEW(unsigned int);
+	idx_ptr = XCNEW(unsigned int);
 	*idx_ptr = i;
 	str_hash_insert(list->indexes,group_name,idx_ptr,0);
 }
@@ -28678,6 +28587,7 @@ static void	elf_frob_file_after_relocs(void)
 		size_t		size;
 
 		head = groups.head[i];
+		gas_assert(head);
 		size = 4;
 		for (s = head; s != NULL; s = elf_next_in_group(s))
 			size += (s->flags & SEC_RELOC) != 0 ? 8 : 4;
@@ -29628,7 +29538,7 @@ static void	xmalloc_failed(size_t size)
 		"\n%s%sout of memory allocating %lu bytes\n",
 		ProgramName,*ProgramName ? ": " : "",
 		(unsigned long)size);
-	xexit(1);
+	exit(1);
 }
 
 static void    *xmalloc(size_t size)
@@ -29714,7 +29624,7 @@ static char    *concat(const char *first,...)
 
 	/* First compute the size of the result and get sufficient memory.  */
 	va_start(args,first);
-	newstr = XNEWVEC(char,vconcat_length(first,args) + 1);
+	newstr = XCNEWVEC(char,vconcat_length(first,args) + 1);
 	va_end(args);
 
 	/* Now copy the individual pieces to the result string. */
@@ -29802,7 +29712,7 @@ static char    *getpwd(void)
 			 * The shortcut didn't work.  Try the slow,``sure''
 			 * way.
 			 */
-			for (s = GUESSPATHLEN; !getcwd(p = XNEWVEC(char,s),s); s *= 2) {
+			for (s = GUESSPATHLEN; !getcwd(p = XCNEWVEC(char,s),s); s *= 2) {
 				int		e = errno;
 				free(p);
 #ifdef ERANGE
@@ -29833,7 +29743,7 @@ char           *getpwd(void)
 	static char    *pwd = 0;
 
 	if (!pwd)
-		pwd = getcwd(XNEWVEC(char,MAXPATHLEN + 1),MAXPATHLEN + 1);
+		pwd = getcwd(XCNEWVEC(char,MAXPATHLEN + 1),MAXPATHLEN + 1);
 	return pwd;
 }
 #endif				/* VMS || _WIN32 && !__CYGWIN__ */
@@ -29914,115 +29824,20 @@ static void    *xmemdup(const void *input,size_t copy_size,size_t alloc_size)
 		memset((char *)output + copy_size,0,alloc_size - copy_size);
 	return (void *)memcpy(output,input,copy_size);
 }
-/*
- * xexit.c -- Run any exit handlers,then exit. Replacement void xexit (int
- * code)
- * 
- * Terminates the program.  If any functions have been registered with the
- * @code{xatexit} replacement function,they will be called first. Termination
- * is handled via the system's normal @code{exit} call.
- * 
- * @end deftypefn
- * 
- */
-
-/*
- * This variable is set by xatexit if it is called.  This way,xmalloc doesn't
- * drag xatexit into the link.
- */
-static void     (*_xexit_cleanup) (void);
-static void	xexit(int code)
-{
-	if (_xexit_cleanup != NULL)
-		(*_xexit_cleanup) ();
-	exit(code);
-}
-/* Libiberty realpath.  Like realpath,but more consistent behavior. */
-/*
- * Replacement {const char*} lrealpath (const char *name)
- * 
- * Given a pointer to a string containing a pathname,returns a canonical version
- * of the filename.  Symlinks will be resolved,and ``.'' and ``..'' components
- * will be simplified.  The returned value will be allocated using
- * @code{malloc},or @code{NULL} will be returned on a memory allocation error.
- * 
- */
 /* On GNU libc systems the declaration is only visible with _GNU_SOURCE.  */
 #if defined(HAVE_CANONICALIZE_FILE_NAME) \
     && defined(NEED_DECLARATION_CANONICALIZE_FILE_NAME)
 extern char    *canonicalize_file_name(const char *);
 #endif
 
-static void	xatexit_cleanup(void);
-
-/* Pointer to function run by xexit.  */
-static void     (*_xexit_cleanup) (void);
-
-#define	XATEXIT_SIZE 32
-struct xatexit {
-	struct xatexit *next;	/* next in list */
-	int		ind;	/* next index in this table */
-	void            (*fns[XATEXIT_SIZE]) (void);	/* the table itself */
-};
-
-/*
- * Allocate one struct statically to guarantee that we can register at least a
- * few handlers.
- */
-static struct xatexit xatexit_first;
-/* Points to head of LIFO stack.  */
-static struct xatexit *xatexit_head = &xatexit_first;
-/*
- * Register function FN to be run by xexit. Return 0 if successful,-1 if not.
- */
-static int	xatexit(void (*fn) (void))
-{
-	register struct xatexit *p;
-
-	/* Tell xexit to call xatexit_cleanup.  */
-	if (!_xexit_cleanup)
-		_xexit_cleanup = xatexit_cleanup;
-
-	p = xatexit_head;
-	if (p->ind >= XATEXIT_SIZE) {
-		if ((p = (struct xatexit *)malloc(sizeof *p)) == NULL)
-			return -1;
-		p->ind = 0;
-		p->next = xatexit_head;
-		xatexit_head = p;
-	}
-	p->fns[p->ind++] = fn;
-	return 0;
-}
-
-/* Call any cleanup functions.  */
-static void	xatexit_cleanup(void)
-{
-	register struct xatexit *p;
-	register int	n;
-
-	for (p = xatexit_head; p; p = p->next)
-		for (n = p->ind; --n >= 0;)
-			(*p->fns[n]) ();
-}
-/*
- * Create and destroy argument vectors.  An argument vector is simply an array
- * of string pointers,terminated by a NULL pointer.
- */
-
-/* Routines imported from standard C runtime libraries. */
-#ifndef EOS
-#define EOS '\0'
-#endif
+/* Create and destroy argument vectors.  An argument vector is simply an array
+ * of string pointers,terminated by a NULL pointer.  */
 
 #define INITIAL_MAXARGC 8	/* Number of args + NULL in initial argv */
 bool		set_section_size(asection * sec,size_t val)
 {
-	/*
-	 * Once you've started writing to any section you cannot create or
-	 * change the size of any others.
-	 */
-
+	/* Once you've started writing to any section you cannot create or
+	 * change the size of any others.  */
 	if (sec->owner == NULL || sec->owner->output_has_begun) {
 		bfd_set_error(bfd_error_invalid_operation);
 		return false;
@@ -30049,10 +29864,8 @@ static void    *bfd_realloc(void *ptr,size_t size)
 		bfd_set_error(bfd_error_no_memory);
 		return NULL;
 	}
-	/*
-	 * The behaviour of realloc(0) is implementation defined,but for this
-	 * function we always allocate memory.
-	 */
+	/* The behaviour of realloc(0) is implementation defined,but for this
+	 * function we always allocate memory.  */
 	ret = realloc(ptr,sz ? sz : 1);
 
 	if (ret == NULL)
@@ -30064,10 +29877,8 @@ void           *bfd_realloc_or_free(void *ptr,size_t size)
 {
 	void           *ret;
 
-	/*
-	 * The behaviour of realloc(0) is implementation defined,but for this
-	 * function we treat it is always freeing the memory.
-	 */
+	/* The behaviour of realloc(0) is implementation defined,but for this
+	 * function we treat it is always freeing the memory.  */
 	if (size == 0) {
 		free(ptr);
 		return NULL;
@@ -30078,10 +29889,8 @@ void           *bfd_realloc_or_free(void *ptr,size_t size)
 
 	return ret;
 }
-/*
- * Get the index of an entity in a hash table,adding it if it is not already
- * present.
- */
+/* Get the index of an entity in a hash table,adding it if it is not already
+ * present.  */
 static size_t	strtab_add(struct elf_strtab_hash *tab,
 			 		const		char  *str,
 			 		bool		copy)
@@ -30120,11 +29929,9 @@ static size_t	strtab_add(struct elf_strtab_hash *tab,
 	}
 	return entry->u.index;
 }
-/*
- * Allocate and initialize a section-header for a new reloc section,containing
+/* Allocate and initialize a section-header for a new reloc section,containing
  * relocations against ASECT.  It is stored in RELDATA.  If USE_RELA_P is TRUE,
- * we use RELA relocations; otherwise,we use REL relocations.
- */
+ * we use RELA relocations; otherwise,we use REL relocations.  */
 static bool	_bfd_elf_init_reloc_shdr(bfd * abfd ATTRIBUTE_UNUSED,
 		       		struct	bfd_elf_section_reloc_data *reldata,
 				   		const		char  *sec_name,
@@ -30141,6 +29948,7 @@ static bool	_bfd_elf_init_reloc_shdr(bfd * abfd ATTRIBUTE_UNUSED,
 	if (delay_st_name_p)
 		rel_hdr->sh_name = (unsigned int)-1;
 	char           *name = zmalloc(sizeof(".rela") + strlen(sec_name));
+	if (name == NULL) return false;
 	sprintf(name,".rela%s",sec_name);
 	rel_hdr->sh_name = (unsigned int)strtab_add(elf_shstrtab(stdoutput),name,1);
 	if (rel_hdr->sh_name == (unsigned int)-1)
@@ -33599,6 +33407,7 @@ struct elf_strtab_hash *_bfd_elf_strtab_init(void)
 	table->array = ((struct elf_strtab_hash_entry **)
 			malloc(table->alloced * amt));
 	if (table->array == NULL) {
+		bfd_hash_table_free(&table->table);
 		free(table);
 		return NULL;
 	}
@@ -33631,7 +33440,7 @@ static struct bfd_hash_entry *
 	 * subclass.  */
 	if (entry == NULL)
 		entry = (struct bfd_hash_entry *)
-		bfd_hash_allocate(table,sizeof(struct elf_strtab_hash_entry));
+			bfd_hash_allocate(table,sizeof(struct elf_strtab_hash_entry));
 	if (entry == NULL)
 		return NULL;
 
@@ -33662,10 +33471,7 @@ static void	_bfd_stab_cleanup(bfd * abfd ATTRIBUTE_UNUSED,void **pinfo)
 static void    *bfd_arch_default_fill(size_t count,bool is_bigendian ATTRIBUTE_UNUSED,
 			   		bool		code	ATTRIBUTE_UNUSED)
 {
-	void           *fill = malloc(count);
-	if (fill != NULL)
-		memset(fill,0,count);
-	return fill;
+	return calloc(count,1);
 }
 static void	bfd_release(bfd * abfd,void *block)
 {
@@ -33694,7 +33500,7 @@ static bool	bfd_hash_table_init(struct bfd_hash_table *table,
 	return bfd_hash_table_init_n(table,newfunc,entsize,4051);
 }
 static void	bfd_putb64(uint64_t data,void *p)
-{
+{	// FILE: libbfd.c:964
 	bfd_byte       *addr = (bfd_byte *) p;
 	addr[0] = (data >> (7 * 8)) & 0xff;
 	addr[1] = (data >> (6 * 8)) & 0xff;
@@ -33706,10 +33512,8 @@ static void	bfd_putb64(uint64_t data,void *p)
 	addr[7] = (data >> (0 * 8)) & 0xff;
 }
 static void	_bfd_elf_strtab_clear_all_refs(struct elf_strtab_hash *tab)
-{
-	size_t		idx;
-
-	for (idx = 1; idx < tab->size; idx++)
+{	// FILE: elf-strtab.c:210
+	for (size_t idx = 1; idx < tab->size; idx++)
 		tab->array[idx]->refcount = 0;
 }
 static void	bfd_rename_section(asection * sec,const char *newname)
@@ -33724,7 +33528,7 @@ static void	bfd_rename_section(asection * sec,const char *newname)
 /* Compressed section support (intended for debug sections). */
 #define MAX_COMPRESSION_HEADER_SIZE 24
 
-/* FUNCTION bfd_update_compression_header compress.c:153
+/* FUNCTION bfd_update_compression_header FILE: bfd/compress.c:153
  * SYNOPSIS void bfd_update_compression_header (bfd *abfd,bfd_byte *contents,
  * asection *sec);
  * 

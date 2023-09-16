@@ -2494,7 +2494,6 @@ static void *xcalloc(size_t,size_t);
 static char *xstrerror(int);
 static void *xrealloc(void *,size_t);
 static char *getpwd(void);
-static void xexit(int status) ATTRIBUTE_NORETURN;
 static void	cfi_finish(void);
 static void	map_over_sections(void (*operation) (asection *,void *),void *user_storage);
 static int	obj_elf_vendor_attribute(int vendor);
@@ -2595,7 +2594,6 @@ static const unsigned char _hex_value[_hex_array_size] = {
 static void *xmalloc(size_t);
 static long get_run_time(void);
 static char *concat(const char *,...);
-static int xatexit(void (*fn)(void));
 static void xmalloc_set_program_name(const char *);
 static const char *lbasename(const char *);
 static const char *unix_lbasename(const char *Name);
@@ -6645,7 +6643,6 @@ static bool input_from_string;
 static char lex_type[];
 static char is_end_of_line[];
 static int is_it_end_of_statement (void);
-static int target_big_endian;
 
 /* These are initialized by the CPU specific target files (tc-*.c).  */
 static const char line_separator_chars[];

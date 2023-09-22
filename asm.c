@@ -8175,6 +8175,8 @@ static int	eq_string_tuple(const void *a,const void *b)
 static void ** htab_insert(htab_t htab,void *element,int replace)
 {
 	void          **slot = htab_find_slot(htab,element,INSERT);
+
+	gas_assert(slot);
 	if (*slot != NULL) {
 		if (replace) {
 			if (htab->del_f)
@@ -11618,7 +11620,7 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 		reloc_howto_type *reloc_howto;
 
 		reloc_howto = riscv_reloc_type_lookup(stdoutput,r);
-		size = bfd_get_reloc_size(reloc_howto);
+		size = reloc_howto->size;
 
 		if (size > nbytes) {
 			as_bad("%s relocations do not fit in %u byte(s)",reloc_howto->name,nbytes);
@@ -16441,7 +16443,7 @@ bfd_check_overflow(enum complain_overflow how,
  * (bfd_vma).  The number of bytes read is given by the HOWTO.  */
 static bfd_vma	read_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_byte * data,reloc_howto_type * howto)
 {
-	switch (bfd_get_reloc_size(howto)) {
+	switch (howto->size) {
 	case 0:
 		break;
 	case 1:
@@ -16463,7 +16465,7 @@ static bfd_vma	read_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_byte * data,reloc_howt
  * is given by the HOWTO.  */
 static void	write_reloc(bfd * abfd ATTRIBUTE_UNUSED,bfd_vma val,bfd_byte * data,reloc_howto_type * howto)
 {
-	switch (bfd_get_reloc_size(howto)) {
+	switch (howto->size) {
 	case 0:
 		break;
 	case 1:
@@ -16507,7 +16509,7 @@ static bool	bfd_reloc_offset_in_range(reloc_howto_type * howto,
 				      		size_t	octet)
 {
 	size_t		octet_end = bfd_get_section_limit_octets(abfd,section);
-	size_t		reloc_size = bfd_get_reloc_size(howto);
+	size_t		reloc_size = howto->size;
 
 	/* The reloc field must be contained entirely within the section. Allow
 	 * zero length fields (marker relocs or NONE relocs where no relocation
@@ -21253,10 +21255,12 @@ static void	append_insn(struct riscv_cl_insn *ip,expressionS * address_expr,
 			return;
 		} else {
 			howto = riscv_reloc_type_lookup(stdoutput,reloc_type);
-			if (howto == NULL)
+			if (howto == NULL) {
 				as_bad("internal: unsupported RISC-V relocation number %d",reloc_type);
+				return;
+			}
 
-			ip->fixp = fix_new_exp(ip->frag,ip->where, bfd_get_reloc_size(howto),
+			ip->fixp = fix_new_exp(ip->frag,ip->where, howto->size,
 					     address_expr,false,reloc_type);
 
 			ip->fixp->fx_tcbit = riscv_opts.relax;
@@ -22100,7 +22104,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 	asargStart = asarg;
 	for (; insn && insn->name && strcmp(insn->name,str) == 0; insn++) {
 		/* Reset error message of the previous round.  */
-		error.msg = ("illegal operands");
+		error.msg = "illegal operands";
 		error.missing_ext = NULL;
 
 		/* Purge deferred symbols from the previous round,if any.  */
@@ -24137,11 +24141,8 @@ static void	s_riscv_insn(int x ATTRIBUTE_UNUSED)
 	demand_empty_rest_of_line();
 }
 
-/*
- * Update architecture and privileged elf attributes.  If we don't set them,
- * then try to output the default ones.
- */
-
+/* Update architecture and privileged elf attributes.  If we don't set them,
+ * then try to output the default ones. */
 static void	riscv_write_out_attrs(void)
 {
 	const char     *arch_str,*priv_str,*p;

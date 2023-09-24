@@ -4537,8 +4537,8 @@ static void bfd_elf_add_obj_attr_int (bfd *, int, unsigned int, unsigned int);
 static void bfd_elf_add_obj_attr_string (bfd *, int, unsigned int, const char *,const char *);
 #define bfd_elf_add_proc_attr_string(BFD, TAG, VALUE) \
   bfd_elf_add_obj_attr_string ((BFD), OBJ_ATTR_PROC, (TAG), (VALUE),NULL)
-static void bfd_elf_add_obj_attr_int_string (bfd *, int, unsigned int,
-					     unsigned int, const char *);
+static void	elf_add_obj_attr_int_string(bfd * abfd,int vendor,unsigned int tag,
+    		unsigned	int	i,const char *s,const char *end);
 #define bfd_elf_add_proc_attr_int_string(BFD, TAG, INTVAL, STRVAL) \
   bfd_elf_add_obj_attr_int_string ((BFD), OBJ_ATTR_PROC, (TAG), \
 				   (INTVAL), (STRVAL))
@@ -6646,8 +6646,6 @@ static int is_it_end_of_statement (void);
 
 /* These are initialized by the CPU specific target files (tc-*.c).  */
 static const char line_separator_chars[];
-/* Table of -I directories.  */
-static size_t include_dir_maxlen;
 
 /* The offset in the absolute section.  */
 static addressT abs_section_offset;

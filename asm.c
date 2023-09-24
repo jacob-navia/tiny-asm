@@ -13,45 +13,27 @@
  * and making it  easier to read.
  * All linker code that was getting pulled in by the vtables is gone. This is an 
  * assembler, not a linker.
- * The code has been reformatted to minimize the vertical length. There are already
- * around 35 000 lines, so the less, the better. Of course readability is more
- * important than minimizing vertical space.
+ * The code has been reformatted to minimize the vertical length. There are 
+ * already around 35 000 lines, so the less, the better. Of course readability 
+ * is more important than minimizing vertical space.
  *
  * jacob navia, Villetaneuse, France, summer 2023 
  * jacob at jacob dot remcomp dot fr
  */
 #include "asm.h"
 /* ======================================================== Global variables */
-static char    *buffer;		/* 1st char of each buffer of lines is here.  */
 static char    *buffer_limit;	/*->1 + last char in buffer.  */
 
-/* TARGET_BYTES_BIG_ENDIAN is required to be defined to either 0 or 1 in the
- * tc-<CPU>.h file.  See the "Porting GAS" section of the internals manual. */
-// No longer used. Jacob
-//static int	target_big_endian = 0;
-
-/* Variables for handling include file directory table.  */
-/* Length of longest in table.  */
-static size_t	include_dir_maxlen;
 /* Record the current function so that we can issue an error message for
  * misplaced .func,.endfunc,and also so that .endfunc needs no arguments.  */
 static char    *current_name;
 static char    *current_label;
 
-static int	dwarf_file;
-static int	dwarf_line;
-
 /* Used to control final evaluation of expressions.  */
 static int	finalize_syms = 0;
-/* This variable is set to be non-zero if the next string we see might be the
- * name of the source file in DWARF debugging information.  See the comment in
- * emit_expr for the format we look for.  */
-static int	dwarf_file_string;
 /* ============================================================**** as.c */
-/*
- * We build a list of defsyms as we read the options,and then define them
- * after we have initialized everything.
- */
+/* We build a list of defsyms as we read the options,and then define them
+ * after we have initialized everything.  */
 struct defsym_list {
 	struct defsym_list *next;
 	char           *name;
@@ -9227,9 +9209,6 @@ static void	read_begin(void)
 	current_name = NULL;
 	current_label = NULL;
 
-	dwarf_file = 0;
-	dwarf_line = -1;
-	dwarf_file_string = 0;
 }
 
 static void	read_end(void)
@@ -9580,8 +9559,7 @@ static void	read_a_source_file(const char *name)
 	char           *s;	/* String of symbol,'\0' appended.  */
 	const pseudo_typeS *pop;
 
-
-	buffer = input_scrub_new_file(name);
+	input_scrub_new_file(name);
 	/* Generate debugging information before we've read anything in to
 	 * denote this file as the "main" source file and not a subordinate one
 	 * (e.g. N_SO vs N_SOL in stabs).  */
@@ -12077,7 +12055,7 @@ static void	stringer_append_char(int c,int bitsize)
 	if (c && in_bss())
 		as_bad(("attempt to store non-empty string in section `%s'"),
 		       segment_name(now_seg));
-
+	FRAG_APPEND_1_CHAR(c);
 	switch (bitsize) {
 	case 64:
 		FRAG_APPEND_1_CHAR(0);
@@ -12442,7 +12420,7 @@ static void	s_incbin(int x ATTRIBUTE_UNUSED)
 	}
 	demand_empty_rest_of_line();
 
-	path = XCNEWVEC(char,len + include_dir_maxlen + 2);
+	path = XCNEWVEC(char,len + 2);
 	binfile = search_and_open(filename,path);
 
 	if (binfile == NULL)
@@ -17580,11 +17558,9 @@ static void	write_object_file(void)
 
 	subsegs_finish();
 	riscv_pre_output_hook();
-	/*
-	 * From now on,we don't care about sub-segments.  Build one frag chain
-	 * for each segment. Linked through fr_next.
-	 */
-	/* Remove the sections created by gas for its own purposes.  */
+	/* From now on,we don't care about sub-segments.  Build one frag chain
+	 * for each segment. Linked through fr_next.  *
+	 * Remove the sections created by gas for its own purposes.  */
 	{
 		int		i;
 
@@ -17597,11 +17573,9 @@ static void	write_object_file(void)
 
 	map_over_sections(chain_frchains_together,(char *)0);
 
-	/*
-	 * We have two segments. If user gave -R flag,then we must put the
+	/* We have two segments. If user gave -R flag,then we must put the
 	 * data frags into the text segment. Do this before relaxing so we know
-	 * to take advantage of -R and make shorter addresses.
-	 */
+	 * to take advantage of -R and make shorter addresses.  */
 	if (flag_readonly_data_in_text) {
 		merge_data_into_text();
 	}
@@ -17664,11 +17638,8 @@ static void	write_object_file(void)
 			const char     *name;
 
 			if (skip_next_symbol) {
-				/*
-				 * Don't do anything besides moving the value
-				 * of the symbol from the GAS value-field to
-				 * the BFD value-field.
-				 */
+				/* Don't do anything besides moving the value of the symbol 
+ 				 * from the GAS value-field to the BFD value-field.  */
 				symbol_get_bfdsym(symp)->value = S_GET_VALUE(symp);
 				skip_next_symbol = false;
 				continue;
@@ -17731,11 +17702,9 @@ static void	write_object_file(void)
 				&& !symbol_used_in_reloc_p(symp))) {
 				symbol_remove(symp,&symbol_rootP,&symbol_lastP);
 
-				/* After symbol_remove,symbol_next(symp) still
-				 * returns the one that came after it in the
-				 * chain.  So we don't need to do any extra
-				 * cleanup work here.
-				 */
+				/* After symbol_remove,symbol_next(symp) still returns the one
+ 				 * that came after it in the chain.  So we don't need to do any 
+ 				 * extra cleanup work here.  */
 				continue;
 			}
 			/* Make sure we really got a value for the symbol.  */
@@ -17756,10 +17725,8 @@ static void	write_object_file(void)
 				skip_next_symbol = true;
 		}
 	}
-	/*
-	 * Now do any format-specific adjustments to the symbol table,such as
-	 * adding file symbols.
-	 */
+	/* Now do any format-specific adjustments to the symbol table,such as
+	 * adding file symbols.  */
 	riscv_adjust_symtab();
 
 	/* Stop if there is an error.  */
@@ -17783,12 +17750,10 @@ static void	write_object_file(void)
 		stdoutput->flags |= BFD_CONVERT_ELF_COMMON|BFD_USE_ELF_STT_COMMON;
 #endif
 
-	/*
-	 * Once all relocations have been written,we can compress the contents
+	/* Once all relocations have been written,we can compress the contents
 	 * of the debug sections.  This needs to be done before we start
 	 * writing any sections,because it will affect the file layout,which
-	 * is fixed once we start writing contents.
-	 */
+	 * is fixed once we start writing contents.  */
 	if (flag_compress_debug != COMPRESS_DEBUG_NONE) {
 		uint32_t	flags = BFD_COMPRESS;
 		if (flag_compress_debug == COMPRESS_DEBUG_GABI_ZLIB)
@@ -17835,10 +17800,8 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 	/* In case md_estimate_size_before_relax() wants to make fixSs.  */
 	subseg_change(segment,0);
 
-	/*
-	 * For each frag in segment: count and store  (a 1st guess of)
-	 * fr_address.
-	 */
+	/* For each frag in segment: count and store  (a 1st guess of)
+	 * fr_address.  */
 	address = 0;
 	region = 0;
 	for (frag_count = 0,fragP = segment_frag_root;
@@ -17884,9 +17847,8 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 			break;
 
 		case rs_machine_dependent:
-			/* If fr_symbol is an expression,this call to
-			 * resolve_symbol_value sets up the correct segment,
-			 * which will likely be needed in
+			/* If fr_symbol is an expression,this call to resolve_symbol_value 
+ 			 * sets up the correct segment, which will likely be needed in
 			 * md_estimate_size_before_relax. */
 			if (fragP->fr_symbol)
 				resolve_symbol_value(fragP->fr_symbol);
@@ -17897,8 +17859,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 		case rs_leb128:
 			/* Initial guess is always 1; doing otherwise can
 			 * result in stable solutions that are larger than the
-			 * minimum.
-			 */
+			 * minimum.  */
 			address += fragP->fr_offset = 1;
 			break;
 
@@ -17927,15 +17888,12 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 		/* Cumulative address adjustment.  */
 		offsetT		stretch;
 
-		/*
-		 * Have we made any adjustment this pass?  We can't just test
+		/* Have we made any adjustment this pass?  We can't just test
 		 * stretch because one piece of code may have grown and another
-		 * shrank.
-		 */
+		 * shrank.  */
 		int		stretched;
 
-		/*
-		 * Most horrible,but gcc may give us some exception data that
+		/* Most horrible,but gcc may give us some exception data that
 		 * is impossible to assemble,of the form
 		 * 
 		 * .align 4 .byte 0,0 .uleb128 end - start start: .space 128*128
@@ -17950,19 +17908,16 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 		 * to the end label.
 		 * 
 		 * This counter is used in a tiny state machine to detect whether
-		 * a leb128 followed by an align is impossible to relax.
-		 */
+		 * a leb128 followed by an align is impossible to relax.  */
 		int		rs_leb128_fudge = 0;
 
-		/*
-		 * We want to prevent going into an infinite loop where one
+		/* We want to prevent going into an infinite loop where one
 		 * frag grows depending upon the location of a symbol which is
 		 * in turn moved by the growing frag.  eg:
 		 * 
 		 * foo = . .org foo+16 foo = .
 		 * 
-		 * So we dictate that this algorithm can be at most O2.
-		 */
+		 * So we dictate that this algorithm can be at most O2.  */
 		max_iterations = frag_count * frag_count;
 		/* Check for overflow.  */
 		if (max_iterations < frag_count)
@@ -18131,7 +18086,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 					break;
 
 				case rs_machine_dependent:
-					growth = md_relax_frag(segment,fragP,stretch);
+					growth = riscv_relax_frag(segment,fragP,stretch);
 					break;
 
 				case rs_leb128:
@@ -18189,7 +18144,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 		while (stretched && --max_iterations);
 
 		if (stretched)
-			as_fatal(("Infinite loop encountered whilst attempting to compute the addresses of symbols in section %s"),
+			as_fatal( "Infinite loop encountered in section %s",
 				 segment_name(segment));
 	}
 
@@ -18212,7 +18167,6 @@ static void	number_to_chars_littleendian(char *buf,valueT val,int n)
 }
 
 /* ====================================================================== app.c */
-
 #define MULTIBYTE_WARN_COUNT_LIMIT 10
 static unsigned int multibyte_warn_count = 0;
 
@@ -18360,10 +18314,8 @@ static struct riscv_supported_ext riscv_supported_std_ext[] =
 	{"i",ISA_SPEC_CLASS_20191213,2,1,0},
 	{"i",ISA_SPEC_CLASS_20190608,2,1,0},
 	{"i",ISA_SPEC_CLASS_2P2,2,0,0},
-	/*
-	 * The g is a special case which we don't want to output it,but still
-	 * need it when adding implicit extensions.
-	 */
+	/* The g is a special case which we don't want to output it,but still
+	 * need it when adding implicit extensions.  */
 	{"g",ISA_SPEC_CLASS_NONE,RISCV_UNKNOWN_VERSION,RISCV_UNKNOWN_VERSION,EXT_DEFAULT},
 	{"m",ISA_SPEC_CLASS_20191213,2,0,0},
 	{"m",ISA_SPEC_CLASS_20190608,2,0,0},
@@ -18475,11 +18427,9 @@ static struct riscv_supported_ext riscv_supported_vendor_x_ext[] =
 	{"xtheadmemidx",ISA_SPEC_CLASS_DRAFT,1,0,0},
 	{"xtheadmempair",ISA_SPEC_CLASS_DRAFT,1,0,0},
 	{"xtheadsync",ISA_SPEC_CLASS_DRAFT,1,0,0},
-	/*
-	 * XVentanaCondOps:
+	/* XVentanaCondOps:
 	 * https://github.com/ventanamicro/ventana-custom-extensions/releases/do
-	 * wnload/v1.0.0/ventana-custom-extensions-v1.0.0.pdf
-	 */
+	 * wnload/v1.0.0/ventana-custom-extensions-v1.0.0.pdf */
 	{"xventanacondops",ISA_SPEC_CLASS_DRAFT,1,0,0},
 	{NULL,0,0,0,0}
 };
@@ -18636,14 +18586,14 @@ static void	riscv_parse_add_subset(riscv_parse_subset_t * rps,
 		|| minor_version == RISCV_UNKNOWN_VERSION)) {
 		if (subset[0] == 'x')
 			rps->error_handler
-				(("x ISA extension `%s' must be set with the versions"),
+				("x ISA extension `%s' must be set with the versions",
 				 subset);
 		/* Allow old ISA spec can recognize zicsr and zifencei.  */
 		else
 			if (strcmp(subset,"zicsr") != 0
 			    && strcmp(subset,"zifencei") != 0)
 				rps->error_handler
-					(("cannot find default versions of the ISA extension `%s'"),
+					("cannot find default versions of the ISA extension `%s'",
 					 subset);
 		return;
 	}
@@ -18660,20 +18610,20 @@ static bool	riscv_parse_check_conflicts(riscv_parse_subset_t * rps)
 	if (riscv_lookup_subset(rps->subset_list,"e",&subset)
 	    && xlen > 32) {
 		rps->error_handler
-			(("rv%d does not support the `e' extension"),xlen);
+			("rv%d does not support the `e' extension",xlen);
 		no_conflict = false;
 	}
 	if (riscv_lookup_subset(rps->subset_list,"q",&subset)
 	    && (subset->major_version < 2 || (subset->major_version == 2
 					      && subset->minor_version < 2))
 	    && xlen < 64) {
-		rps->error_handler(("rv%d does not support the `q' extension"),xlen);
+		rps->error_handler("rv%d does not support the `q' extension",xlen);
 		no_conflict = false;
 	}
 	if (riscv_lookup_subset(rps->subset_list,"zfinx",&subset)
 	    && riscv_lookup_subset(rps->subset_list,"f",&subset)) {
 		rps->error_handler
-			(("`zfinx' is conflict with the `f/d/q/zfh/zfhmin' extension"));
+			("`zfinx' is conflict with the `f/d/q/zfh/zfhmin' extension");
 		no_conflict = false;
 	}
 	bool		support_zve = false;
@@ -18830,10 +18780,8 @@ static bool	riscv_update_subset(riscv_parse_subset_t * rps,const char *str)
 		while (*q != '\0' && *q != ',')
 			q++;
 
-		/*
-		 * Look forward to the first letter which is not
-		 * <major>p<minor>.
-		 */
+		/* Look forward to the first letter which is not
+		 * <major>p<minor>.  */
 		bool		find_any_version = false;
 		bool		find_minor_version = false;
 		size_t		len = q - subset;
@@ -19201,13 +19149,10 @@ static const struct riscv_spec riscv_priv_specs[] =
 	{"1.12",PRIV_SPEC_CLASS_1P12},
 };
 
-/*
- * Get the corresponding CSR version class by giving privilege version numbers.
+/* Get the corresponding CSR version class by giving privilege version numbers.
  * It is usually used to convert the priv
  * 
- * attribute numbers into the corresponding class.
- */
-
+ * attribute numbers into the corresponding class.  */
 static void	riscv_get_priv_spec_class_from_numbers(unsigned int major,
 	    		unsigned	int	minor,unsigned int revision,
 			 		enum		riscv_spec_class *class)
@@ -19552,7 +19497,7 @@ static char    *riscv_arch_str(unsigned Xlen,const riscv_subset_list_t * subset)
 static riscv_parse_subset_t riscv_rps_as =
 {
 	NULL,			/* subset_list,we will set it later once
-				 * riscv_opts_stack is created or updated.  */
+				     * riscv_opts_stack is created or updated.  */
 	as_bad,			/* error_handler.  */
 	&xlen,			/* xlen.  */
 	&default_isa_spec,	/* isa_spec.  */
@@ -19928,6 +19873,9 @@ static void	add_fixed_insn(struct riscv_cl_insn *insn)
 	move_insn(insn,frag_now,f - frag_now->fr_literal);
 }
 
+/* The only call to this function is in append_insn. It is done when we have a
+ * relocation of type LOW_12 or a jump insn. The argument max_chars corresponds
+ * to the worst case hypthesis, the "var" argument is the best case Jacob */
 static void	add_relaxed_insn(struct riscv_cl_insn *insn,int max_chars,int var,
 	 		relax_substateT subtype,symbolS * symbol,offsetT offset)
 {
@@ -19958,7 +19906,9 @@ static unsigned	relaxed_branch_length(fragS * fragp,asection * sec,int update)
 	    && !S_IS_WEAK(fragp->fr_symbol)
 	    && sec == S_GET_SEGMENT(fragp->fr_symbol)) {
 		offsetT		val = S_GET_VALUE(fragp->fr_symbol) + fragp->fr_offset;
-		bfd_vma		rvc_range = jump ? RVC_JUMP_REACH : RVC_BRANCH_REACH;
+		// This macrology drives me nuts... jacob
+		//uin64_t rvc_range = jump ?   (2048 * 2)   :     (256 * 2); 
+		bfd_vma	rvc_range =   jump ? RVC_JUMP_REACH : RVC_BRANCH_REACH;
 		val -= fragp->fr_address + fragp->fr_fix;
 
 		if (rvc && (bfd_vma) (val + rvc_range / 2) < rvc_range)
@@ -23562,8 +23512,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 	}
 }
 
-/* Because the value of .cfi_remember_state may changed after relaxation,we
- * insert a fix to relocate it again in link-time.  */
+/* Because the value of .cfi_remember_state may have changed after relaxation,
+ * we insert a fix to relocate it again in link-time.  */
 static void	riscv_pre_output_hook(void)
 {
 	const frchainS *frch;
@@ -23814,7 +23764,8 @@ static bool	riscv_frag_align_code(int n)
 	return true;
 }
 
-/* Implement HANDLE_ALIGN.  */
+/* Implement HANDLE_ALIGN. 
+ * Since riscv_opts.relax is always 1, so this whole function is a nop. jacob*/
 static void	riscv_handle_align(fragS * fragP)
 {
 	switch (fragP->fr_type) {
@@ -23843,16 +23794,13 @@ static void	riscv_handle_align(fragS * fragP)
 				fragP->fr_fix += excess;
 				p += excess;
 			}
-			/*
-			 * The frag will be changed to `rs_fill` later.  The
-			 * function `write_contents` will try to fill the
-			 * remaining spaces according to the patterns we give.
-			 * In this case,we give a 4 byte uncompressed nop as
-			 * the pattern,and set the size of the pattern into
-			 * `fr_var`.  The nop will be output to the file
-			 * `fr_offset` times.  However,`fr_offset` could be
-			 * zero if we don't need to pad the boundary finally.
-			 */
+			/* The frag will be changed to `rs_fill` later.  The function 
+			 * `write_contents` will try to fill the remaining spaces 
+			 * according to the patterns we give. In this case,we give a 
+			 * 4 byte uncompressed nop as the pattern,and set the size of 
+			 * the pattern into `fr_var`.  The nop will be output to the file
+			 * `fr_offset` times.  However,`fr_offset` could be zero if we 
+			 * don't need to pad the boundary finally.  */
 			riscv_make_nops(p,size);
 			fragP->fr_var = size;
 		}
@@ -23926,7 +23874,6 @@ int		riscv_relax_frag(asection * sec,fragS * fragp,long stretch ATTRIBUTE_UNUSED
 }
 
 /* Expand far branches to multi-instruction sequences.  */
-
 static void	md_convert_frag_branch(fragS * fragp)
 {
 	uint8_t        *buf;
@@ -24298,7 +24245,7 @@ static int	riscv_convert_symbolic_attribute(const char *name)
 /* Parse a .attribute directive.  */
 static void	s_riscv_attribute(int ignored ATTRIBUTE_UNUSED)
 {
-	as_fatal("could not set architecture and machine");
+	//as_fatal("could not set architecture and machine");
 }
 
 /* Mark symbol that it follows a variant CC convention.  */
@@ -27891,7 +27838,7 @@ static int	obj_elf_vendor_attribute(int vendor)
 	record_attribute(vendor,tag);
 	switch (type & 3) {
 	case 3:
-		bfd_elf_add_obj_attr_int_string(stdoutput,vendor,tag,i,s);
+		elf_add_obj_attr_int_string(stdoutput,vendor,tag,i,s,NULL);
 		break;
 	case 2:
 		bfd_elf_add_obj_attr_string(stdoutput,vendor,tag,s,NULL);
@@ -33631,11 +33578,6 @@ static void	elf_add_obj_attr_int_string(bfd * abfd,int vendor,unsigned int tag,
 	attr->s = elf_attr_strdup(abfd,s,end);
 }
 
-static void	bfd_elf_add_obj_attr_int_string(bfd * abfd,int vendor,unsigned int tag,
-			 		unsigned	int	i,const char *s)
-{
-	elf_add_obj_attr_int_string(abfd,vendor,tag,i,s,NULL);
-}
 bool		bfd_default_set_arch_mach(bfd * abfd,
        		enum		bfd_architecture arch ATTRIBUTE_UNUSED,
 				unsigned	long	mach ATTRIBUTE_UNUSED)
@@ -33645,5 +33587,5 @@ bool		bfd_default_set_arch_mach(bfd * abfd,
 		return true;
 
 	bfd_set_error(bfd_error_bad_value);
-	return false;
+return false;
 }

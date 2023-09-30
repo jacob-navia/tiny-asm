@@ -1392,7 +1392,7 @@ static void	cfi_add_CFA_val_offset(unsigned regno,offsetT offset)
 	abs_data_align = (DWARF2_CIE_DATA_ALIGNMENT < 0
 		    ? -DWARF2_CIE_DATA_ALIGNMENT : DWARF2_CIE_DATA_ALIGNMENT);
 	if (offset % abs_data_align)
-		as_bad(("register save offset not a multiple of %u"),abs_data_align);
+		as_bad("register save offset not a multiple of %u",abs_data_align);
 }
 
 /* Add a DW_CFA_def_cfa record to the CFI data.  */
@@ -2082,13 +2082,14 @@ static void	output_cfi_insn(struct cfi_insn_data *insn)
 				exp.X_op_symbol = from;
 				exp.X_add_number = 0;
 
-				/* The code in ehopt.c expects that one byte of the encoding is already 
-				 * allocated to the frag.  This comes from the way that it scans the
-				 * .eh_frame section looking first for the .byte DW_CFA_advance_loc4. 
-				 * Call frag_grow with the sum of room needed by frag_more and
-				 * frag_var to preallocate space ensuring that the DW_CFA_advance_loc4 
-				 * is in the fixed part of the rs_cfa frag,so that the relax
-				 * machinery can remove the advance_loc should it advance by zero.  */
+				/* The code in ehopt.c expects that one byte of the encoding
+				 * is already allocated to the frag. This comes from the way 
+				 * that it scans the .eh_frame section looking first for the 
+				 * .byte DW_CFA_advance_loc4.  Call frag_grow with the sum 
+				 * of room needed by frag_more and frag_var to preallocate 
+				 * space ensuring that the DW_CFA_advance_loc4 is in the 
+				 * fixed part of the rs_cfa frag,so that the relax machinery 
+				 * can remove the advance_loc should it advance by zero.  */
 				frag_grow(5);
 				*frag_more(1) = DW_CFA_advance_loc4;
 
@@ -2297,13 +2298,11 @@ static void	output_cie(struct cie_entry *cie,bool eh_frame,int align)
 		out_one('S');
 	out_one(0);
 	if (flag_dwarf_cie_version >= 4) {
-		/*
-		 * For now we are assuming a flat address space with 4 or 8
-		 * byte addresses.
-		 */
+		/* For now we are assuming a flat address space with 4 or 8
+		 * byte addresses.  */
 		int		address_size = dwarf2_format_32bit ? 4 : 8;
 		out_one(address_size);	/* Address size.  */
-		out_one(0);	/* Segment size.  */
+		out_one(0);				/* Segment size.  */
 	}
 	out_uleb128(DWARF2_LINE_MIN_INSN_LENGTH);	/* Code alignment.  */
 	out_sleb128(DWARF2_CIE_DATA_ALIGNMENT);	/* Data alignment.  */
@@ -2922,12 +2921,10 @@ static struct line_entry *reverse_line_entry_list(struct line_entry *h)
 	return p;
 }
 
-/*
- * Compute the view for E based on the previous entry P.  If we introduce an
+/* Compute the view for E based on the previous entry P.  If we introduce an
  * (undefined) view symbol for P,and H is given (P must be the tail in this
  * case),introduce view symbols for earlier list entries as well,until one of
- * them is constant.
- */
+ * them is constant. */
 static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 			      		struct	line_entry *h)
 {
@@ -2936,11 +2933,9 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 	memset(&viewx,0,sizeof(viewx));
 	viewx.X_unsigned = 1;
 
-	/*
-	 * First,compute !(E->label > P->label),to tell whether or not we're
+	/* First,compute !(E->label > P->label),to tell whether or not we're
 	 * to reset the view number.  If we can't resolve it to a constant,
-	 * keep it symbolic.
-	 */
+	 * keep it symbolic.  */
 	if (!p || (e->loc.u.view == force_reset_view && force_reset_view)) {
 		viewx.X_op = O_constant;
 		viewx.X_add_number = 0;
@@ -2964,20 +2959,16 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 
 	if (S_IS_DEFINED(e->loc.u.view) && symbol_constant_p(e->loc.u.view)) {
 		expressionS    *value = symbol_get_value_expression(e->loc.u.view);
-		/*
-		 * We can't compare the view numbers at this point,because in
+		/* We can't compare the view numbers at this point,because in
 		 * VIEWX we've only determined whether we're to reset it so
-		 * far.
-		 */
+		 * far.  */
 		if (viewx.X_op == O_constant) {
 			if (!value->X_add_number != !viewx.X_add_number)
 				as_bad(("view number mismatch"));
 		}
-		/*
-		 * Record the expression to check it later.  It is the result
+		/* Record the expression to check it later.  It is the result
 		 * of a logical not,thus 0 or 1.  We just add up all such
-		 * deferred expressions,and resolve it at the end.
-		 */
+		 * deferred expressions,and resolve it at the end.  */
 		else
 			if (!value->X_add_number) {
 				symbolS        *deferred = make_expr_symbol(&viewx);
@@ -3041,10 +3032,10 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		gas_assert(r == p);
 		/* Set or check views until we find a defined or absent view.  */
 		do {
-			/* Do not define the head of a (sub?)segment view while handling others.  
-			 * It would be defined too early, without regard to the last view of other
-			 * subsegments. set_or_check_view will be called for every head segment that 
-			 * needs it.  */
+		/* Do not define the head of a (sub?)segment view while handling others.  
+		 * It would be defined too early, without regard to the last view of other
+		 * subsegments. set_or_check_view will be called for every head segment that
+		 * needs it.  */
 			if (r == h)
 				break;
 			set_or_check_view(r,r->next,NULL);
@@ -3061,9 +3052,9 @@ static void	set_or_check_view(struct line_entry *e,struct line_entry *p,
 		/* Starting from the last view we just defined,attempt to simplify the 
 		 * view expressions,until we do so to P.  */
 		do {
-			/* The head view of a subsegment may remain undefined while handling 
-			 * other elements,before it is linked to the last view of the previous 
-			 * subsegment. */
+		/* The head view of a subsegment may remain undefined while handling 
+		 * other elements,before it is linked to the last view of the previous 
+		 * subsegment. */
 			if (r == h)
 				continue;
 			gas_assert(S_IS_DEFINED(r->loc.u.view));
@@ -3189,10 +3180,10 @@ static unsigned int get_directory_table_entry(const char *dirname,
 			const char     *pwd = file0_dirname ? file0_dirname : getpwd();
 
 			if (dwarf_level >= 5 && filename_cmp(dirname,pwd) != 0) {
-				/* In DWARF-5 the 0 entry in the directory table is expected 
-				 * to be the same as the DW_AT_comp_dir (which is set to the current
-				 * build directory).  Since we are about to create a directory entry
-				 * that is not the same,allocate the current directory first.  */
+			/* In DWARF-5 the 0 entry in the directory table is expected 
+			 * to be the same as the DW_AT_comp_dir (which is set to the current
+			 * build directory).  Since we are about to create a directory entry
+			 * that is not the same,allocate the current directory first.  */
 				(void)get_directory_table_entry(pwd,file0_dirname,
 							   strlen(pwd),true);
 				d = 1;
@@ -3413,7 +3404,7 @@ static bool	allocate_filename_to_slot(const char *dirname,
 			}
 
 fail:
-		as_bad("file table slot %u is already occupied by a different file (%s%s%s vs %s%s%s)",
+	as_bad("file table slot %u is already occupied by a different file (%s%s%s vs %s%s%s)",
 		       num,
 		       dir == NULL ? "" : dir,
 		       dir == NULL ? "" : "/",
@@ -3522,8 +3513,7 @@ static void	dwarf2_emit_insn(int size)
  * used.  */
 static void	dwarf2_consume_line_info(void)
 {
-	/*
-	 * Unless we generate DWARF2 debugging information for each assembler
+	/* Unless we generate DWARF2 debugging information for each assembler
 	 * line,we only emit one line symbol for one LOC.
 	 */
 	dwarf2_loc_directive_seen = false;
@@ -3730,60 +3720,58 @@ static void	dwarf2_directive_loc(int dummy ATTRIBUTE_UNUSED)
 			if (value >= 0)
 				current.discriminator = value;
 			else {
-									as_bad(("discriminator less than zero"));
-									return;
-								}
-							} else
-								if (strcmp(p,"view") == 0) {
-									symbolS        *sym;
+				as_bad(("discriminator less than zero"));
+				return;
+			}
+		} else if (strcmp(p,"view") == 0) {
+			symbolS        *sym;
 
-									(void)restore_line_pointer(c);
-									SKIP_WHITESPACE();
+			(void)restore_line_pointer(c);
+			SKIP_WHITESPACE();
 
-									if (ISDIGIT(*input_line_pointer)
-									    || *input_line_pointer == '-') {
-										bool		force_reset = *input_line_pointer == '-';
+			if (ISDIGIT(*input_line_pointer)
+			    || *input_line_pointer == '-') {
+				bool		force_reset = *input_line_pointer == '-';
 
-										value = get_absolute_expression();
-										if (value != 0) {
-											as_bad("numeric view can only be asserted to zero");
-											return;
-										}
-										if (force_reset && force_reset_view)
-											sym = force_reset_view;
-										else {
-											sym = symbol_temp_new(absolute_section,&zero_address_frag,
+				value = get_absolute_expression();
+				if (value != 0) {
+					as_bad("numeric view can only be asserted to zero");
+					return;
+				}
+				if (force_reset && force_reset_view)
+					sym = force_reset_view;
+				else {
+					sym = symbol_temp_new(absolute_section,&zero_address_frag,
 													      value);
-											if (force_reset)
-												force_reset_view = sym;
-										}
-									} else {
-										char           *name = read_symbol_name();
+					if (force_reset)
+						force_reset_view = sym;
+				}
+			} else {
+				char           *name = read_symbol_name();
 
-										if (!name)
-											return;
-										sym = symbol_find_or_make(name);
-										free(name);
-										if (S_IS_DEFINED(sym) || symbol_equated_p(sym)) {
-											if (S_IS_VOLATILE(sym))
-												sym = symbol_clone(sym,1);
-											else
-												if (!S_CAN_BE_REDEFINED(sym)) {
-													as_bad(("symbol `%s' is already defined"),
+				if (!name)
+					return;
+				sym = symbol_find_or_make(name);
+				free(name);
+				if (S_IS_DEFINED(sym) || symbol_equated_p(sym)) {
+					if (S_IS_VOLATILE(sym))
+						sym = symbol_clone(sym,1);
+					else if (!S_CAN_BE_REDEFINED(sym)) {
+						as_bad("symbol `%s' is already defined",
 													       S_GET_NAME(sym));
-													return;
-												}
-										}
-										S_SET_SEGMENT(sym,undefined_section);
-										S_SET_VALUE(sym,0);
-										symbol_set_frag(sym,&zero_address_frag);
-									}
-									current.u.view = sym;
-								} else {
-									as_bad(("unknown .loc sub-directive `%s'"),p);
-									(void)restore_line_pointer(c);
-									return;
-								}
+						return;
+					}
+				}
+				S_SET_SEGMENT(sym,undefined_section);
+				S_SET_VALUE(sym,0);
+				symbol_set_frag(sym,&zero_address_frag);
+			}
+			current.u.view = sym;
+		} else {
+			as_bad(("unknown .loc sub-directive `%s'"),p);
+			(void)restore_line_pointer(c);
+			return;
+		}
 
 		SKIP_WHITESPACE_AFTER_NAME();
 	}
@@ -3855,11 +3843,9 @@ static offsetT	get_frag_fix(fragS * frag,segT seg)
 	if (frag->fr_next)
 		return frag->fr_fix;
 
-	/*
-	 * If a fragment is the last in the chain,special measures must be
+	/* If a fragment is the last in the chain,special measures must be
 	 * taken to find its size before relaxation,since it may be pending on
-	 * some subsegment chain.
-	 */
+	 * some subsegment chain.  */
 	for (fr = seg_info(seg)->frchainP; fr; fr = fr->frch_next)
 		if (fr->frch_last == frag)
 			return (char *)obstack_next_free(&fr->frch_obstack) - frag->fr_literal;
@@ -4657,10 +4643,8 @@ static void	out_debug_line(segT line_seg)
 
 	/* For each section,emit a statement program.  */
 	for (s = all_segs; s; s = s->next)
-		/*
-		 * Paranoia - this check should have already have been handled
-		 * in dwarf2_gen_line_info_1().
-		 */
+		/* Paranoia - this check should have already have been handled
+		 * in dwarf2_gen_line_info_1().  */
 		if (s->head->head && SEG_NORMAL(s->seg))
 			process_entries(s->seg,s->head->head);
 
@@ -4844,10 +4828,9 @@ static void	out_debug_aranges(segT aranges_seg,segT info_seg)
 	symbol_set_value_now(aranges_end);
 }
 
-/*
- * Emit data for .debug_abbrev.  Note that this must be kept in sync with
- * out_debug_info below.
- */
+static symbolS *symbol_rootP; // All the symbol nodes
+/* Emit data for .debug_abbrev.  Note that this must be kept in sync with
+ * out_debug_info below. */
 static void	out_debug_abbrev(segT abbrev_seg,
 			 		segT		info_seg ATTRIBUTE_UNUSED,
 			 		segT		line_seg ATTRIBUTE_UNUSED,
@@ -4969,16 +4952,14 @@ static void	out_debug_info(segT info_seg,segT abbrev_seg,segT line_seg,segT str_
 	if (DWARF2_VERSION < 5) {
 		/* .debug_abbrev offset */
 		generic_dwarf2_emit_offset(section_symbol(abbrev_seg),sizeof_offset);
-	} else {
-		/* unit (header) type */
+	} else { /* unit (header) type */
 		out_byte(DW_UT_compile);
 	}
 
 	/* Target address size.  */
 	out_byte(sizeof_address);
 
-	if (DWARF2_VERSION >= 5) {
-		/* .debug_abbrev offset */
+	if (DWARF2_VERSION >= 5) { /* .debug_abbrev offset */
 		generic_dwarf2_emit_offset(section_symbol(abbrev_seg),sizeof_offset);
 	}
 	/* DW_TAG_compile_unit DIE abbrev */
@@ -5623,16 +5604,15 @@ static int	check_eh_frame(expressionS * exp,unsigned int *pnbytes)
 	switch (d->state) {
 	case state_idle:
 		if (*pnbytes == 4) {
-			/* This might be the size of the CIE or FDE.  We want
-			 * to know the size so that we don't accidentally
-			 * optimize across an FDE boundary.  We recognize the
-			 * size in one of two forms: a symbol which will later
-			 * be defined as a difference,or a subtraction of two
-			 * symbols.  Either way,we can tell when we are at the
-			 * end of the FDE because the symbol becomes defined
-			 * (in the case of a subtraction,the end symbol,from
-			 * which the start symbol is being subtracted).  Other
-			 * ways of describing the size will not be optimized.  */
+		/* This might be the size of the CIE or FDE.  We want to know the 
+		 * size so that we don't accidentally optimize across an FDE 
+		 * boundary.  We recognize the size in one of two forms: a symbol 
+		 * which will later be defined as a difference,or a subtraction of 
+		 * two symbols.  Either way,we can tell when we are at the end of 
+		 * the FDE because the symbol becomes defined (in the case of a 
+		 * subtraction, the end symbol, from which the start symbol is 
+		 * being subtracted).  Other ways of describing the size will not 
+		 * be optimized.  */
 			if ((exp->X_op == O_symbol || exp->X_op == O_subtract)
 			    && !S_IS_DEFINED(exp->X_add_symbol)) {
 				d->state = state_saw_size;
@@ -6450,95 +6430,76 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 		op = O_uminus;
 		/* Fall through.  */
 	case '+':
-		{
-	unary:
-			operand(expressionP,mode);
+unary:
+		operand(expressionP,mode);
 
-				if (expressionP->X_op == O_constant) {
-					/*
-					 * input_line_pointer -> char after
-					 * operand.
-					 */
-					if (op == O_uminus) {
-						expressionP->X_add_number
-							= -(addressT) expressionP->X_add_number;
-						/*
-						 * Notice: '-' may overflow: no
-						 * warning is given. This is
-						 * compatible with other
-						 * people's assemblers.  Sigh.
-						 */
-						expressionP->X_unsigned = 0;
-						if (expressionP->X_add_number)
-							expressionP->X_extrabit ^= 1;
-					} else
-						if (op == O_bit_not) {
-							expressionP->X_add_number = ~expressionP->X_add_number;
-							expressionP->X_extrabit ^= 1;
-							expressionP->X_unsigned = 0;
-						} else
-							if (op == O_logical_not) {
-								expressionP->X_add_number = !expressionP->X_add_number;
-								expressionP->X_unsigned = 1;
-								expressionP->X_extrabit = 0;
-							}
-				} else
-					if (expressionP->X_op == O_big
-					    && expressionP->X_add_number <= 0
-					    && op == O_uminus
-					    && (generic_floating_point_number.sign == '+'
-						|| generic_floating_point_number.sign == 'P')) {
-						/*
-						 * Negative flonum (eg,
-						 * -1.000e0).
-						 */
-						if (generic_floating_point_number.sign == '+')
-							generic_floating_point_number.sign = '-';
-						else
-							generic_floating_point_number.sign = 'N';
-					} else
-						if (expressionP->X_op == O_big
-						    && expressionP->X_add_number > 0) {
-							int		i;
+		if (expressionP->X_op == O_constant) {
+			/* input_line_pointer -> char after operand.  */
+			if (op == O_uminus) {
+				expressionP->X_add_number
+						= -(addressT) expressionP->X_add_number;
+				/* Notice: '-' may overflow: no warning is given. This is
+				 * compatible with other people's assemblers.  Sigh.  */
+				expressionP->X_unsigned = 0;
+				if (expressionP->X_add_number)
+					expressionP->X_extrabit ^= 1;
+			} else if (op == O_bit_not) {
+				expressionP->X_add_number = ~expressionP->X_add_number;
+				expressionP->X_extrabit ^= 1;
+				expressionP->X_unsigned = 0;
+			} else if (op == O_logical_not) {
+				expressionP->X_add_number = !expressionP->X_add_number;
+				expressionP->X_unsigned = 1;
+				expressionP->X_extrabit = 0;
+			}
+		} else if (expressionP->X_op == O_big
+		    && expressionP->X_add_number <= 0
+		    && op == O_uminus
+		    && (generic_floating_point_number.sign == '+'
+			|| generic_floating_point_number.sign == 'P')) {
+			/* Negative flonum (eg, * -1.000e0).  */
+				if (generic_floating_point_number.sign == '+')
+					generic_floating_point_number.sign = '-';
+				else
+					generic_floating_point_number.sign = 'N';
+		} else if (expressionP->X_op == O_big
+		    && expressionP->X_add_number > 0) {
+			int		i;
 
-							if (op == O_uminus || op == O_bit_not) {
-								for (i = 0; i < expressionP->X_add_number; ++i)
-									generic_bignum[i] = ~generic_bignum[i];
+			if (op == O_uminus || op == O_bit_not) {
+				for (i = 0; i < expressionP->X_add_number; ++i)
+					generic_bignum[i] = ~generic_bignum[i];
 
-								/* Extend the bignum to at least the size of .octa. */
-								if (expressionP->X_add_number < SIZE_OF_LARGE_NUMBER) {
-									expressionP->X_add_number = SIZE_OF_LARGE_NUMBER;
-									for (; i < expressionP->X_add_number; ++i)
-										generic_bignum[i] = ~(LITTLENUM_TYPE) 0;
-								}
-								if (op == O_uminus)
-									for (i = 0; i < expressionP->X_add_number; ++i) {
-										generic_bignum[i] += 1;
-										if (generic_bignum[i])
-											break;
-									}
-							} else
-								if (op == O_logical_not) {
-									for (i = 0; i < expressionP->X_add_number; ++i)
-										if (generic_bignum[i] != 0)
-											break;
-									expressionP->X_add_number = i >= expressionP->X_add_number;
-									expressionP->X_op = O_constant;
-									expressionP->X_unsigned = 1;
-									expressionP->X_extrabit = 0;
-								}
-						} else
-							if (expressionP->X_op != O_illegal
-							    && expressionP->X_op != O_absent) {
-								if (op != O_absent) {
-									expressionP->X_add_symbol = make_expr_symbol(expressionP);
-									expressionP->X_op = op;
-									expressionP->X_add_number = 0;
-								} 
-							} else
-								as_warn(("Unary operator %c ignored because bad operand follows"),
-									c);
-		}
+				/* Extend the bignum to at least the size of .octa. */
+				if (expressionP->X_add_number < SIZE_OF_LARGE_NUMBER) {
+					expressionP->X_add_number = SIZE_OF_LARGE_NUMBER;
+					for (; i < expressionP->X_add_number; ++i)
+						generic_bignum[i] = ~(LITTLENUM_TYPE) 0;
+				}
+				if (op == O_uminus)
+					for (i = 0; i < expressionP->X_add_number; ++i) {
+						generic_bignum[i] += 1;
+						if (generic_bignum[i])
+							break;
+					}
+			} else if (op == O_logical_not) {
+				for (i = 0; i < expressionP->X_add_number; ++i)
+					if (generic_bignum[i] != 0)
+						break;
+				expressionP->X_add_number = i >= expressionP->X_add_number;
+				expressionP->X_op = O_constant;
+				expressionP->X_unsigned = 1;
+				expressionP->X_extrabit = 0;
+			}
+		} else if (expressionP->X_op != O_illegal
+					    && expressionP->X_op != O_absent) {
+			if (op != O_absent) {
+				expressionP->X_add_symbol = make_expr_symbol(expressionP);
+				expressionP->X_op = op;
+				expressionP->X_add_number = 0;
+			} 
+		} else
+			as_warn("Unary operator %c ignored because bad operand follows",c);
 		break;
 	/* The dollar case goes into the default case since "literal_prefix_dollar_hex"
 		is false and never changed  */
@@ -6547,49 +6508,44 @@ static segT	operand(expressionS * expressionP,enum expr_mode mode)
 		if (!is_part_of_name(*input_line_pointer)) {
 			current_location(expressionP);
 			break;
-		} else
-			if ((strncasecmp(input_line_pointer,"startof.",8) == 0
-			     && !is_part_of_name(input_line_pointer[8]))
+		} else if ((strncasecmp(input_line_pointer,"startof.",8) == 0
+			 && !is_part_of_name(input_line_pointer[8]))
 			|| (strncasecmp(input_line_pointer,"sizeof.",7) == 0
 			    && !is_part_of_name(input_line_pointer[7]))) {
-				int		start;
+			int		start;
 
-				start = (input_line_pointer[1] == 't'
-					 || input_line_pointer[1] == 'T');
-				input_line_pointer += start ? 8 : 7;
+			start = (input_line_pointer[1] == 't'
+				 || input_line_pointer[1] == 'T');
+			input_line_pointer += start ? 8 : 7;
+			SKIP_WHITESPACE();
+
+			/* Cover for the as_bad () invocations below.  */
+			expressionP->X_op = O_absent;
+
+			if (*input_line_pointer != '(')
+				as_bad(("syntax error in .startof. or .sizeof."));
+			else {
+				++input_line_pointer;
 				SKIP_WHITESPACE();
-
-				/* Cover for the as_bad () invocations below.  */
-				expressionP->X_op = O_absent;
-
-				if (*input_line_pointer != '(')
-					as_bad(("syntax error in .startof. or .sizeof."));
-				else {
-					++input_line_pointer;
-					SKIP_WHITESPACE();
-					c = get_symbol_name(&name);
-					if (!*name) {
-						as_bad(("expected symbol name"));
+				c = get_symbol_name(&name);
+				if (!*name) {
+					as_bad(("expected symbol name"));
 						(void)restore_line_pointer(c);
-						if (c == ')')
-							++input_line_pointer;
-						break;
-					}
-					expressionP->X_op = O_symbol;
-					expressionP->X_add_symbol = symbol_lookup_or_make(name,start);
-					expressionP->X_add_number = 0;
-
-					*input_line_pointer = c;
-					SKIP_WHITESPACE_AFTER_NAME();
-					if (*input_line_pointer != ')')
-						as_bad(("syntax error in .startof. or .sizeof."));
-					else
-						++input_line_pointer;
-				}
+				if (c == ')') ++input_line_pointer;
 				break;
-			} else {
-				goto isname;
 			}
+			expressionP->X_op = O_symbol;
+			expressionP->X_add_symbol = symbol_lookup_or_make(name,start);
+			expressionP->X_add_number = 0;
+
+			*input_line_pointer = c;
+			SKIP_WHITESPACE_AFTER_NAME();
+			if (*input_line_pointer != ')')
+				as_bad(("syntax error in .startof. or .sizeof."));
+			else ++input_line_pointer;
+			}
+			break;
+		} else { goto isname; }
 
 	case ',':
 eol:
@@ -9330,8 +9286,7 @@ static const pseudo_typeS potable[] = {
 	{NULL,NULL,0}		/* End sentinel.  */
 };
 
-static		offsetT
-		get_absolute_expr(expressionS * exp)
+static	offsetT get_absolute_expr(expressionS * exp)
 {
 	expression_and_evaluate(exp);
 
@@ -9443,7 +9398,6 @@ static void	s_dtprel(int bytes);
 static void	s_bss(int ignore ATTRIBUTE_UNUSED);
 static void	s_riscv_leb128(int sign);
 static void	s_riscv_insn(int x ATTRIBUTE_UNUSED);
-static void	s_riscv_attribute(int ignored ATTRIBUTE_UNUSED);
 static void	s_variant_cc(int ignored ATTRIBUTE_UNUSED);
 static const pseudo_typeS riscv_pseudo_table[] =
 {
@@ -9457,7 +9411,7 @@ static const pseudo_typeS riscv_pseudo_table[] =
 	{"uleb128",s_riscv_leb128,0},
 	{"sleb128",s_riscv_leb128,1},
 	{"insn",s_riscv_insn,0},
-	{"attribute",s_riscv_attribute,0},
+	{"attribute",s_ignore,0},
 	{"variant_cc",s_variant_cc,0},
 	{"float16",float_cons,'h'},
 
@@ -9472,12 +9426,12 @@ static void	pobegin(void)
 	pop_override_ok = 0;
 	pop_insert(riscv_pseudo_table);
 
-	/* Now object specific.  Skip any that were in the target table.  */
+	/* Now object specific. Skip any that were in the target table.  */
 	pop_table_name = "obj";
 	pop_override_ok = 1;
 	pop_insert(elf_pseudo_table);
 
-	/* Now portable ones.  Skip any that we've seen already.  */
+	/* Now portable ones. Skip any that we've seen already.  */
 	pop_table_name = "standard";
 	pop_insert(potable);
 
@@ -10064,8 +10018,7 @@ static void	s_linefile(int ignore ATTRIBUTE_UNUSED)
 		 * 
 		 * We do not want to barf on this,especially since such files are
 		 * used in the GCC and GDB testsuites.  So we check for
-		 * negative line numbers rather than non-positive line numbers.
-		 */
+		 * negative line numbers rather than non-positive line numbers. */
 		as_warn("line numbers must be positive; line number %d rejected",linenum);
 	else {
 		int		length = 0;
@@ -10160,29 +10113,26 @@ static void	s_fill(int ignore ATTRIBUTE_UNUSED)
 	if (size < 0) {
 		as_warn(("size negative; .fill ignored"));
 		size = 0;
-	} else
-		if (rep_exp.X_op == O_constant && rep_exp.X_add_number <= 0) {
-			if (rep_exp.X_add_number < 0)
-				as_warn(("repeat < 0; .fill ignored"));
+	} else if (rep_exp.X_op == O_constant && rep_exp.X_add_number <= 0) {
+		if (rep_exp.X_add_number < 0)
+			as_warn(("repeat < 0; .fill ignored"));
+		size = 0;
+	} else if (size) {
+		if (now_seg == absolute_section && rep_exp.X_op != O_constant) {
+			as_bad(("non-constant fill count for absolute section"));
 			size = 0;
-		} else
-			if (size) {
-				if (now_seg == absolute_section && rep_exp.X_op != O_constant) {
-					as_bad(("non-constant fill count for absolute section"));
-					size = 0;
-				} else
-					if (now_seg == absolute_section && fill && rep_exp.X_add_number != 0) {
-						as_bad(("attempt to fill absolute section with non-zero value"));
-						size = 0;
-					} else
-						if (fill
-						    && (rep_exp.X_op != O_constant || rep_exp.X_add_number != 0)
-						    && in_bss()) {
-							as_bad(("attempt to fill section `%s' with non-zero value"),
+		} else if (now_seg == absolute_section && fill 
+					&& rep_exp.X_add_number != 0) {
+			as_bad("attempt to fill absolute section with non-zero value");
+			size = 0;
+		} else if (fill
+		    && (rep_exp.X_op != O_constant || rep_exp.X_add_number != 0)
+		    && in_bss()) {
+			as_bad("attempt to fill section `%s' with non-zero value",
 							segment_name(now_seg));
-							size = 0;
-						}
-			}
+			size = 0;
+		}
+	}
 	if (size) {
 		if (now_seg == absolute_section)
 			abs_section_offset += rep_exp.X_add_number * size;
@@ -10259,11 +10209,9 @@ static void	s_globl(int ignore ATTRIBUTE_UNUSED)
 				c = '\n';
 		}
 		free(name);
-	}
-	while (c == ',');
+	} while (c == ',');
 
 	demand_empty_rest_of_line();
-
 }
 
 
@@ -10274,6 +10222,7 @@ static void	s_globl(int ignore ATTRIBUTE_UNUSED)
 static void	s_linkonce(int ignore ATTRIBUTE_UNUSED)
 {
 	enum linkonce_type type;
+	uint32_t	flags;
 
 	SKIP_WHITESPACE();
 
@@ -10286,29 +10235,22 @@ static void	s_linkonce(int ignore ATTRIBUTE_UNUSED)
 		c = get_symbol_name(&s);
 		if (strcasecmp(s,"discard") == 0)
 			type = LINKONCE_DISCARD;
-		else
-			if (strcasecmp(s,"one_only") == 0)
-				type = LINKONCE_ONE_ONLY;
-			else
-				if (strcasecmp(s,"same_size") == 0)
-					type = LINKONCE_SAME_SIZE;
-				else
-					if (strcasecmp(s,"same_contents") == 0)
-						type = LINKONCE_SAME_CONTENTS;
-					else
-						as_warn(("unrecognized .linkonce type `%s'"),s);
+		else if (strcasecmp(s,"one_only") == 0)
+			type = LINKONCE_ONE_ONLY;
+		else if (strcasecmp(s,"same_size") == 0)
+			type = LINKONCE_SAME_SIZE;
+		else if (strcasecmp(s,"same_contents") == 0)
+			type = LINKONCE_SAME_CONTENTS;
+		else as_warn(("unrecognized .linkonce type `%s'"),s);
 
 		(void)restore_line_pointer(c);
 	}
-	{
-		uint32_t	flags;
+	if ((bfd_applicable_section_flags(stdoutput) & SEC_LINK_ONCE) == 0)
+		as_warn((".linkonce is not supported for this object file format"));
 
-		if ((bfd_applicable_section_flags(stdoutput) & SEC_LINK_ONCE) == 0)
-			as_warn((".linkonce is not supported for this object file format"));
-
-		flags = now_seg->flags;
-		flags |= SEC_LINK_ONCE;
-		switch (type) {
+	flags = now_seg->flags;
+	flags |= SEC_LINK_ONCE;
+	switch (type) {
 		default:
 			abort();
 		case LINKONCE_DISCARD:
@@ -10324,8 +10266,7 @@ static void	s_linkonce(int ignore ATTRIBUTE_UNUSED)
 			flags |= SEC_LINK_DUPLICATES_SAME_CONTENTS;
 			break;
 		}
-		now_seg->flags = flags;
-	}
+	now_seg->flags = flags;
 	demand_empty_rest_of_line();
 }
 
@@ -10394,12 +10335,10 @@ no_align:
 	return align;
 }
 
-/*
- * Called from s_comm_internal after symbol name and size have been parsed.
+/* Called from s_comm_internal after symbol name and size have been parsed.
  * NEEDS_ALIGN is 0 if it was an ".lcomm" (2 args only),1 if this was a ".bss"
  * directive which has a 3rd argument (alignment as a power of 2),or 2 if this
- * was a ".bss" directive with alignment in bytes.
- */
+ * was a ".bss" directive with alignment in bytes.  */
 static symbolS *s_lcomm_internal(int needs_align,symbolS * symbolP,addressT size)
 {
 	addressT	align = 0;
@@ -11453,16 +11392,14 @@ static void	emit_expr_with_reloc(expressionS * exp,
 		as_warn("zero assumed for missing expression");
 		exp->X_add_number = 0;
 		op = O_constant;
-	} else
-		if (op == O_big && exp->X_add_number <= 0) {
-			as_bad("floating point number invalid");
-			exp->X_add_number = 0;
-			op = O_constant;
-		} else
-			if (op == O_register) {
-				as_warn("register value used as expression");
-				op = O_constant;
-			}
+	} else if (op == O_big && exp->X_add_number <= 0) {
+		as_bad("floating point number invalid");
+		exp->X_add_number = 0;
+		op = O_constant;
+	} else if (op == O_register) {
+		as_warn("register value used as expression");
+		op = O_constant;
+	}
 	/* Allow `.word 0' in the absolute section.  */
 	if (now_seg == absolute_section) {
 		if (op != O_constant || exp->X_add_number != 0)
@@ -11533,27 +11470,20 @@ static void	emit_expr_with_reloc(expressionS * exp,
 					while (++i < exp->X_add_number)
 						if (generic_bignum[i] != sign)
 							break;
-				} else
-					if (nbytes == 1) {
-						/*
-						 * We have nbytes == 1 and
-						 * CHARS_PER_LITTLENUM == 2
-						 * (probably). Check that bits
-						 * 8.. of generic_bignum[0]
-						 * match bit 7 and that they
-						 * match all of
-						 * generic_bignum[1..exp->X_add_
-						 * number].
-						 */
-						LITTLENUM_TYPE	sign = (generic_bignum[0] & (1 << 7)) ? -1 : 0;
-						LITTLENUM_TYPE	himask = LITTLENUM_MASK & ~0xFF;
+				} else if (nbytes == 1) {
+					/* We have nbytes == 1 and CHARS_PER_LITTLENUM == 2
+					 * (probably). Check that bits 8.. of generic_
+					 * bignum[0] match bit 7 and that they match all of
+					 * generic_bignum[1..exp->X_add_ number]. */
+					LITTLENUM_TYPE	sign = (generic_bignum[0] & (1 << 7)) ? -1 : 0;
+					LITTLENUM_TYPE	himask = LITTLENUM_MASK & ~0xFF;
 
-						if ((generic_bignum[0] & himask) == (sign & himask)) {
-							while (++i < exp->X_add_number)
-								if (generic_bignum[i] != sign)
-									break;
-						}
+					if ((generic_bignum[0] & himask) == (sign & himask)) {
+						while (++i < exp->X_add_number)
+							if (generic_bignum[i] != sign)
+								break;
 					}
+				}
 				if (i < exp->X_add_number)
 					as_warn("bignum truncated to %d byte(s)", nbytes);
 				size = nbytes;
@@ -11564,21 +11494,19 @@ static void	emit_expr_with_reloc(expressionS * exp,
 			}
 			know(nbytes % CHARS_PER_LITTLENUM == 0);
 
-			{
-				nums = generic_bignum;
-				while (size >= CHARS_PER_LITTLENUM) {
-					md_number_to_chars(p,(valueT) * nums,CHARS_PER_LITTLENUM);
-					++nums;
-					size -= CHARS_PER_LITTLENUM;
-					p += CHARS_PER_LITTLENUM;
-					nbytes -= CHARS_PER_LITTLENUM;
-				}
+			nums = generic_bignum;
+			while (size >= CHARS_PER_LITTLENUM) {
+				md_number_to_chars(p,(valueT) * nums,CHARS_PER_LITTLENUM);
+				++nums;
+				size -= CHARS_PER_LITTLENUM;
+				p += CHARS_PER_LITTLENUM;
+				nbytes -= CHARS_PER_LITTLENUM;
+			}
 
-				while (nbytes >= CHARS_PER_LITTLENUM) {
-					md_number_to_chars(p,extra_digit,CHARS_PER_LITTLENUM);
-					nbytes -= CHARS_PER_LITTLENUM;
-					p += CHARS_PER_LITTLENUM;
-				}
+			while (nbytes >= CHARS_PER_LITTLENUM) {
+				md_number_to_chars(p,extra_digit,CHARS_PER_LITTLENUM);
+				nbytes -= CHARS_PER_LITTLENUM;
+				p += CHARS_PER_LITTLENUM;
 			}
 		} else
 			emit_expr_fix(exp,nbytes,frag_now,p,BFD_RELOC_NONE);
@@ -11593,13 +11521,11 @@ static void	emit_expr_fix(expressionS * exp,unsigned int nbytes,fragS * frag,cha
 	memset(p,0,size);
 
 	/* Generate a fixS to record the symbol value.  */
-
 	if (r != BFD_RELOC_NONE) {
 		reloc_howto_type *reloc_howto;
 
 		reloc_howto = riscv_reloc_type_lookup(stdoutput,r);
 		size = reloc_howto->size;
-
 		if (size > nbytes) {
 			as_bad("%s relocations do not fit in %u byte(s)",reloc_howto->name,nbytes);
 			return;
@@ -11697,6 +11623,7 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 	char           *p;
 	int		length;	/* Number of chars in an object.  */
 	char		temp      [MAXIMUM_NUMBER_OF_CHARS_FOR_FLOAT];
+	int		count;
 
 	if (is_it_end_of_statement()) {
 		demand_empty_rest_of_line();
@@ -11717,30 +11644,23 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 
 	do {
 		length = parse_one_float(float_type,temp);
-		if (length < 0)
-			return;
+		if (length < 0) return;
+		count = 1;
+		if (*input_line_pointer == ':') {
+			expressionS	count_exp;
 
-		{
-			int		count;
+			++input_line_pointer;
+			expression(&count_exp);
 
-			count = 1;
-
-			if (*input_line_pointer == ':') {
-				expressionS	count_exp;
-
-				++input_line_pointer;
-				expression(&count_exp);
-
-				if (count_exp.X_op != O_constant
-				    || count_exp.X_add_number <= 0)
-					as_warn(("unresolvable or nonpositive repeat count; using 1"));
-				else
-					count = count_exp.X_add_number;
-			}
-			while (--count >= 0) {
-				p = frag_more(length);
-				memcpy(p,temp,(unsigned int)length);
-			}
+			if (count_exp.X_op != O_constant
+			    || count_exp.X_add_number <= 0)
+				as_warn("unresolvable or nonpositive repeat count; using 1");
+			else
+				count = count_exp.X_add_number;
+		}
+		while (--count >= 0) {
+			p = frag_more(length);
+			memcpy(p,temp,(unsigned int)length);
 		}
 		SKIP_WHITESPACE();
 	} while (*input_line_pointer++ == ',');
@@ -11751,7 +11671,6 @@ static void	float_cons(	/* Clobbers input_line-pointer,checks
 }
 
 /* LEB128 Encoding.
- * 
  * Note - we are using the DWARF standard's definition of LEB128 encoding where
  * each 7-bit value is a stored in a byte,*not* an octet.  This means that on
  * targets where a byte contains multiple octets there is a *huge waste of
@@ -11771,12 +11690,10 @@ static unsigned int sizeof_sleb128(offsetT value)
 
 	do {
 		byte = (value & 0x7f);
-		/*
-		 * Sadly,we cannot rely on typical arithmetic right shift
+		/* Sadly,we cannot rely on typical arithmetic right shift
 		 * behaviour. Fortunately,we can structure things so that the
 		 * extra work reduces to a noop on systems that do things
-		 * "properly".
-		 */
+		 * "properly".  */
 		value = (value >> 7)|~(-(offsetT) 1 >> 7);
 		size += 1;
 	}
@@ -12827,13 +12744,10 @@ static unsigned int get_stab_string_offset(const char *string,
 	return retval;
 }
 
-/*
- * This can handle different kinds of stabs (s,n,d) and different kinds of stab
+/* This can handle different kinds of stabs (s,n,d) and different kinds of stab
  * sections.  If STAB_SECNAME_OBSTACK_END is non-NULL,then STAB_SECNAME and
  * STABSTR_SECNAME will be freed if possible before this function returns (the
- * former by obstack_free).
- */
-
+ * former by obstack_free).  */
 static void	s_stab_generic(int what,
 			   		const		char  *stab_secname,
 			   		const		char  *stabstr_secname,
@@ -12846,14 +12760,11 @@ static void	s_stab_generic(int what,
 	int		other;
 	int		desc;
 
-	/*
-	 * The general format is: .stabs "STRING",TYPE,OTHER,DESC,VALUE .stabn
+	/* The general format is: .stabs "STRING",TYPE,OTHER,DESC,VALUE .stabn
 	 * TYPE,OTHER,DESC,VALUE .stabd TYPE,OTHER,DESC At this point
 	 * input_line_pointer points after the pseudo-op and any trailing
 	 * whitespace.  The argument what is one of 's','n' or 'd' indicating
-	 * which type of .stab this is.
-	 */
-
+	 * which type of .stab this is.  */
 	if (what != 's') {
 		string = "";
 		saved_string_obstack_end = 0;
@@ -12869,8 +12780,7 @@ static void	s_stab_generic(int what,
 		/*
 		 * FIXME: We should probably find some other temporary storage
 		 * for string,rather than leaking memory if someone else
-		 * happens to use the notes obstack.
-		 */
+		 * happens to use the notes obstack.  */
 		saved_string_obstack_end = obstack_next_free(&notes);
 		SKIP_WHITESPACE();
 		if (*input_line_pointer == ',')
@@ -12899,11 +12809,9 @@ static void	s_stab_generic(int what,
 	desc = get_absolute_expression();
 
 	if ((desc > 0xffff) || (desc < -0x8000))
-		/*
-		 * This could happen for example with a source file with a huge
+		/* This could happen for example with a source file with a huge
 		 * number of lines.  The only cure is to use a different debug
-		 * format,probably DWARF.
-		 */
+		 * format,probably DWARF.  */
 		as_warn((".stab%c: description field '%x' too big,try a different debug format"),
 			what,desc);
 
@@ -12916,17 +12824,11 @@ static void	s_stab_generic(int what,
 		input_line_pointer++;
 		SKIP_WHITESPACE();
 	}
-	/*
-	 * We have now gathered the type,other,and desc information.  For
-	 * .stabs or .stabn,input_line_pointer is now pointing at the value.
-	 */
-
-	if (SEPARATE_STAB_SECTIONS)
-		/*
-		 * Output the stab information in a separate section.  This is
-		 * used at least for COFF and ELF.
-		 */
-	{
+	/* We have now gathered the type,other,and desc information.  For
+	 * .stabs or .stabn,input_line_pointer is now pointing at the value.  */
+	if (SEPARATE_STAB_SECTIONS) {
+		/* Output the stab information in a separate section.  This is
+		 * used at least for COFF and ELF.  */
 		segT		saved_seg = now_seg;
 		subsegT		saved_subseg = now_subseg;
 		fragS          *saved_frag = frag_now;
@@ -12959,19 +12861,15 @@ static void	s_stab_generic(int what,
 		if (saved_string_obstack_end != NULL
 		    && saved_string_obstack_end == obstack_next_free(&notes))
 			obstack_free(&notes,string);
-		/*
-		 * Similarly for the section name.  This must be done before
-		 * creating symbols below,which uses the notes obstack.
-		 */
+		/* Similarly for the section name.  This must be done before
+		 * creating symbols below,which uses the notes obstack.  */
 		if (seg->name != stab_secname
 		    && stab_secname_obstack_end != NULL
 		    && stab_secname_obstack_end == obstack_next_free(&notes))
 			obstack_free(&notes,stab_secname);
 
-		/*
-		 * At least for now,stabs in a special stab section are always
-		 * output as 12 byte blocks of information.
-		 */
+		/* At least for now,stabs in a special stab section are always
+		 * output as 12 byte blocks of information.  */
 		p = frag_more(8);
 		md_number_to_chars(p,(valueT) stroff,4);
 		md_number_to_chars(p + 4,(valueT) type,1);
@@ -12986,10 +12884,7 @@ static void	s_stab_generic(int what,
 			symbolS        *symbol;
 			expressionS	exp;
 
-			/*
-			 * Arrange for a value representing the current
-			 * location.
-			 */
+			/* Arrange for a value representing the current location. */
 			symbol = symbol_temp_new(saved_seg,saved_frag,dot);
 
 			exp.X_op = O_symbol;
@@ -13043,10 +12938,8 @@ static void	s_xstab(int what)
 		return;
 	}
 
-	/*
-	 * To get the name of the stab string section,simply add "str" to the
-	 * stab section name.
-	 */
+	/* To get the name of the stab string section,simply add "str" to the
+	 * stab section name. */
 	stabstr_secname = concat(stab_secname,"str",(char *)NULL);
 	s_stab_generic(what,stab_secname,stabstr_secname,
 		       stab_secname_obstack_end);
@@ -13086,20 +12979,16 @@ static void	generate_asm_file(int type,const char *file)
 	    && filename_cmp(last_asm_file,file) == 0)
 		return;
 
-	/*
-	 * Rather than try to do this in some efficient fashion,we just
+	/* Rather than try to do this in some efficient fashion,we just
 	 * generate a string and then parse it again.  That lets us use the
 	 * existing stabs hook,which expect to see a string,rather than
-	 * inventing new ones.
-	 */
+	 * inventing new ones. */
 	sprintf(sym,"%sF%d",FAKE_LABEL_NAME,file_label_count);
 	++file_label_count;
 
-	/*
-	 * Allocate enough space for the file name (possibly extended with
+	/* Allocate enough space for the file name (possibly extended with
 	 * doubled up backslashes),the symbol name,and the other characters
-	 * that make up a stabs file directive.
-	 */
+	 * that make up a stabs file directive.  */
 	bufp = buf = XCNEWVEC(char,2 * strlen(file) + strlen(sym) + 12);
 
 	*bufp++ = '"';
@@ -13108,12 +12997,10 @@ static void	generate_asm_file(int type,const char *file)
 		const char     *bslash = strchr(tmp,'\\');
 		size_t		len = bslash != NULL ? bslash - tmp + 1 : file_endp - tmp;
 
-		/*
-		 * Double all backslashes,since demand_copy_C_string (used by
+		/* Double all backslashes,since demand_copy_C_string (used by
 		 * s_stab to extract the part in quotes) will try to replace
 		 * them as escape sequences.  backslash may appear in a
-		 * filespec.
-		 */
+		 * filespec.  */
 		memcpy(bufp,tmp,len);
 
 		tmp += len;
@@ -13137,10 +13024,8 @@ static void	generate_asm_file(int type,const char *file)
 	free(buf);
 }
 
-/*
- * Generate stabs debugging information for the current line.  This is used to
- * produce debugging information for an assembler file.
- */
+/* Generate stabs debugging information for the current line.  This is used to
+ * produce debugging information for an assembler file. */
 static void	stabs_generate_asm_lineno(void)
 {
 	const char     *file;
@@ -13148,13 +13033,10 @@ static void	stabs_generate_asm_lineno(void)
 	char           *buf;
 	char		sym       [30];
 
-	/*
-	 * Rather than try to do this in some efficient fashion,we just
+	/* Rather than try to do this in some efficient fashion,we just
 	 * generate a string and then parse it again.  That lets us use the
 	 * existing stabs hook,which expect to see a string,rather than
-	 * inventing new ones.
-	 */
-
+	 * inventing new ones.  */
 	file = as_where(&lineno);
 
 	/* Don't emit sequences of stabs for the same line.  */
@@ -13171,10 +13053,8 @@ static void	stabs_generate_asm_lineno(void)
 
 	prev_lineno = lineno;
 
-	/*
-	 * Let the world know that we are in the middle of generating a piece
-	 * of stabs line debugging information.
-	 */
+	/* Let the world know that we are in the middle of generating a piece
+	 * of stabs line debugging information. */
 	outputting_stabs_line_debug = 1;
 
 	generate_asm_file(N_SOL,file);
@@ -13201,10 +13081,8 @@ static void	stabs_generate_asm_lineno(void)
 	free(buf);
 }
 
-/*
- * Emit a function stab. All assembler functions are assumed to have return
- * type `void'.
- */
+/* Emit a function stab. All assembler functions are assumed to have return
+ * type `void'. */
 static void	stabs_generate_asm_func(const char *funcname,const char *startlabname)
 {
 	char           *buf;
@@ -13231,7 +13109,6 @@ static void	stabs_generate_asm_func(const char *funcname,const char *startlabnam
 }
 
 /* Emit a stab to record the end of a function.  */
-
 static void	stabs_generate_asm_endfunc(const char *funcname ATTRIBUTE_UNUSED,
 				 		const		char  *startlabname)
 {
@@ -13550,8 +13427,7 @@ static void    *symbol_entry_find(htab_t table,const char *name)
 
 
 /* Below are commented in "asm.h".  */
-static symbolS *symbol_rootP;
-static symbolS *symbol_lastP;
+static symbolS *symbol_lastP; // last symbol done or NULL
 static symbolS	abs_symbol;
 struct xsymbol	abs_symbol_x;
 static symbolS	dot_symbol;
@@ -17796,6 +17672,7 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 	relax_addressT	address;
 	int		region;
 	int		ret;
+	addressT	oldoff,newoff;
 
 	/* In case md_estimate_size_before_relax() wants to make fixSs.  */
 	subseg_change(segment,0);
@@ -17948,61 +17825,57 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 				case rs_align:
 				case rs_align_code:
 				case rs_align_test:
-					{
-						addressT	oldoff,newoff;
+					oldoff = relax_align(was_address + fragP->fr_fix,
+							 (int)offset);
+					newoff = relax_align(address + fragP->fr_fix,
+							 (int)offset);
 
-						oldoff = relax_align(was_address + fragP->fr_fix,
-								 (int)offset);
-						newoff = relax_align(address + fragP->fr_fix,
-								 (int)offset);
+					if (fragP->fr_subtype != 0) {
+						if (oldoff > fragP->fr_subtype)
+							oldoff = 0;
+						if (newoff > fragP->fr_subtype)
+							newoff = 0;
+					}
+					growth = newoff - oldoff;
 
-						if (fragP->fr_subtype != 0) {
-							if (oldoff > fragP->fr_subtype)
-								oldoff = 0;
-							if (newoff > fragP->fr_subtype)
-								newoff = 0;
+					/* If this align happens to follow a leb128 and we have
+					 * determined that the leb128 is bouncing in size,then
+					 * break the cycle by inserting an extra alignment.  */
+					if (growth < 0
+					&& (rs_leb128_fudge & 16) != 0
+					    && (rs_leb128_fudge & 15) >= 2) {
+						segment_info_type *seginfo = seg_info(segment);
+						struct obstack *ob = &seginfo->frchainP->frch_obstack;
+						struct frag    *newf;
+
+						newf = frag_alloc(ob);
+						obstack_blank_fast(ob,fragP->fr_var);
+						obstack_finish(ob);
+						memcpy(newf,fragP,SIZEOF_STRUCT_FRAG);
+						memcpy(newf->fr_literal,
+						       fragP->fr_literal + fragP->fr_fix,
+						       fragP->fr_var);
+						newf->fr_type = rs_fill;
+						newf->fr_address = address + fragP->fr_fix + newoff;
+						newf->fr_fix = 0;
+						newf->fr_offset = (((offsetT) 1 << fragP->fr_offset)
+						     / fragP->fr_var);
+						if (newf->fr_offset * newf->fr_var
+						    != (offsetT) 1 << fragP->fr_offset) {
+							newf->fr_offset = (offsetT) 1 << fragP->fr_offset;
+							newf->fr_var = 1;
 						}
-						growth = newoff - oldoff;
-
-						/* If this align happens to follow a leb128 and we have
-						 * determined that the leb128 is bouncing in size,then
-						 * break the cycle by inserting an extra alignment.  */
-						if (growth < 0
-						&& (rs_leb128_fudge & 16) != 0
-						    && (rs_leb128_fudge & 15) >= 2) {
-							segment_info_type *seginfo = seg_info(segment);
-							struct obstack *ob = &seginfo->frchainP->frch_obstack;
-							struct frag    *newf;
-
-							newf = frag_alloc(ob);
-							obstack_blank_fast(ob,fragP->fr_var);
-							obstack_finish(ob);
-							memcpy(newf,fragP,SIZEOF_STRUCT_FRAG);
-							memcpy(newf->fr_literal,
-							       fragP->fr_literal + fragP->fr_fix,
-							       fragP->fr_var);
-							newf->fr_type = rs_fill;
-							newf->fr_address = address + fragP->fr_fix + newoff;
-							newf->fr_fix = 0;
-							newf->fr_offset = (((offsetT) 1 << fragP->fr_offset)
-							     / fragP->fr_var);
-							if (newf->fr_offset * newf->fr_var
-							    != (offsetT) 1 << fragP->fr_offset) {
-								newf->fr_offset = (offsetT) 1 << fragP->fr_offset;
-								newf->fr_var = 1;
-							}
-							/* Include size of new frag in GROWTH.  */
-							growth += newf->fr_offset * newf->fr_var;
-							/*
-							 * Adjust the new frag address for the amount we'll add
-							 * when we process the * new frag.  */
-							newf->fr_address -= stretch + growth;
-							newf->relax_marker ^= 1;
-							fragP->fr_next = newf;
+						/* Include size of new frag in GROWTH.  */
+						growth += newf->fr_offset * newf->fr_var;
+						/*
+						 * Adjust the new frag address for the amount we'll add
+						 * when we process the * new frag.  */
+						newf->fr_address -= stretch + growth;
+						newf->relax_marker ^= 1;
+						fragP->fr_next = newf;
 #ifdef DEBUG
-							as_warn("padding added");
+						as_warn("padding added");
 #endif
-						}
 					}
 					break;
 
@@ -18012,9 +17885,9 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 						addressT	after;
 
 						if (symbolP) {
-							/* Convert from an actual address to an  offset into the section. Here
-							 * it is assumed that the section's VMA is zero,and can omit subtracting 
-							 * it from the symbol's value to get the address offset. */
+						/* Convert from an actual address to an  offset into the section. Here
+						 * it is assumed that the section's VMA is zero,and can omit subtracting 
+						 * it from the symbol's value to get the address offset. */
 							know(S_GET_SEGMENT(symbolP)->vma == 0);
 							target += S_GET_VALUE(symbolP) * OCTETS_PER_BYTE;
 						}
@@ -18066,17 +17939,16 @@ static int	relax_segment(struct frag *segment_frag_root,segT segment,int pass)
 								     ".space,.nops or .fill specifies non-absolute value");
 							/* Prevent repeat of this error message. */
 							fragP->fr_symbol = 0;
-						} else
-							if (amount < 0) {
-								/* Don't error on first few frag relax passes. See rs_org
-								 * comment for a longer explanation.  */
-								if (pass < 2) {
-									ret = 1;
-									break;
-								}
-								as_warn_where(fragP->fr_file,fragP->fr_line,
-									      ".space,.nops or .fill with negative value,ignored");
-								fragP->fr_symbol = 0;
+						} else if (amount < 0) {
+							/* Don't error on first few frag relax passes. See rs_org
+							 * comment for a longer explanation.  */
+							if (pass < 2) {
+								ret = 1;
+								break;
+							}
+							as_warn_where(fragP->fr_file,fragP->fr_line,
+								      ".space,.nops or .fill with negative value,ignored");
+							fragP->fr_symbol = 0;
 							} else {
 								gas_assert(fragP->fr_next); // NULL check. jacob
 								growth = (was_address + fragP->fr_fix + amount
@@ -22760,8 +22632,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				*imm_reloc = BFD_RELOC_RISCV_LO12_I;
 				goto load_store;
 			case '1':
-				/* This is used for TLS,where the fourth operand is %tprel_add,to get a relocation
-				 * applied to an add instruction,for
+				/* This is used for TLS,where the fourth operand is %tprel_add,
+ 				 * to get a relocation applied to an add instruction,for
 				 * relaxation to use.  */
 				p = percent_op_rtype;
 				goto alu_op;
@@ -22770,8 +22642,8 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 				if (riscv_handle_implicit_zero_offset(imm_expr,asarg))
 					continue;
 		alu_op:
-				/* If this value won't fit into a 16 bit offset,then go find a macro that will
-				 * generate the 32 bit offset code pattern. */
+				/* If this value won't fit into a 16 bit offset,then go find 
+				 * a macro that will generate the 32 bit offset code pattern. */
 				if (!my_getSmallExpression(imm_expr,imm_reloc,asarg,p)) {
 					normalize_constant_expr(imm_expr);
 					if (imm_expr->X_op != O_constant
@@ -23004,11 +22876,11 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 						check_absolute_expr(ip,imm_expr,false);
 						if (!sign) {
 							if (!VALIDATE_U_IMM(imm_expr->X_add_number,n))
-								as_bad(("improper immediate value (%" PRIu64 ")"),
+								as_bad("improper immediate value (%" PRIu64 ")",
 								       imm_expr->X_add_number);
 						} else {
 							if (!VALIDATE_S_IMM(imm_expr->X_add_number,n))
-								as_bad(("improper immediate value (%" PRIi64 ")"),
+								as_bad("improper immediate value (%" PRIi64 ")",
 								       imm_expr->X_add_number);
 						}
 						INSERT_IMM(n,s,*ip,imm_expr->X_add_number);
@@ -23023,8 +22895,7 @@ static struct riscv_ip_error riscv_ip(char *str,struct riscv_cl_insn *ip,express
 
 			default:
 		unknown_riscv_ip_operand:
-				as_fatal(("internal: unknown argument type `%s'"),
-					 opargStart);
+				as_fatal("internal: unknown argument type `%s'",opargStart);
 			}
 			break;
 		}
@@ -23313,11 +23184,11 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 		relaxable = true;
 		break;
 
-	case BFD_RELOC_RISCV_GOT_HI20: case BFD_RELOC_RISCV_ADD8:
-	case BFD_RELOC_RISCV_ADD16: case BFD_RELOC_RISCV_ADD32:
-	case BFD_RELOC_RISCV_ADD64: case BFD_RELOC_RISCV_SUB6:
-	case BFD_RELOC_RISCV_SUB8: case BFD_RELOC_RISCV_SUB16:
-	case BFD_RELOC_RISCV_SUB32: case BFD_RELOC_RISCV_SUB64:
+	case BFD_RELOC_RISCV_GOT_HI20:	case BFD_RELOC_RISCV_ADD8:
+	case BFD_RELOC_RISCV_ADD16:		case BFD_RELOC_RISCV_ADD32:
+	case BFD_RELOC_RISCV_ADD64:		case BFD_RELOC_RISCV_SUB6:
+	case BFD_RELOC_RISCV_SUB8:		case BFD_RELOC_RISCV_SUB16:
+	case BFD_RELOC_RISCV_SUB32:		case BFD_RELOC_RISCV_SUB64:
 	case BFD_RELOC_RISCV_RELAX:
 		/* cvt_frag_to_fill () has called output_leb128 ().  */
 	case BFD_RELOC_RISCV_SET_ULEB128: case BFD_RELOC_RISCV_SUB_ULEB128:
@@ -23387,7 +23258,8 @@ static void	md_apply_fix(fixS * fixP,valueT * valP,segT seg ATTRIBUTE_UNUSED)
 
 			case BFD_RELOC_RISCV_CFA:
 				/* Load the byte to get the subtype.  */
-				subtype = bfd_get_8(NULL,&((fragS *) (fixP->fx_frag->fr_opcode))->fr_literal[fixP->fx_where]);
+				subtype = bfd_get_8(NULL,
+				&((fragS *)(fixP->fx_frag->fr_opcode))->fr_literal[fixP->fx_where]);
 				loc = fixP->fx_frag->fr_fix - (subtype & 7);
 				switch (subtype) {
 				case DW_CFA_advance_loc1:
@@ -23899,17 +23771,13 @@ static void	md_convert_frag_branch(fragS * fragp)
 			rs1 = 8 + ((insn >> OP_SH_CRS1S) & OP_MASK_CRS1S);
 			if ((insn & MASK_C_J) == MATCH_C_J)
 				insn = MATCH_JAL;
-			else
-				if ((insn & MASK_C_JAL) == MATCH_C_JAL)
-					insn = MATCH_JAL|(X_RA << OP_SH_RD);
-				else
-					if ((insn & MASK_C_BEQZ) == MATCH_C_BEQZ)
-						insn = MATCH_BEQ|(rs1 << OP_SH_RS1);
-					else
-						if ((insn & MASK_C_BNEZ) == MATCH_C_BNEZ)
-							insn = MATCH_BNE|(rs1 << OP_SH_RS1);
-						else
-							abort();
+			else if ((insn & MASK_C_JAL) == MATCH_C_JAL)
+				insn = MATCH_JAL|(X_RA << OP_SH_RD);
+			else if ((insn & MASK_C_BEQZ) == MATCH_C_BEQZ)
+				insn = MATCH_BEQ|(rs1 << OP_SH_RS1);
+			else if ((insn & MASK_C_BNEZ) == MATCH_C_BNEZ)
+				insn = MATCH_BNE|(rs1 << OP_SH_RS1);
+			else abort();
 			bfd_putl32(insn,buf);
 			break;
 
@@ -24131,7 +23999,7 @@ static void	riscv_write_out_attrs(void)
 			if (ISDIGIT(*p))
 				number = (number * 10) + (*p - '0');
 			else {
-				as_bad(("internal: bad RISC-V privileged spec (%s)"),priv_str);
+				as_bad("internal: bad RISC-V privileged spec (%s)",priv_str);
 				return;
 			}
 	}
@@ -24205,10 +24073,8 @@ static void	riscv_adjust_symtab(void)
 	elf_adjust_symtab();
 }
 
-/*
- * Given a symbolic attribute NAME,return the proper integer value. Returns -1
- * if the attribute is not known.
- */
+/* Given a symbolic attribute NAME,return the proper integer value. Returns -1
+ * if the attribute is not known.  */
 static int	riscv_convert_symbolic_attribute(const char *name)
 {
 	static const struct {
@@ -24240,12 +24106,6 @@ static int	riscv_convert_symbolic_attribute(const char *name)
 			return attribute_table[i].tag;
 
 	return -1;
-}
-
-/* Parse a .attribute directive.  */
-static void	s_riscv_attribute(int ignored ATTRIBUTE_UNUSED)
-{
-	//as_fatal("could not set architecture and machine");
 }
 
 /* Mark symbol that it follows a variant CC convention.  */

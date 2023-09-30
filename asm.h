@@ -634,27 +634,15 @@ typedef struct bfd_section {
   /* Mark flag used by some linker backends for garbage collection.  */
   unsigned int gc_mark : 1;
 
-  /* Section compression status.  */
+  /* Section compression status. Not used in tiny-asm */
   unsigned int compress_status : 2;
-#define COMPRESS_SECTION_NONE    0
-#define COMPRESS_SECTION_DONE    1
-#define DECOMPRESS_SECTION_ZLIB  2
-#define DECOMPRESS_SECTION_ZSTD  3
 
   /* The following flags are used by the ELF linker. */
   /* Mark sections which have been allocated to segments.  */
   unsigned int segment_mark : 1;
 
-  /* Type of sec_info information.  */
+  /* Type of sec_info information.  Not used in tiny-asm */
   unsigned int sec_info_type:3;
-#define SEC_INFO_TYPE_NONE      0
-#define SEC_INFO_TYPE_STABS     1
-#define SEC_INFO_TYPE_MERGE     2
-#define SEC_INFO_TYPE_EH_FRAME  3
-#define SEC_INFO_TYPE_JUST_SYMS 4
-#define SEC_INFO_TYPE_TARGET    5
-#define SEC_INFO_TYPE_EH_FRAME_ENTRY 6
-#define SEC_INFO_TYPE_SFRAME  7
 
   /* Nonzero if this section uses RELA relocations, rather than REL.  */
   unsigned int use_rela_p:1;
@@ -1081,14 +1069,6 @@ static inline bool bfd_is_const_section (const asection *sec)
 				       / sizeof (_bfd_std_section[0])));
 }
 
-/* Return TRUE if input section SEC has been discarded.  */
-static inline bool discarded_section (const asection *sec)
-{
-  return (!bfd_is_abs_section (sec)
-	  && bfd_is_abs_section (sec->output_section)
-	  && sec->sec_info_type != SEC_INFO_TYPE_MERGE
-	  && sec->sec_info_type != SEC_INFO_TYPE_JUST_SYMS);
-}
 /* We use a macro to initialize the static asymbol structures because
    traditional C does not permit us to initialize a union member while
    gcc warns if we don't initialize it.
@@ -6723,9 +6703,6 @@ static void s_weakref (int);
 static void temp_ilp (char *);
 static void restore_ilp (void);
 /* symbols.h - */
-
-static symbolS *symbol_rootP;	/* all the symbol nodes */
-static symbolS *symbol_lastP;	/* last struct symbol we made, or NULL */
 
 static int symbol_table_frozen;
 
